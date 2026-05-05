@@ -118,6 +118,11 @@ const NAV = [
   { id: 'ralph', icon: '🦞', label: 'Ralph Loop', group: 'build',
     desc: 'Geoffrey Huntley Ralph Wiggum 패턴 — 같은 PROMPT.md를 4중 안전장치 안에서 반복. 프로젝트 추천기 + 라이브 SSE + CLI.',
     docUrl: null },
+  // QQ222 — lazyclaw 모드 진입 시 보이는 대시보드. 데몬/프로바이더/세션
+  // /워크플로우/오케스트레이터를 한 화면에 모아서 보여주는 허브.
+  { id: 'lazyclawDashboard', icon: '🦞', label: 'LazyClaw 대시보드', group: 'build',
+    desc: 'LazyClaw 데몬·프로바이더·최근 채팅·워크플로우 실행을 한 눈에. 빠른 진입 타일 + 라이브 상태.',
+    docUrl: null },
   // OO1 (v2.66.64) — direct multi-provider chat, n8n-style "playground"
   // for any registered AI provider (Claude / OpenAI / Gemini / Ollama).
   { id: 'lazyclawChat', icon: '💬', label: 'AI 채팅', group: 'build',
@@ -550,6 +555,7 @@ const MODE_TABS = {
     'costsTimeline','zclaude','envConfig','settings',
   ]),
   lazyclaw: new Set([
+    'lazyclawDashboard',
     'orchestrator','ralph','agents','workflows','lazyclawChat','lazyclawTerm',
     'aiProviders','runCenter','sessionReplay',
     'settings',
@@ -588,7 +594,7 @@ const MODE_DEFAULT_TAB = {
   claude:     'overview',
   workflow:   'workflows',
   providers:  'aiProviders',
-  lazyclaw:   'orchestrator',
+  lazyclaw:   'lazyclawDashboard',
 };
 
 function _modeLastTab(m) {
@@ -8335,7 +8341,7 @@ async function _wfShowRunResult(run) {
   const hasErr = Object.values(results).some(r => r && r.status === 'err');
   if (hasErr) {
     try {
-      const pr = await api('/api/ai-providers/list');
+      const pr = await cachedApi('/api/ai-providers/list');
       availableProviders = (pr.providers || []).filter(p => p.available);
     } catch (e) { /* silent */ }
   }
@@ -18933,15 +18939,23 @@ window.showEditCustomProviderModal = async (cpId) => {
   showAddCustomProviderModal(cp);
 };
 
-// 기본 모델 저장 (Task 3)
+// Default-model save. The dedicated endpoint persists into config's
+// `defaultModels` map; the older `/api/ai-providers/save-key` ignored
+// `defaultModel` so the dropdown was a no-op. Invalidate the cached
+// /list response so the next render reflects the new default.
 window.saveDefaultModel = async (providerId, modelId) => {
   try {
-    const r = await api('/api/ai-providers/save-key', {
+    const r = await api('/api/ai-providers/default-model', {
       method: 'POST',
-      body: JSON.stringify({ providerId, defaultModel: modelId })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providerId, model: modelId })
     });
-    if (r.ok) toast(t('기본 모델 저장 완료'), 'ok');
-    else toast(errMsg(r), 'err');
+    if (r && r.ok) {
+      toast(t('기본 모델 저장 완료'), 'ok');
+      _apiCacheInvalidate('/api/ai-providers/list');
+    } else {
+      toast(errMsg(r), 'err');
+    }
   } catch (e) {
     toast(t('기본 모델 저장 실패') + ': ' + (e.message || e), 'err');
   }
@@ -20322,7 +20336,7 @@ VIEWS.orchestrator = async () => {
     api('/api/slack/config'),
     api('/api/telegram/config'),
     api('/api/orchestrator/history?limit=20'),
-    api('/api/ai-providers/list'),
+    cachedApi('/api/ai-providers/list'),
   ]);
   if (!cfgR.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
   const cfg = cfgR.config || {};
@@ -27529,8 +27543,194 @@ window._lcSessionDelete = function (sid) {
   } else _lcRenderSessions();
 };
 
+// QQ222 — LazyClaw mode dashboard. Aggregates daemon health, provider
+// state, recent chat sessions (lazyclawChat localStorage), workflow
+// stats, and orchestrator history. Quick-launch tiles to chat / term /
+// workflows / providers replace the old default-to-orchestrator behavior.
+VIEWS.lazyclawDashboard = async () => {
+  // Run independent fetches in parallel; failures degrade gracefully so
+  // the dashboard always paints (don't block on a slow provider probe).
+  const [provR, wfStatsR, wfListR, orchHistR, slkR, tgR] = await Promise.all([
+    cachedApi('/api/ai-providers/list').catch(() => ({ providers: [] })),
+    cachedApi('/api/workflows/stats').catch(() => ({})),
+    cachedApi('/api/workflows/list').catch(() => ({ workflows: [] })),
+    api('/api/orchestrator/history?limit=5').catch(() => ({ runs: [] })),
+    api('/api/slack/config').catch(() => ({ configured: false })),
+    api('/api/telegram/config').catch(() => ({ configured: false })),
+  ]);
+
+  const providers = (provR && provR.providers) || [];
+  const available = providers.filter(p => p.available);
+  const unavailable = providers.filter(p => !p.available);
+  const defaultModels = (provR && provR.defaultModels) || {};
+
+  const wfTotals = (wfStatsR && wfStatsR.totals) || {};
+  const totalRuns = wfTotals.runs || 0;
+  const successRate = (wfTotals.successRate ?? 0).toFixed(1);
+  const avgDur = ((wfTotals.avgDurationMs || 0) / 1000).toFixed(1);
+  const wfCount = ((wfListR && wfListR.workflows) || []).length;
+
+  // Pull recent chat sessions out of localStorage (the lazyclawChat side
+  // never persists to the server). Sorted newest-first by `_lcGetSessions`.
+  let recentSessions = [];
+  try { recentSessions = (typeof _lcGetSessions === 'function' ? _lcGetSessions() : []).slice(0, 6); }
+  catch (_) { recentSessions = []; }
+
+  const orchRuns = (orchHistR && orchHistR.runs) || [];
+
+  // Provider quick-card. Shows defaultModel when set, model count, and a
+  // chip indicating availability state.
+  const provCard = (p) => {
+    const dm = defaultModels[p.id] || p.defaultModel || '';
+    const dmChip = dm
+      ? `<span class="chip text-[9px]" style="background:rgba(217,119,87,0.18);border-color:rgba(217,119,87,0.4);">⭐ ${escapeHtml(dm)}</span>`
+      : '';
+    const avChip = p.available
+      ? '<span class="chip chip-ok text-[9px]">' + t('사용 가능') + '</span>'
+      : '<span class="chip chip-err text-[9px]">' + t('미설치/미설정') + '</span>';
+    return `<div class="card p-3 hover-lift" style="cursor:pointer;" onclick="_lzdJumpToProvider('${escapeHtml(p.id)}')">
+      <div class="flex items-center gap-2 mb-1">
+        <span style="font-size:1.1rem;">${p.icon || '🔌'}</span>
+        <span class="font-semibold text-xs truncate" style="flex:1;">${escapeHtml(p.name || p.id)}</span>
+        ${avChip}
+      </div>
+      <div class="text-[10px]" style="color:var(--text-dim);">${p.modelCount || 0} ${t('개 모델')}</div>
+      ${dmChip ? '<div class="mt-1">' + dmChip + '</div>' : ''}
+    </div>`;
+  };
+
+  const sessRow = (s) => {
+    const ts = s.ts ? new Date(s.ts).toLocaleString() : '';
+    return `<button class="card p-2 text-left w-full hover-lift" style="background:transparent;border:1px solid var(--border);cursor:pointer;display:block;" onclick="_lzdOpenChatSession('${escapeHtml(s.id)}')">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold text-xs truncate" style="flex:1;">${escapeHtml(s.label || t('새 대화'))}</span>
+        <span class="text-[9px]" style="color:var(--text-dim);">${escapeHtml(ts)}</span>
+      </div>
+      <div class="text-[10px] mt-1 truncate" style="color:var(--text-dim);">${escapeHtml((s.preview || '').slice(0, 80))}</div>
+    </button>`;
+  };
+
+  const orchRow = (r) => `<tr class="text-[11px]">
+    <td class="p-1 font-mono">${new Date(r.ts).toLocaleTimeString()}</td>
+    <td class="p-1">${escapeHtml(r.via || r.kind)}</td>
+    <td class="p-1 truncate" style="max-width:240px;">${escapeHtml((r.text || '').slice(0, 80))}</td>
+    <td class="p-1" style="color:${r.ok ? 'var(--ok)' : '#fca5a5'};">${r.ok ? '✓' : '✗'}</td>
+  </tr>`;
+
+  return `
+    ${viewHeader('🦞 LazyClaw 대시보드',
+      'LazyClaw 데몬·프로바이더·채팅·워크플로우 상태 한 눈에. 타일을 클릭해 빠른 진입.', 'lazyclawDashboard')}
+
+    <!-- Quick launch tiles -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <button class="card p-4 hover-lift" style="cursor:pointer;text-align:left;background:linear-gradient(135deg,rgba(217,119,87,0.15),rgba(217,119,87,0.04));border-color:rgba(217,119,87,0.3);" onclick="go('lazyclawChat')">
+        <div style="font-size:1.6rem;">💬</div>
+        <div class="font-semibold text-sm mt-2">${t('AI 채팅')}</div>
+        <div class="text-[10px]" style="color:var(--text-dim);">${t('하위 에이전트 호출 + 업무 지시')}</div>
+      </button>
+      <button class="card p-4 hover-lift" style="cursor:pointer;text-align:left;" onclick="go('lazyclawTerm')">
+        <div style="font-size:1.6rem;">⌨</div>
+        <div class="font-semibold text-sm mt-2">${t('터미널')}</div>
+        <div class="text-[10px]" style="color:var(--text-dim);">${t('whitelisted 명령으로 즉석 점검')}</div>
+      </button>
+      <button class="card p-4 hover-lift" style="cursor:pointer;text-align:left;" onclick="go('workflows')">
+        <div style="font-size:1.6rem;">🔀</div>
+        <div class="font-semibold text-sm mt-2">${t('워크플로우')}</div>
+        <div class="text-[10px]" style="color:var(--text-dim);">${wfCount} ${t('개 등록됨')}</div>
+      </button>
+      <button class="card p-4 hover-lift" style="cursor:pointer;text-align:left;" onclick="go('orchestrator')">
+        <div style="font-size:1.6rem;">🎼</div>
+        <div class="font-semibold text-sm mt-2">${t('Orchestrator')}</div>
+        <div class="text-[10px]" style="color:var(--text-dim);">Slack ${slkR.configured?'✓':'·'} · TG ${tgR.configured?'✓':'·'}</div>
+      </button>
+    </div>
+
+    <!-- Workflow + provider summary -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-sm">📊 ${t('워크플로우')}</h3>
+          <button class="btn text-xs" onclick="go('workflows')">${t('열기')} →</button>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="card p-2 text-center"><div class="text-base font-bold" style="color:var(--accent);">${totalRuns}</div><div class="text-[10px]" style="color:var(--text-dim);">${t('총 실행')}</div></div>
+          <div class="card p-2 text-center"><div class="text-base font-bold" style="color:var(--ok);">${successRate}%</div><div class="text-[10px]" style="color:var(--text-dim);">${t('성공률')}</div></div>
+          <div class="card p-2 text-center"><div class="text-base font-bold" style="color:var(--cyan);">${avgDur}s</div><div class="text-[10px]" style="color:var(--text-dim);">${t('평균')}</div></div>
+        </div>
+      </div>
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-sm">🔌 ${t('프로바이더')}</h3>
+          <button class="btn text-xs" onclick="go('aiProviders')">${t('관리')} →</button>
+        </div>
+        <div class="text-xs mb-2">
+          <span class="chip chip-ok">${available.length} ${t('사용 가능')}</span>
+          <span class="chip chip-err">${unavailable.length} ${t('미설정')}</span>
+        </div>
+        <div class="text-[10px]" style="color:var(--text-dim);">${t('기본 모델')} ${Object.keys(defaultModels).length} / ${available.length}</div>
+      </div>
+    </div>
+
+    <!-- Provider grid -->
+    ${available.length ? `
+    <div class="card p-4 mb-4">
+      <h3 class="font-semibold text-sm mb-3">⭐ ${t('가용 프로바이더')}</h3>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        ${available.map(provCard).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- Recent chats + orchestrator history -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-sm">💬 ${t('최근 대화')}</h3>
+          <button class="btn text-xs" onclick="go('lazyclawChat')">＋ ${t('새 대화')}</button>
+        </div>
+        ${recentSessions.length
+          ? '<div class="flex flex-col gap-2">' + recentSessions.map(sessRow).join('') + '</div>'
+          : '<div class="text-xs text-center py-4" style="color:var(--text-dim);">' + t('아직 대화 없음') + '</div>'}
+      </div>
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-sm">🎼 ${t('최근 디스패치')}</h3>
+          <button class="btn text-xs" onclick="go('orchestrator')">${t('전체')} →</button>
+        </div>
+        ${orchRuns.length
+          ? `<table class="w-full text-left">
+              <thead><tr class="text-[10px]" style="color:var(--text-dim)"><th class="p-1">${t('시각')}</th><th class="p-1">via</th><th class="p-1">${t('메시지')}</th><th class="p-1"></th></tr></thead>
+              <tbody>${orchRuns.map(orchRow).join('')}</tbody>
+            </table>`
+          : '<div class="text-xs text-center py-4" style="color:var(--text-dim);">' + t('아직 디스패치 기록 없음') + '</div>'}
+      </div>
+    </div>
+  `;
+};
+
+// Quick-jump from a provider card to lazyclawChat with that provider
+// pre-selected (preserves the QQ97 behaviour from the providers tab).
+window._lzdJumpToProvider = function (pid) {
+  const cached = state.data._aiProviders;
+  let assignee = pid;
+  try {
+    const ps = (cached && cached.providers) || [];
+    const p = ps.find(x => x.id === pid);
+    if (p && p.models && p.models.length) {
+      const dm = (cached && cached.defaultModels && cached.defaultModels[pid]) || p.defaultModel || p.models[0].id;
+      assignee = pid + ':' + dm;
+    }
+  } catch (_) {}
+  try { localStorage.setItem('cc.lazyclawChat.assignee', assignee); } catch (_) {}
+  go('lazyclawChat');
+};
+
+window._lzdOpenChatSession = function (sessionId) {
+  try { _lcSetCurrentId(sessionId); } catch (_) {}
+  go('lazyclawChat');
+};
+
 VIEWS.lazyclawChat = async () => {
-  const provs = await api('/api/ai-providers/list').catch(() => ({ providers: [] }));
+  const provs = await cachedApi('/api/ai-providers/list').catch(() => ({ providers: [] }));
   const available = (provs.providers || []).filter(p => p.available);
   const opts = available.flatMap(p => {
     const models = (p.models || []).slice(0, 8);
@@ -27747,7 +27947,8 @@ AFTER.lazyclawChat = () => {
                         'whoami', 'pin', 'unpin', 'branch', 'fork',
                         'temperature', 'temp', 'keys', 'providers',
                         'usage', 'workflows', 'wfs', 'run', 'cancel',
-                        'uptime', 'refresh', 'reload'];
+                        'uptime', 'refresh', 'reload',
+                        'delegate', 'd', 'parallel', 'fanout'];
           // Use a stored "seed partial" so repeated Tab cycles through
           // matches based on the original prefix, not the auto-completed one.
           const cur = window.__lcTabCycle;
@@ -28066,12 +28267,27 @@ function _lcChatRender(opts) {
     // (m.starred boolean) so it travels with export / search results.
     const starOn = !!m.starred;
     const starBtn = `<button onclick="_lcToggleStar('${id}',${i})" title="${t('즐겨찾기')}" style="background:none;border:0;cursor:pointer;padding:1px 5px;font-size:12px;opacity:${starOn?0.95:0.4};color:${starOn?'#fbbf24':'var(--text-dim)'};line-height:1;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=${starOn?0.95:0.4}">${starOn?'⭐':'☆'}</button>`;
-    return `<div style="background:${bg};border:${border};border-radius:10px;padding:11px 14px;align-self:${isUser?'flex-end':'flex-start'};max-width:88%;min-width:100px;${starOn?'box-shadow:0 0 0 2px rgba(251,191,36,0.18);':''}">
+    return `<div data-lc-msg-idx="${i}" style="background:${bg};border:${border};border-radius:10px;padding:11px 14px;align-self:${isUser?'flex-end':'flex-start'};max-width:88%;min-width:100px;${starOn?'box-shadow:0 0 0 2px rgba(251,191,36,0.18);':''}">
       <div style="display:flex;align-items:center;font-size:10px;color:var(--text-dim);">${label}${tokenHtml}<span style="flex:1;"></span>${starBtn}${editBtn}${forkBtn}${regenBtn}${copyBtn}${delBtn}</div>
-      ${_lcMsgBody(m)}${metaHtml}
+      <div class="lc-msg-body-host">${_lcMsgBody(m)}${metaHtml}</div>
     </div>`;
   }).join('');
   if (!opts || opts.keepScroll !== true || wasAtBottom) log.scrollTop = log.scrollHeight;
+}
+
+// Incremental streaming patch — updates only the body of the bubble whose
+// index matches `idx`. Avoids rebuilding all message DOM (and re-running
+// marked.parse) on every token. Falls back to a full render when the bubble
+// is missing (e.g. user switched sessions mid-stream).
+function _lcPatchStreamMsg(idx, m) {
+  const log = document.getElementById('lcChatLog');
+  if (!log) return;
+  const node = log.querySelector(`[data-lc-msg-idx="${idx}"] .lc-msg-body-host`);
+  if (!node) { _lcChatRender({ keepScroll: true }); return; }
+  const metaHtml = m.meta ? `<div style="font-size:10px;color:var(--text-dim);margin-top:4px;">${escapeHtml(m.meta)}</div>` : '';
+  node.innerHTML = _lcMsgBody(m) + metaHtml;
+  const wasAtBottom = log.scrollHeight - log.scrollTop <= log.clientHeight + 80;
+  if (wasAtBottom) log.scrollTop = log.scrollHeight;
 }
 
 window._lcDeleteMsg = function (sessionId, idx) {
@@ -29088,6 +29304,105 @@ async function _lcChatSlashCommand(line) {
       _lcChatRender();
       return true;
     }
+    case 'delegate':
+    case 'd': {
+      // QQ223 — delegate a one-shot task to a sub-agent (assignee).
+      // Usage: /delegate <provider:model> <task...>
+      // Renders the result inline without changing the active assignee.
+      const m = rest.match(/^(\S+)\s+([\s\S]+)$/);
+      if (!m) {
+        toast(t('사용법: /delegate <provider:model> <업무 지시>'), 'warn');
+        return true;
+      }
+      const subAssignee = m[1].trim();
+      const task = m[2].trim();
+      if (!task) { toast(t('업무 지시가 비어 있습니다'), 'warn'); return true; }
+      // Render a placeholder bubble so the user sees the dispatch immediately.
+      const id = _lcCurrentId();
+      const history = _lcGetHistory(id);
+      history.push({ role: 'user', text: `🛰 /delegate \`${subAssignee}\` — ${task}`, assignee: 'system', ts: Date.now() });
+      const placeholder = { role: 'assistant', text: '_…_', assignee: subAssignee, ts: Date.now(), pending: true };
+      history.push(placeholder);
+      _lcSaveHistory(id, history);
+      _lcChatRender();
+      (async () => {
+        try {
+          const r = await api('/api/lazyclaw/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignee: subAssignee, message: task, history: [] }),
+          });
+          placeholder.pending = false;
+          if (r && r.ok) {
+            placeholder.text = r.output || '';
+            placeholder.meta = [r.provider, r.model, ((r.durationMs || 0) / 1000).toFixed(1) + 's'].filter(Boolean).join(' · ');
+          } else {
+            placeholder.text = '⚠ ' + (errMsg(r) || t('알 수 없는 오류'));
+          }
+        } catch (e) {
+          placeholder.pending = false;
+          placeholder.text = '⚠ ' + (e.message || String(e));
+        }
+        _lcSaveHistory(id, history);
+        _lcChatRender({ keepScroll: true });
+      })();
+      return true;
+    }
+    case 'parallel':
+    case 'fanout': {
+      // QQ223 — fan-out same task to N sub-agents in parallel via the
+      // existing /api/ai-providers/compare endpoint. Renders a single
+      // assistant bubble with a section per assignee.
+      // Usage: /parallel <a1>,<a2>,... <task...>
+      const m = rest.match(/^(\S+)\s+([\s\S]+)$/);
+      if (!m) {
+        toast(t('사용법: /parallel <a1,a2,...> <업무 지시>'), 'warn');
+        return true;
+      }
+      const csv = m[1].trim();
+      const task = m[2].trim();
+      const targets = csv.split(',').map(s => s.trim()).filter(Boolean).map(s => {
+        const [pid, ...rest2] = s.split(':');
+        return { providerId: pid, model: rest2.join(':') || undefined };
+      });
+      if (!targets.length || !task) {
+        toast(t('어시니 목록과 업무 지시가 모두 필요합니다'), 'warn');
+        return true;
+      }
+      const id = _lcCurrentId();
+      const history = _lcGetHistory(id);
+      history.push({ role: 'user', text: `🛰 /parallel ${csv} — ${task}`, assignee: 'system', ts: Date.now() });
+      const placeholder = { role: 'assistant', text: '_' + t('병렬 호출 중…') + '_', assignee: 'parallel', ts: Date.now(), pending: true };
+      history.push(placeholder);
+      _lcSaveHistory(id, history);
+      _lcChatRender();
+      (async () => {
+        try {
+          const r = await api('/api/ai-providers/compare', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: task, providers: targets, timeout: 120 }),
+          });
+          placeholder.pending = false;
+          const results = (r && r.results) || [];
+          if (!results.length) {
+            placeholder.text = '⚠ ' + (errMsg(r) || t('결과 없음'));
+          } else {
+            placeholder.text = results.map(rr => {
+              const head = `### ${rr.providerId}${rr.model ? ' · ' + rr.model : ''}` +
+                (rr.status === 'ok' ? '' : ` — ⚠ ${rr.error || t('실패')}`);
+              return head + '\n\n' + (rr.output || '');
+            }).join('\n\n---\n\n');
+          }
+        } catch (e) {
+          placeholder.pending = false;
+          placeholder.text = '⚠ ' + (e.message || String(e));
+        }
+        _lcSaveHistory(id, history);
+        _lcChatRender({ keepScroll: true });
+      })();
+      return true;
+    }
     case 'help': {
       // QQ213 — section-grouped help + optional substring filter so a
       // 25-command flat wall is scannable. `/help workflow` or
@@ -29108,6 +29423,8 @@ async function _lcChatSlashCommand(line) {
           [`/model <provider:model>`,   t('어시니 전환 (예: claude:opus)')],
           [`/system [<텍스트>|clear]`,  t('시스템 프롬프트 보기/설정/초기화')],
           [`/agents [필터]`,            t('등록된 어시니 목록 (예: /agents claude)')],
+          [`/delegate <a> <업무>  (= /d)`,  t('하위 에이전트 호출 — 결과를 인라인 표시')],
+          [`/parallel <a1,a2> <업무>`,  t('여러 어시니에 병렬 호출 (= /fanout)')],
           [`/keys [필터]  (= /providers)`, t('프로바이더 가용성 + API 키 상태 (마스킹)')],
           [`/temperature [0-2]  (= /temp)`, t('어시니 temperature 읽기/설정')],
           [`/whoami`,                   t('Claude CLI 로그인 + 어시니 식별')],
@@ -29204,7 +29521,8 @@ async function _lcChatSlashCommand(line) {
                    'whoami','pin','unpin','branch','fork',
                    'temperature','temp','keys','providers',
                    'usage','workflows','wfs','run','cancel','uptime',
-                   'refresh','reload'];
+                   'refresh','reload',
+                   'delegate','d','parallel','fanout'];
     // QQ161 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     const hint = (() => {
       let best = null, bestScore = 99;
@@ -29373,9 +29691,11 @@ async function _lcChatSend() {
               if (reply.pending) { reply.text = ''; reply.pending = false; }
               reply.text += o.text;
               const now = performance.now();
-              if (now - lastRender > 30) {
-                _lcSaveHistory(sessionId, history);
-                _lcChatRender();
+              // Throttle to ~16 fps; patch only the streaming bubble's
+              // body. Full _lcChatRender() with marked.parse over the
+              // whole history was a major lag source.
+              if (now - lastRender > 60) {
+                _lcPatchStreamMsg(history.length - 1, reply);
                 lastRender = now;
               }
             }
@@ -29501,7 +29821,7 @@ window._lcChatRegenerate = async function (msgIdx) {
     return;
   }
   // Build provider:model picker modal.
-  const provs = await api('/api/ai-providers/list').catch(() => ({ providers: [] }));
+  const provs = await cachedApi('/api/ai-providers/list').catch(() => ({ providers: [] }));
   const available = (provs.providers || []).filter(p => p.available);
   const opts = available.flatMap(p => {
     const models = (p.models || []).slice(0, 6);
@@ -29958,6 +30278,7 @@ function _lcTermSuggest(prefix) {
     'lazyclaude whoami', 'lazyclaude keys', 'lazyclaude uptime',
     'lazyclaude refresh', 'lazyclaude reload',
     'lazyclaude usage', 'lazyclaude usage 7', 'lazyclaude usage 30',
+    'lazyclaude agents', 'lazyclaude sessions', 'lazyclaude skills', 'lazyclaude doctor',
     'lazyclaude workflows', 'lazyclaude workflows ',
     'lazyclaude run ', 'lazyclaude cancel', 'lazyclaude cancel ',
     'lz get', 'lz set', 'lz help', 'lz version', 'lz status',
@@ -30084,7 +30405,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime','refresh','reload'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -30102,7 +30423,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime','refresh','reload'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -30141,7 +30462,10 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
         ['lazyclaude whoami',                  'Claude CLI login (email/plan/org)'],
         ['lazyclaude keys',                    'list providers + api-key status (masked)'],
         ['lazyclaude status',                  'quick summary (version + theme + assignee)'],
-        ['lazyclaude diag',                    're-run CLI health check (claude/ollama/gemini/...)'],
+        ['lazyclaude diag  (= doctor)',        're-run CLI health check (claude/ollama/gemini/...)'],
+        ['lazyclaude agents [filter]',         'list registered Claude Code agents'],
+        ['lazyclaude sessions [filter]',       'list recent indexed Claude Code sessions'],
+        ['lazyclaude skills [filter]',         'list registered skills'],
       ]],
       ['Cost / Version', [
         ['lazyclaude usage [N]',               'cost summary across all sessions (default 7d)'],
@@ -30601,6 +30925,117 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     try { localStorage.removeItem('cc.lazyclawTerm.log'); } catch (_) {}
     log.length = 0;
     log.push({ kind: 'out', text: '✓ ' + t('터미널 로그 비움'), ts: Date.now() });
+    return;
+  }
+  if (verb === 'agents') {
+    // QQ224 — terminal parity with the lazyclaw CLI `agent list`. Lists
+    // user-level Claude Code agents from `/api/agents`. Optional filter
+    // matches against name/description.
+    try {
+      const r = await fetch('/api/agents', { cache: 'no-store' });
+      const j = await r.json();
+      const all = (j && j.agents) || [];
+      const q = (rest || '').trim().toLowerCase();
+      const matched = q ? all.filter(a =>
+        (a.name || '').toLowerCase().includes(q) ||
+        (a.description || '').toLowerCase().includes(q)
+      ) : all;
+      if (!all.length) {
+        log.push({ kind: 'out', text: '(no agents registered — see Agents tab)', ts: Date.now() });
+        return;
+      }
+      if (q && !matched.length) {
+        log.push({ kind: 'err', text: '⚠ no agent match: ' + rest, ts: Date.now() });
+        return;
+      }
+      const lines = matched.slice(0, 60).map(a => {
+        const desc = (a.description || '').replace(/\s+/g, ' ').slice(0, 60);
+        return `  ${(a.name || '?').padEnd(24)} ${desc}`;
+      });
+      const header = q
+        ? `# ${matched.length}/${all.length} agents · "${rest}"`
+        : `# ${all.length} agents`;
+      log.push({ kind: 'out', text: header + '\n' + lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'sessions') {
+    // QQ224 — terminal parity with the CLI `sessions list`. Reads the
+    // dashboard SQLite session index (no shell exec needed).
+    try {
+      const r = await fetch('/api/sessions/list?limit=20', { cache: 'no-store' });
+      const j = await r.json();
+      const all = (j && j.sessions) || [];
+      const q = (rest || '').trim().toLowerCase();
+      const matched = q ? all.filter(s =>
+        (s.id || '').toLowerCase().includes(q) ||
+        (s.project || '').toLowerCase().includes(q)
+      ) : all;
+      if (!all.length) {
+        log.push({ kind: 'out', text: '(no sessions indexed yet — open a project first)', ts: Date.now() });
+        return;
+      }
+      if (q && !matched.length) {
+        log.push({ kind: 'err', text: '⚠ no session match: ' + rest, ts: Date.now() });
+        return;
+      }
+      const lines = matched.slice(0, 20).map(s => {
+        const id = (s.id || '?').slice(0, 8);
+        const proj = (s.project || '').slice(0, 28);
+        const turns = s.turnCount != null ? s.turnCount : '?';
+        return `  ${id.padEnd(10)} ${proj.padEnd(30)} turns=${turns}`;
+      });
+      const header = q
+        ? `# ${matched.length}/${all.length} sessions · "${rest}"`
+        : `# ${matched.length} (limit 20) of ${all.length} sessions`;
+      log.push({ kind: 'out', text: header + '\n' + lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'skills') {
+    // QQ224 — terminal parity with the CLI `skills list`. Reads
+    // /api/skills (cached).
+    try {
+      const r = await fetch('/api/skills', { cache: 'no-store' });
+      const j = await r.json();
+      const all = (j && j.skills) || [];
+      const q = (rest || '').trim().toLowerCase();
+      const matched = q ? all.filter(s =>
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.description || '').toLowerCase().includes(q)
+      ) : all;
+      if (!all.length) {
+        log.push({ kind: 'out', text: '(no skills registered)', ts: Date.now() });
+        return;
+      }
+      if (q && !matched.length) {
+        log.push({ kind: 'err', text: '⚠ no skill match: ' + rest, ts: Date.now() });
+        return;
+      }
+      const lines = matched.slice(0, 60).map(s => {
+        const desc = (s.description || '').replace(/\s+/g, ' ').slice(0, 60);
+        return `  ${(s.name || '?').padEnd(24)} ${desc}`;
+      });
+      const header = q
+        ? `# ${matched.length}/${all.length} skills · "${rest}"`
+        : `# ${all.length} skills`;
+      log.push({ kind: 'out', text: header + '\n' + lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'doctor') {
+    // QQ224 — alias to existing `diag` to match the CLI verb name.
+    if (typeof _lcTermHealthCheck === 'function') {
+      _lcTermHealthCheck();
+      return;
+    }
+    log.push({ kind: 'err', text: '⚠ doctor handler unavailable', ts: Date.now() });
     return;
   }
   if (!prefs || !schema) {

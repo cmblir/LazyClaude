@@ -501,12 +501,25 @@ def api_providers_list() -> dict:
         else:
             masked_keys[pid] = ""
 
+    # Tag each provider with its persisted default model + flag the matching
+    # entry inside `models[]` so the picker dropdown can preselect without a
+    # second round-trip. The frontend checks `m.isDefault` (see app.js
+    # `defaultModelSelect`).
+    defaults = cfg.get("defaultModels", {}) or {}
+    for prov in providers:
+        dm = defaults.get(prov["id"])
+        prov["defaultModel"] = dm or ""
+        if dm and isinstance(prov.get("models"), list):
+            for m in prov["models"]:
+                if isinstance(m, dict) and m.get("id") == dm:
+                    m["isDefault"] = True
+
     return {
         "providers": providers,
         "apiKeys": masked_keys,
         "customProviders": cfg.get("customProviders", []),
         "fallbackChain": cfg.get("fallbackChain", []),
-        "defaultModels": cfg.get("defaultModels", {}),
+        "defaultModels": defaults,
     }
 
 

@@ -10,6 +10,74 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.67.0] — 2026-05-06  🦞 LazyClaw dashboard + provider/chat/term parity wave
+
+### Added
+- **`lazyclawDashboard` view** — new default tab when LazyClaw mode is
+  active. Aggregates daemon status, provider availability, default-model
+  state, recent chat sessions, workflow stats, and orchestrator history
+  in a single hub. Quick-launch tiles route to chat / terminal /
+  workflows / orchestrator without needing the sidebar.
+- **`/delegate <provider:model> <task>` chat slash** — fan-in a single
+  sub-agent dispatch from the active chat. Shows a placeholder bubble,
+  posts to `/api/lazyclaw/chat`, and renders the result inline without
+  changing the active assignee. Aliased to `/d`.
+- **`/parallel <a1,a2,...> <task>` chat slash** — fan-out the same
+  task to N sub-agents in parallel via `/api/ai-providers/compare`.
+  Renders one consolidated bubble with a section per assignee.
+  Aliased to `/fanout`.
+- **Terminal `lazyclaude agents|sessions|skills|doctor`** — bring four
+  more verbs to parity with the lazyclaw CLI:
+  - `agents [filter]` — list registered Claude Code agents (`/api/agents`)
+  - `sessions [filter]` — list recent indexed sessions
+  - `skills [filter]` — list registered skills
+  - `doctor` — alias to `diag` (CLI verb name)
+
+### Fixed
+- **Default-model dropdown was a no-op.** `saveDefaultModel` posted to
+  `/api/ai-providers/save-key` with a `defaultModel` body field, but
+  that handler only reads `apiKey` / `baseUrl` — `defaultModel` was
+  silently dropped. Now posts to the dedicated
+  `/api/ai-providers/default-model` endpoint and invalidates the cached
+  `/list` response so the UI re-renders with the new selection.
+- **Provider list now flags the default model.** `api_providers_list`
+  now stamps each provider with `defaultModel` and tags the matching
+  entry inside `models[]` with `isDefault: true`. The frontend's
+  preselect-on-render path was already coded against this contract;
+  it just never received the flag.
+
+### Performance
+- **Chat streaming no longer rebuilds the entire history per token.**
+  `_lcChatRender()` did a full `innerHTML = history.map(...).join('')`
+  every 30 ms during SSE — re-running `marked.parse()` over every
+  prior message. Replaced with `_lcPatchStreamMsg(idx, msg)` which
+  patches only the streaming bubble's body via a `data-lc-msg-idx`
+  attribute. Throttle bumped from 30 ms → 60 ms (~16 fps). Long
+  sessions (50+ messages) regain smoothness during streaming.
+- **Provider list call dedupe.** Four call sites that bypassed
+  `cachedApi('/api/ai-providers/list')` now go through the cache
+  (`lazyclawChat`, `lazyclawTerm`, `orchestrator`, run-error recovery
+  modal). The cache TTL was already configured (30 s) but those four
+  paths re-fetched on every render.
+
+### Files touched
+- `dist/app.js`: dashboard view + 2 slash cmds + 4 terminal verbs +
+  streaming patch + cachedApi swaps
+- `server/ai_keys.py`: stamp `defaultModel` / `isDefault` in /list
+- `server/nav_catalog.py`: register `lazyclawDashboard` tab metadata
+- `scripts/e2e-v3-67-verify.mjs`: targeted Playwright verification
+- `VERSION` 3.66.0 → 3.67.0
+
+### Verification
+- `e2e-tabs-smoke` — 67/67 tabs render without console errors
+- `e2e-chat-slash-smoke` — all slash verbs handled
+- `e2e-terminal-builtins-smoke` — alias paths intact
+- `e2e-v3-67-verify` (new) — dashboard renders, /delegate + /parallel
+  return true, terminal verbs stay client-side, default-model save
+  routes to the right endpoint and persists with the `isDefault` flag
+  set on the matching model entry.
+
+---
 ## [3.66.0] — 2026-05-06  🐛 toast copy button fix + JS-attr helper
 
 **User-reported bug: features failing with `b.textContent=", 1200"` errors.**

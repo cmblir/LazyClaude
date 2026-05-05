@@ -183,6 +183,11 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "sandbox iframe + CSP + 정적 필터 4중 보안으로 안전하게 미리보기.",
         ["artifacts", "아티팩트", "viewer", "뷰어", "preview", "미리보기",
          "render", "sandbox", "csp"]),
+    ("lazyclawDashboard", "work",
+        "🦞 LazyClaw 대시보드 — LazyClaw 모드의 허브. 데몬 상태·프로바이더·기본 모델·"
+        "최근 채팅 세션·워크플로우 실행 통계·오케스트레이터 디스패치 이력을 한 화면에 모음. "
+        "타일 클릭으로 채팅·터미널·워크플로우·프로바이더로 빠르게 이동.",
+        ["lazyclaw", "lazyclaw 대시보드", "dashboard", "허브", "hub", "오버뷰", "overview"]),
     ("orchestrator", "work",
         "오케스트레이터 — Slack/Telegram/Discord 채널에 멘션하면 Claude(플래너)가 작업을 분해해 "
         "여러 모델에 병렬 분배하고 결과를 합쳐 채널에 회신. "
