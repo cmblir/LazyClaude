@@ -10,6 +10,47 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.74.0] — 2026-05-06  ⚡ memory-tab content trim + mascot/ralph hidden-tab guards
+
+### Performance
+- **Walked all 67 tabs with PerformanceObserver longtask sampling.**
+  Two tabs were spending ≥ 100 ms on the initial paint:
+  - `memory`: 181 ms longest, 302 ms total
+  - `openPorts`: 124 ms longest, 217 ms total
+
+  After this cycle: **0 tabs with longest ≥ 100 ms · total scripting
+  672 ms → 450 ms (33% drop) across 67 tabs.**
+
+- **Memory tab — render-blob trim.** Each memory item rendered its full
+  content (up to 2000 chars) inside a `<pre>` clipped to 6 lines via
+  `line-clamp-6`. The visible 6 lines were ≤ 600 chars; the rest was
+  inflating the innerHTML blob the browser had to parse on every
+  render. Now the template trims to 800 chars + adds `…` when
+  truncated. With 32 items the per-render HTML drops from ~64 KB to
+  ~24 KB; the 181 ms longtask vanished from the sample.
+
+- **Mascot timers gain `document.hidden` guards.** `_mascotWanderStep`
+  (every 6–10 s) and `_showRandomBubble` (every 15 s) now early-return
+  when the tab is backgrounded. Saves CPU/GPU when the user has the
+  dashboard buried in another window. Matches the existing pattern on
+  the workflow + telemetry + auto-resume timers.
+- **Ralph poll timer** (3 s) gains the same `document.hidden` guard;
+  was the only remaining poller without one.
+
+### Files touched
+- `dist/app.js`: memory-tab content trim, ralph poller hidden guard,
+  mascot wander + bubble hidden guards
+- `scripts/perf-all-tabs.mjs`: new exhaustive 67-tab profiler used as
+  before/after evidence
+- `VERSION` 3.73.0 → 3.74.0
+
+### Verification
+- `perf-all-tabs` — 0 tabs ≥ 100 ms longtask after the changes
+- `e2e-tabs-smoke` — 67/67 tabs render without console errors
+- `e2e-workflow-run-e2e` — 8/8
+- `e2e-workflow-error-e2e` — 9/9
+
+---
 ## [3.73.0] — 2026-05-06  🧪 workflow-failure E2E + i18n pipeline confirmed clean
 
 ### Added

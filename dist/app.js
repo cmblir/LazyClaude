@@ -20936,6 +20936,9 @@ function _ralphStartAutoRefresh() {
       state.data._ralphPollTimer = null;
       return;
     }
+    // QQ232 — skip the network call while the tab is backgrounded; the
+    // signature-diff renderer won't paint anything anyway.
+    if (document.hidden) return;
     try {
       const r = await api('/api/ralph/list?limit=200');
       if (!r || !r.ok) return;
@@ -22541,7 +22544,7 @@ VIEWS.memory = async () => {
                 <div class="font-semibold text-sm">${escapeHtml(it.name)}</div>
               </div>
               ${it.description ? `<div class="text-xs text-[var(--text-mute)] mb-1">${escapeHtml(it.description)}</div>` : ''}
-              <pre class="mono text-[10px] whitespace-pre-wrap text-[var(--text-mute)] line-clamp-6">${escapeHtml(it.content||'')}</pre>
+              <pre class="mono text-[10px] whitespace-pre-wrap text-[var(--text-mute)] line-clamp-6">${escapeHtml((it.content || '').slice(0, 800))}${(it.content || '').length > 800 ? '\n…' : ''}</pre>
             </div>`).join('') || '<div class="text-xs text-[var(--text-dim)]">MEMORY.md 인덱스만 존재 (개별 파일 없음)</div>'}
         </div>
       </div>`).join('') : `<div class="card empty">${(q || type) ? t('일치하는 메모리 없음') : '아직 저장된 메모리가 없습니다.<br><span class="text-xs">Claude 가 \"Saved to memory\" 라고 말하면 여기에 자동으로 나타납니다.</span>'}</div>`}
@@ -25885,6 +25888,9 @@ function _mascotWanderStep() {
   if (_mascotDragging || _mascotOnChat) return;
   // Skip work when the user has hidden the mascot via Quick Settings.
   if (document.body.dataset.mascotHidden === 'true') return;
+  // QQ232 — pause mascot animation while the tab is backgrounded so the
+  // 6–10s timer doesn't waste CPU/GPU when the user can't see anything.
+  if (document.hidden) return;
   const el = document.getElementById('claudeMascot');
   if (!el || el.style.display === 'none') return;
 
@@ -26056,6 +26062,9 @@ function _showRandomBubble() {
   if (_chatOpen || _mascotDragging) return;
   // Skip work when the user has hidden the mascot via Quick Settings.
   if (document.body.dataset.mascotHidden === 'true') return;
+  // QQ232 — same hidden-tab guard as the wander timer; bubbles
+  // shouldn't pop up + animate on an offscreen tab.
+  if (document.hidden) return;
   const bubble = document.getElementById('mascotBubble');
   if (!bubble) return;
   const msg = t(_mascotBubbles[Math.floor(Math.random() * _mascotBubbles.length)]);
