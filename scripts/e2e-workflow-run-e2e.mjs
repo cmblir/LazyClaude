@@ -57,8 +57,8 @@ const saveR = await jpost('/api/workflows/save', wf);
 check('workflow saves', !!saveR.ok && !!saveR.id, JSON.stringify(saveR).slice(0, 200));
 const wfId = saveR.id;
 
-// 2. Kick off the run.
-const runR = await jpost('/api/workflows/run', { workflowId: wfId });
+// 2. Kick off the run. The handler reads body.id, not body.workflowId.
+const runR = await jpost('/api/workflows/run', { id: wfId });
 check('run starts', !!runR.ok && !!runR.runId, JSON.stringify(runR).slice(0, 200));
 const runId = runR.runId;
 

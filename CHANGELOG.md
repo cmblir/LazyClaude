@@ -10,6 +10,47 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.72.0] — 2026-05-06  🐛 cross-workflow runs listing + dashboard recent-runs
+
+### Fixed
+- **`/api/workflows/runs` rejected calls without `wfId`.** The endpoint
+  required a workflow id, but `lazyclaude runs` (added v3.69) and the
+  freshly-built workflow E2E test both wanted a cross-workflow listing.
+  When `wfId` is omitted, the handler now returns the most recent runs
+  across the entire registry (newest first). Existing per-workflow
+  callers are unaffected. Each item additionally exposes `runId` and
+  `workflowId` so consumers can disambiguate.
+- **`limit` query param respected.** Previously hardcoded to 50; now
+  clamps the user-supplied value to `[1, 200]`.
+
+### Added
+- **Dashboard: "🔀 최근 워크플로우 실행" tile.** Renders the last 5 runs
+  across all workflows with start time, workflow name (resolved from
+  the existing list response), status (color-coded), and duration. Sits
+  next to the "최근 대화" tile, above the orchestrator history.
+- **Workflow run E2E test** (`scripts/e2e-workflow-run-e2e.mjs`) — builds
+  a 3-node `start → transform → output` pipeline (no provider needed),
+  kicks off the run via `/api/workflows/run`, polls `run-status` until
+  terminal, and asserts the run reaches `ok`, every node succeeds, the
+  transform output matches the template, and the run shows up in the
+  cross-workflow listing.
+
+### Files touched
+- `server/workflows.py`: `api_workflow_runs_list` cross-workflow path,
+  `limit` clamping, error_key, `runId` + `workflowId` per row
+- `dist/app.js`: new dashboard recent-runs tile + parallel fetch +
+  workflow-name lookup
+- `scripts/e2e-workflow-run-e2e.mjs`: E2E now passes 8/8
+- `VERSION` 3.71.0 → 3.72.0
+
+### Verification
+- `e2e-workflow-run-e2e` — 8/8 (run starts, reaches `ok` in 7 ms,
+  3 nodes succeed, transform template applied, listing surfaces it)
+- `e2e-tabs-smoke` — 67/67 tabs render without console errors
+- Single-tab smoke for `lazyclawDashboard` — passes after the new
+  recent-runs tile
+
+---
 ## [3.71.0] — 2026-05-06  🌐 every external link gets noopener+noreferrer
 
 **User report**: "Google Chrome Helper (Renderer) 헬퍼도 엄청 켜지는 것

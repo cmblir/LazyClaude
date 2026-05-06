@@ -27611,13 +27611,16 @@ window._lcSessionDelete = function (sid) {
 VIEWS.lazyclawDashboard = async () => {
   // Run independent fetches in parallel; failures degrade gracefully so
   // the dashboard always paints (don't block on a slow provider probe).
-  const [provR, wfStatsR, wfListR, orchHistR, slkR, tgR] = await Promise.all([
+  const [provR, wfStatsR, wfListR, orchHistR, slkR, tgR, wfRunsR] = await Promise.all([
     cachedApi('/api/ai-providers/list').catch(() => ({ providers: [] })),
     cachedApi('/api/workflows/stats').catch(() => ({})),
     cachedApi('/api/workflows/list').catch(() => ({ workflows: [] })),
     api('/api/orchestrator/history?limit=5').catch(() => ({ runs: [] })),
     api('/api/slack/config').catch(() => ({ configured: false })),
     api('/api/telegram/config').catch(() => ({ configured: false })),
+    // QQ231 — cross-workflow runs (no wfId filter). Newly enabled this
+    // cycle; surfaces last 5 workflow runs across the entire registry.
+    api('/api/workflows/runs?limit=5').catch(() => ({ runs: [] })),
   ]);
 
   const providers = (provR && provR.providers) || [];
@@ -27638,6 +27641,14 @@ VIEWS.lazyclawDashboard = async () => {
   catch (_) { recentSessions = []; }
 
   const orchRuns = (orchHistR && orchHistR.runs) || [];
+  const wfRuns = (wfRunsR && wfRunsR.runs) || [];
+
+  // Map workflow id → workflow name so the recent-run rows can render
+  // a human-readable label without an extra round-trip.
+  const wfNameById = {};
+  for (const w of ((wfListR && wfListR.workflows) || [])) {
+    if (w && w.id) wfNameById[w.id] = w.name || w.id;
+  }
 
   // Provider quick-card. Shows defaultModel when set, model count, and a
   // chip indicating availability state.
@@ -27741,8 +27752,8 @@ VIEWS.lazyclawDashboard = async () => {
       </div>
     </div>` : ''}
 
-    <!-- Recent chats + orchestrator history -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <!-- Recent chats + workflow runs -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
       <div class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold text-sm">💬 ${t('최근 대화')}</h3>
@@ -27754,16 +27765,42 @@ VIEWS.lazyclawDashboard = async () => {
       </div>
       <div class="card p-4">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="font-semibold text-sm">🎼 ${t('최근 디스패치')}</h3>
-          <button class="btn text-xs" onclick="go('orchestrator')">${t('전체')} →</button>
+          <h3 class="font-semibold text-sm">🔀 ${t('최근 워크플로우 실행')}</h3>
+          <button class="btn text-xs" onclick="go('workflows')">${t('전체')} →</button>
         </div>
-        ${orchRuns.length
+        ${wfRuns.length
           ? `<table class="w-full text-left">
-              <thead><tr class="text-[10px]" style="color:var(--text-dim)"><th class="p-1">${t('시각')}</th><th class="p-1">via</th><th class="p-1">${t('메시지')}</th><th class="p-1"></th></tr></thead>
-              <tbody>${orchRuns.map(orchRow).join('')}</tbody>
+              <thead><tr class="text-[10px]" style="color:var(--text-dim)"><th class="p-1">${t('시각')}</th><th class="p-1">${t('워크플로우')}</th><th class="p-1">${t('상태')}</th><th class="p-1 text-right">${t('소요')}</th></tr></thead>
+              <tbody>${wfRuns.map(r => {
+                const dur = r.durationMs ? (r.durationMs / 1000).toFixed(1) + 's' : '—';
+                const wfName = wfNameById[r.workflowId] || (r.workflowId || '').slice(0, 14);
+                const statusColor = r.status === 'ok' ? 'var(--ok)'
+                  : r.status === 'err' ? '#fca5a5'
+                  : r.status === 'running' ? 'var(--accent)' : 'var(--text-dim)';
+                return `<tr class="text-[11px]">
+                  <td class="p-1 font-mono">${new Date(r.startedAt || 0).toLocaleTimeString()}</td>
+                  <td class="p-1 truncate" style="max-width:220px;" title="${escapeHtml(r.workflowId || '')}">${escapeHtml(wfName)}</td>
+                  <td class="p-1" style="color:${statusColor};">${escapeHtml(r.status || '?')}</td>
+                  <td class="p-1 text-right font-mono">${dur}</td>
+                </tr>`;
+              }).join('')}</tbody>
             </table>`
-          : '<div class="text-xs text-center py-4" style="color:var(--text-dim);">' + t('아직 디스패치 기록 없음') + '</div>'}
+          : '<div class="text-xs text-center py-4" style="color:var(--text-dim);">' + t('아직 실행 기록 없음') + '</div>'}
       </div>
+    </div>
+
+    <!-- Orchestrator history -->
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-sm">🎼 ${t('최근 디스패치')}</h3>
+        <button class="btn text-xs" onclick="go('orchestrator')">${t('전체')} →</button>
+      </div>
+      ${orchRuns.length
+        ? `<table class="w-full text-left">
+            <thead><tr class="text-[10px]" style="color:var(--text-dim)"><th class="p-1">${t('시각')}</th><th class="p-1">via</th><th class="p-1">${t('메시지')}</th><th class="p-1"></th></tr></thead>
+            <tbody>${orchRuns.map(orchRow).join('')}</tbody>
+          </table>`
+        : '<div class="text-xs text-center py-4" style="color:var(--text-dim);">' + t('아직 디스패치 기록 없음') + '</div>'}
     </div>
   `;
 };

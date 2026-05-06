@@ -4359,25 +4359,44 @@ def api_workflow_run_diff(body: dict) -> dict:
 
 
 def api_workflow_runs_list(query: dict) -> dict:
-    """GET /api/workflows/runs?wfId=... — 해당 워크플로우의 runs 리스트 (최신순).
+    """GET /api/workflows/runs?wfId=... — 해당 워크플로우의 runs 리스트.
+
+    QQ231 — when wfId is omitted, return cross-workflow runs (latest first)
+    so callers like the terminal `lazyclaude runs` verb and the LazyClaw
+    dashboard's "recent runs" tile work without needing to specify an id.
+    Each item includes `runId` and `workflowId` to disambiguate.
 
     요약 필드만 반환. 상세는 run-status 로 재조회.
     """
-    wfId = None
-    if isinstance(query, dict):
-        v = query.get("wfId")
+    def _coerce(key: str) -> str | None:
+        if not isinstance(query, dict):
+            return None
+        v = query.get(key)
         if isinstance(v, list) and v:
-            wfId = v[0]
-        elif isinstance(v, str):
-            wfId = v
-    if not (isinstance(wfId, str) and _WF_ID_RE.match(wfId)):
-        return {"ok": False, "error": "invalid wfId"}
-    # v2.47.0 — runs come from the workflow_runs table.
-    runs_map = _runs_db_load(workflow_id=wfId, limit=50)
+            return v[0] if isinstance(v[0], str) else None
+        return v if isinstance(v, str) else None
+
+    wfId_raw = _coerce("wfId") or _coerce("workflowId") or ""
+    limit_raw = _coerce("limit") or ""
+    try:
+        limit = max(1, min(200, int(limit_raw))) if limit_raw else 50
+    except ValueError:
+        limit = 50
+
+    if wfId_raw:
+        if not _WF_ID_RE.match(wfId_raw):
+            return {"ok": False, "error": "invalid wfId", "error_key": "err_invalid_id"}
+        runs_map = _runs_db_load(workflow_id=wfId_raw, limit=limit)
+    else:
+        # Cross-workflow listing.
+        runs_map = _runs_db_load(workflow_id=None, limit=limit)
+
     out = []
     for rid, r in runs_map.items():
         out.append({
             "id": rid,
+            "runId": rid,
+            "workflowId": r.get("workflowId") or wfId_raw or "",
             "status": r.get("status"),
             "startedAt": r.get("startedAt", 0),
             "finishedAt": r.get("finishedAt", 0),
@@ -4386,7 +4405,7 @@ def api_workflow_runs_list(query: dict) -> dict:
             "error": r.get("error"),
         })
     out.sort(key=lambda x: x["startedAt"], reverse=True)
-    return {"ok": True, "runs": out[:50]}
+    return {"ok": True, "runs": out[:limit]}
 
 
 # ═══════════════════════════════════════════
