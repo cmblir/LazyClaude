@@ -10,6 +10,36 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.82.0] — 2026-05-06  🧪 E2E coverage for /delegate and /parallel chat slashes
+
+### Added
+- **`scripts/e2e-delegate-parallel.mjs`** — round-trip E2E for the
+  v3.67 chat sub-agent dispatch. Mocks `/api/lazyclaw/chat` and
+  `/api/ai-providers/compare`, then asserts:
+  - `/delegate <provider:model> <task>` posts the expected body
+    (`{assignee, message, history}`), surfaces a placeholder bubble
+    immediately, and replaces it with the mocked response when the
+    API resolves.
+  - `/parallel <a1,a2> <task>` posts the expected `compare` body
+    (`{prompt, providers: [{providerId, model}, …], timeout}`) and
+    renders one section per assignee with the correct headers
+    (`mockA`, `mockB`) and outputs in a single bubble.
+  - No console errors fire during the round-trip.
+
+  v3.67's verify script only checked the handler returns `true`.
+  v3.82 confirms the actual backend wiring, body shape, and DOM
+  rendering — closes a real coverage gap.
+
+### Verification
+- `e2e-delegate-parallel` (new) — 7/7
+- `e2e-tabs-smoke` 67/67
+- `perf-long-session` 0.0 MB heap growth
+
+### Files touched
+- `scripts/e2e-delegate-parallel.mjs`: new E2E
+- `VERSION` 3.81.0 → 3.82.0
+
+---
 ## [3.81.0] — 2026-05-06  ⚡ chunked chat render — bounded first-paint cost
 
 ### Performance
