@@ -10,6 +10,49 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.79.0] — 2026-05-06  🔁 template assignee patch consolidation + Claude CLI aliases
+
+### Centralized
+- **`_wfPatchTemplateAssignees(nodes)`** — single helper replaces every
+  inline template-default-substitution block. v3.78 added the Quick
+  Action path; v3.79 wires it into both builtin templates modal
+  (`_wfUseTemplate`) and custom templates (`_wfUseCustomTemplate`) so
+  every "create from template" entry uses the same policy.
+- The helper additionally accepts the canonical Claude CLI aliases —
+  `claude:opus`, `claude:sonnet`, `claude:haiku` — when claude-cli is
+  installed, mirroring `server/ai_providers.py::_CLI_FLAG_ALIASES`.
+  Previously the helper substituted `claude:sonnet` even on a working
+  claude-cli setup because the strict id check looked for
+  `claude:claude-sonnet-4-6`.
+- multiAssignee arrays now get the same per-entry filter; a parallel
+  node imported from a template no longer leaves stale members behind
+  when the primary was swapped.
+
+### Confirmed
+- **Backend latency probe** — measured the 38 highest-traffic GET
+  endpoints over 3 trials each. Slowest: `/api/sessions-monitor/list`
+  (77 ms — runs lsof). Median across the rest: under 20 ms. Backend
+  is not the lag source.
+- `perf-long-session` — 0 MB heap growth over 117 navigations holds
+  with the helper added.
+
+### Files touched
+- `dist/app.js`: extracted `_wfPatchTemplateAssignees`, wired into
+  Quick Action / `_wfUseTemplate` / `_wfUseCustomTemplate`, added
+  `_WF_CLAUDE_CLI_ALIASES` constant
+- `VERSION` 3.78.0 → 3.79.0
+
+### Verification
+- `e2e-tabs-smoke` 67/67
+- `e2e-workflow-run-e2e` 8/8
+- `e2e-workflow-error-e2e` 9/9
+- `e2e-crew-wizard-defaults` 4/4
+- `perf-long-session` 0.0 MB growth
+- Synthetic helper test: `claude:sonnet/opus/haiku` preserved on
+  claude-cli-available systems; bogus assignees swapped; multiAssignee
+  rewritten per-entry; non-session nodes left alone.
+
+---
 ## [3.78.0] — 2026-05-06  🧯 long-session leak probe + quick-action assignee swap
 
 ### Confirmed

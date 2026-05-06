@@ -3382,6 +3382,52 @@ const _WF_QUICK_TPL = {
     desc: '요구사항을 소크라테스식 질문으로 명확히한 후 설계 문서 산출' },
 };
 
+// QQ238 — replace any session/subagent assignee whose `provider:model`
+// isn't backed by an installed provider with the user's first-available
+// real assignee. Mutates `nodes` in-place. Safe to call with an empty
+// providers cache (no-op). Centralized so every "create from template"
+// path (Quick Action, builtin templates modal, custom templates,
+// import) shares one substitution policy.
+//
+// Canonical Claude CLI aliases — kept in lockstep with
+// server/ai_providers.py::_CLI_FLAG_ALIASES. Without this map a
+// perfectly-valid `claude:sonnet` would be considered "unavailable"
+// because the strict id check looks for `claude:claude-sonnet-4-6`.
+const _WF_CLAUDE_CLI_ALIASES = ['opus', 'sonnet', 'haiku'];
+
+async function _wfPatchTemplateAssignees(nodes) {
+  if (!Array.isArray(nodes) || !nodes.length) return;
+  await _wfLoadProviders();
+  const provs = ((__wfProviders || {}).providers || []).filter(p => p.available && (p.models || []).length);
+  if (!provs.length) return;
+  const p0 = provs[0];
+  const m0 = (p0.models || [])[0];
+  const realFallback = `${p0.id.replace('-cli', '').replace('-api', '')}:${m0.id || m0.name}`;
+  const availSet = new Set();
+  let claudeCliAvailable = false;
+  for (const p of provs) {
+    const alias = p.id.replace('-cli', '').replace('-api', '');
+    for (const m of (p.models || [])) {
+      availSet.add(`${alias}:${m.id || m.name}`);
+    }
+    if (p.id === 'claude-cli') claudeCliAvailable = true;
+  }
+  // When claude-cli is installed, accept its canonical 1-word aliases.
+  if (claudeCliAvailable) {
+    for (const a of _WF_CLAUDE_CLI_ALIASES) availSet.add('claude:' + a);
+  }
+  const isAvail = (a) => availSet.has(a) || availSet.has(a.replace(/^claude:/, 'claude-cli:'));
+  for (const n of nodes) {
+    if ((n.type === 'session' || n.type === 'subagent') && n.data) {
+      const cur = (n.data.assignee || '').trim();
+      if (cur && !isAvail(cur)) n.data.assignee = realFallback;
+      if (Array.isArray(n.data.multiAssignee)) {
+        n.data.multiAssignee = n.data.multiAssignee.map(a => (a && !isAvail(a)) ? realFallback : a);
+      }
+    }
+  }
+}
+
 async function _wfQuickAction(modeKey) {
   const meta = _WF_QUICK_TPL[modeKey];
   if (!meta) return;
@@ -3432,33 +3478,10 @@ async function _wfQuickAction(modeKey) {
     planner.data.description = (orig ? orig + '\n\n# User goal\n' : '# User goal\n') + goal.trim();
   }
   // QQ237 — sub in the user's actual available assignee for any session/
-  // subagent node whose template-default assignee isn't installed. The
-  // builtin templates were authored against claude-cli; without this fix
-  // running Autopilot/Ultrawork on an Ollama-only box would 100% fail at
-  // the first node.
-  await _wfLoadProviders();
-  const provs = ((__wfProviders || {}).providers || []).filter(p => p.available && (p.models || []).length);
-  if (provs.length) {
-    const p0 = provs[0];
-    const m0 = (p0.models || [])[0];
-    const realFallback = `${p0.id.replace('-cli', '').replace('-api', '')}:${m0.id || m0.name}`;
-    const availSet = new Set();
-    for (const p of provs) {
-      const alias = p.id.replace('-cli', '').replace('-api', '');
-      for (const m of (p.models || [])) {
-        availSet.add(`${alias}:${m.id || m.name}`);
-        availSet.add(`${alias}:${(m.id || '').split('-').pop()}`);  // short alias
-      }
-    }
-    for (const n of cloneNodes) {
-      if ((n.type === 'session' || n.type === 'subagent') && n.data) {
-        const cur = (n.data.assignee || '').trim();
-        if (cur && !availSet.has(cur) && !availSet.has(cur.replace(/^claude:/, 'claude-cli:'))) {
-          n.data.assignee = realFallback;
-        }
-      }
-    }
-  }
+  // subagent node whose template-default assignee isn't installed.
+  // Extracted to _wfPatchTemplateAssignees in v3.79 so the same logic
+  // applies to the templates modal and import paths too.
+  await _wfPatchTemplateAssignees(cloneNodes);
 
   const body = {
     name: `${meta.title} · ${goal.slice(0, 40)}${goal.length > 40 ? '…' : ''}`,
@@ -8936,6 +8959,9 @@ async function _wfUseTemplate(tplId) {
   if (!tpl) return;
   closeModal();
   const body = tpl.build();
+  // QQ238 — same substitution Quick Actions get; builtin client-side
+  // templates also assume claude:sonnet by default.
+  await _wfPatchTemplateAssignees(body.nodes);
   const r = await api('/api/workflows/save', {
     method: 'POST', headers: { 'Content-Type':'application/json' },
     body: JSON.stringify(body),
@@ -8955,10 +8981,14 @@ async function _wfUseCustomTemplate(tplId) {
   closeModal();
   const tpl = r.template;
   // 템플릿을 바탕으로 새 워크플로우 생성 (id 제거해서 신규 ID 할당)
+  // Deep-clone the nodes so we can safely mutate assignees without
+  // polluting the cached template.
+  const cloneNodes = JSON.parse(JSON.stringify(tpl.nodes || []));
+  await _wfPatchTemplateAssignees(cloneNodes);
   const body = {
     name: tpl.name + ' (' + t('복제') + ')',
     description: tpl.description,
-    nodes: tpl.nodes,
+    nodes: cloneNodes,
     edges: tpl.edges,
     viewport: tpl.viewport,
   };
