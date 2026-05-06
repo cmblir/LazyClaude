@@ -567,25 +567,42 @@ def api_providers_list() -> dict:
 
 
 def api_provider_test(body: dict) -> dict:
-    """프로바이더 연결 테스트. body: {providerId, model?, prompt?}"""
+    """프로바이더 연결 테스트. body: {providerId, model?, prompt?}
+
+    QQ229 — surfaces a translatable error_key alongside the raw error
+    string so the frontend can render i18n'd messages without parsing
+    English fragments.
+    """
     if not isinstance(body, dict):
-        return {"ok": False, "error": "bad body"}
+        return {"ok": False, "error": "bad body", "error_key": "err_bad_body"}
 
     from .ai_providers import get_registry
     reg = get_registry()
 
     pid = (body.get("providerId") or "").strip()
+    if not pid:
+        return {"ok": False, "error": "providerId required", "error_key": "err_provider_id_required"}
     model = (body.get("model") or "").strip()
     prompt = (body.get("prompt") or "Say 'Hello! I am working.' in one sentence.").strip()
 
     p = reg.get(pid)
     if not p:
-        return {"ok": False, "error": f"unknown provider: {pid}"}
+        return {"ok": False,
+                "error": f"unknown provider: {pid}",
+                "error_key": "err_provider_unknown"}
+
+    if not p.is_available():
+        return {"ok": False,
+                "error": f"provider '{pid}' not available — check installation / API key",
+                "error_key": "err_provider_unavailable"}
 
     resp = p.execute(prompt, model=model, timeout=30)
     return {
         "ok": resp.status == "ok",
         "response": resp.to_dict(),
+        # Mirror response.error to top-level so the frontend's errMsg(r)
+        # helper has a string to fall back on when error_key isn't set.
+        **({"error": resp.error} if resp.status != "ok" and resp.error else {}),
     }
 
 

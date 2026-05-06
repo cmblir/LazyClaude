@@ -10,6 +10,53 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.70.0] — 2026-05-06  🛠 3 more terminal verbs + provider-test error_key
+
+### Added
+- **`lazyclaude completion <bash|zsh>`** — print a shell completion
+  script users can `eval $(...)` into their shell. Mirrors the
+  `lazyclaw completion` Node CLI verb. Static template kept in lockstep
+  with `src/lazyclaw/cli.mjs::SUBCOMMANDS`.
+- **`lazyclaude daemon`** — probe ports 3737 / 3838 for a running
+  lazyclaw Node daemon and report its `/health` payload (or
+  unreachable). Useful when a separate daemon is expected to be running
+  alongside the Python dashboard.
+- **`lazyclaude onboard`** — jump to the onboarding tab. Mirrors the
+  CLI's interactive `lazyclaw onboard`; in the dashboard, the
+  dedicated tab covers the same ground.
+
+### Fixed
+- **`POST /api/ai-providers/test`** now emits a translatable
+  `error_key` (`err_provider_unknown` / `err_provider_unavailable` /
+  `err_provider_id_required` / `err_bad_body`) alongside the descriptive
+  `error` string. Previously the frontend rendered raw English fragments
+  ("unknown provider: openai-api") regardless of UI locale.
+- **Provider card test result** now flows through `errMsg(r)` so it
+  picks up the translated `error_key` and additionally appends the
+  inner `response.error` (provider-side stage failure: timeout,
+  auth, model id, …) when present.
+
+### Performance
+- Boot timeline measured at FCP 92 ms / view-painted 558 ms /
+  network-idle 1 055 ms — no work needed on initial paint.
+
+### Files touched
+- `dist/app.js`: completion / daemon / onboard verbs + verb-list
+  propagation, `testProvider` errMsg upgrade
+- `server/ai_keys.py`: `api_provider_test` error_key + early
+  is_available short-circuit
+- `scripts/e2e-v3-70-verify.mjs`: focused regression
+- `VERSION` 3.69.0 → 3.70.0
+
+### Verification
+- `e2e-tabs-smoke` — 67/67
+- `e2e-v3-69-verify` — still green
+- `e2e-v3-70-verify` (new) — completion bash/zsh both emit the right
+  shell template; daemon probes 3737/3838 without breaking the term;
+  onboard navigates; testProvider returns `err_provider_unknown` for
+  the unknown-id path.
+
+---
 ## [3.69.0] — 2026-05-06  ⚡ agents-tab lazy graph + 4 more terminal verbs
 
 ### Performance

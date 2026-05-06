@@ -18854,16 +18854,24 @@ window._cliLogin = async (toolId) => {
 
 window.testProvider = async (pid) => {
   const el = document.getElementById('testResult-' + pid);
-  if (el) el.innerHTML = '<span class="text-xs" style="color:var(--text-dim)">테스트 중...</span>';
+  if (el) el.innerHTML = `<span class="text-xs" style="color:var(--text-dim)">${t('테스트 중...')}</span>`;
   try {
     const r = await api('/api/ai-providers/test', { method: 'POST', body: JSON.stringify({ providerId: pid }) });
     if (r.ok) {
       const resp = r.response || {};
-      el.innerHTML = `<div class="text-xs" style="color:var(--ok)">✓ 성공 (${resp.duration_ms || 0}ms) — ${escapeHtml((resp.output || '').substring(0, 100))}</div>`;
+      el.innerHTML = `<div class="text-xs" style="color:var(--ok)">✓ ${t('성공')} (${resp.duration_ms || 0}ms) — ${escapeHtml((resp.output || '').substring(0, 100))}</div>`;
     } else {
-      el.innerHTML = `<div class="text-xs" style="color:var(--err)">✗ ${escapeHtml(r.error || (r.response||{}).error || '실패')}</div>`;
+      // QQ229 — surface error_key when present (translated via t()) and
+      // include the response.error inner string for cli/api providers
+      // that report a stage-specific failure (timeout, auth, model id).
+      const respErr = (r.response || {}).error || '';
+      const baseMsg = errMsg(r) || respErr || t('실패');
+      const detail = (respErr && respErr !== r.error) ? ` — ${escapeHtml(respErr)}` : '';
+      el.innerHTML = `<div class="text-xs" style="color:var(--err)">✗ ${escapeHtml(baseMsg)}${detail}</div>`;
     }
-  } catch (e) { if (el) el.innerHTML = `<div class="text-xs" style="color:var(--err)">✗ ${escapeHtml(String(e))}</div>`; }
+  } catch (e) {
+    if (el) el.innerHTML = `<div class="text-xs" style="color:var(--err)">✗ ${escapeHtml(String((e && e.message) || e))}</div>`;
+  }
 };
 
 window._saveFallbackChain = async () => {
@@ -30373,6 +30381,8 @@ function _lcTermSuggest(prefix) {
     'lazyclaude usage', 'lazyclaude usage 7', 'lazyclaude usage 30',
     'lazyclaude agents', 'lazyclaude sessions', 'lazyclaude skills', 'lazyclaude doctor',
     'lazyclaude providers', 'lazyclaude inspect ', 'lazyclaude runs', 'lazyclaude rates',
+    'lazyclaude completion bash', 'lazyclaude completion zsh',
+    'lazyclaude daemon', 'lazyclaude onboard',
     'lazyclaude workflows', 'lazyclaude workflows ',
     'lazyclaude run ', 'lazyclaude cancel', 'lazyclaude cancel ',
     'lz get', 'lz set', 'lz help', 'lz version', 'lz status',
@@ -30499,7 +30509,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates','completion','daemon','onboard'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -30517,7 +30527,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates','completion','daemon','onboard'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -30572,6 +30582,9 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
       ['Terminal', [
         ['lazyclaude reset',                   'wipe terminal log'],
         ['lazyclaude refresh  (= reload)',     'clear client-side API cache (no page reload)'],
+        ['lazyclaude completion <bash|zsh>',   'shell completion script (paste into ~/.bashrc or ~/.zshrc)'],
+        ['lazyclaude daemon',                  'probe the lazyclaw Node daemon (3737/3838)'],
+        ['lazyclaude onboard',                 'open the onboarding tab'],
         ['lazyclaude help [filter]',           'this listing (filter narrows by group/cmd)'],
       ]],
     ];
@@ -31213,6 +31226,58 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     } catch (e) {
       log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
     }
+    return;
+  }
+  if (verb === 'completion') {
+    // QQ228 — print the lazyclaw shell completion script. Mirrors the
+    // node CLI's `lazyclaw completion bash|zsh`. We can't actually
+    // shell out node from the browser, so we ship a static template
+    // produced by the same SUBCOMMANDS list as cli.mjs (kept in sync
+    // by hand — single block).
+    const shell = (rest || 'bash').trim().toLowerCase();
+    if (shell !== 'bash' && shell !== 'zsh') {
+      log.push({ kind: 'err', text: '⚠ ' + t('사용법') + ': lazyclaude completion <bash|zsh>', ts: Date.now() });
+      return;
+    }
+    const subs = 'run resume inspect clear validate graph config chat agent doctor status onboard sessions skills providers daemon version completion help export import rates';
+    let script;
+    if (shell === 'bash') {
+      script = `# lazyclaw bash completion. Eval inline:\n#   eval "$(lazyclaw completion bash)"\n_lazyclaw_completion() {\n  local cur="\${COMP_WORDS[COMP_CWORD]}"\n  if [ "$COMP_CWORD" -eq 1 ]; then\n    COMPREPLY=( $(compgen -W "${subs}" -- "$cur") )\n    return 0\n  fi\n  return 0\n}\ncomplete -F _lazyclaw_completion lazyclaw`;
+    } else {
+      script = `#compdef lazyclaw\n# lazyclaw zsh completion. Eval inline:\n#   eval "$(lazyclaw completion zsh)"\n_lazyclaw() {\n  local subs=(${subs.split(' ').map(s => "'" + s + "'").join(' ')})\n  if (( CURRENT == 2 )); then\n    _values 'subcommand' \${subs[@]}\n    return\n  fi\n}\ncompdef _lazyclaw lazyclaw\n_lazyclaw "$@"`;
+    }
+    log.push({ kind: 'out', text: script, ts: Date.now() });
+    return;
+  }
+  if (verb === 'daemon') {
+    // QQ228 — daemon status. The Python dashboard isn't itself the
+    // lazyclaw daemon (that lives in src/lazyclaw/daemon.mjs and runs
+    // on a separate port). Probe the conventional ports and report.
+    const candidates = [3737, 3838];  // common lazyclaw daemon ports
+    const lines = ['# lazyclaw daemon probe'];
+    for (const port of candidates) {
+      try {
+        const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(800) });
+        if (r.ok) {
+          const j = await r.json().catch(() => ({}));
+          lines.push(`  :${port}  ✅ alive  ${JSON.stringify(j).slice(0, 80)}`);
+        } else {
+          lines.push(`  :${port}  ❌ HTTP ${r.status}`);
+        }
+      } catch (e) {
+        lines.push(`  :${port}  ❌ ${(e && e.message) || 'unreachable'}`);
+      }
+    }
+    lines.push('');
+    lines.push('Start the daemon with: `lazyclaw daemon --port 3737` (Node CLI)');
+    log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    return;
+  }
+  if (verb === 'onboard') {
+    // QQ228 — jump to onboarding tab. Mirrors CLI `lazyclaw onboard` which
+    // is interactive there; in the dashboard the dedicated tab covers it.
+    if (typeof window.go === 'function') window.go('onboarding');
+    log.push({ kind: 'out', text: '→ onboarding', ts: Date.now() });
     return;
   }
   if (verb === 'rates') {
