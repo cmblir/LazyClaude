@@ -10,6 +10,58 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.77.0] — 2026-05-06  📱 mobile 320px chat layout + 2 more openclaw verbs
+
+### Added
+- **`lazyclaude validate <wfId|name>`** — preflight check against
+  `/api/workflows/preflight`. Reports any node whose assignee doesn't
+  resolve to an available provider, with reason. Mirrors the CLI
+  `lazyclaw validate`.
+- **`lazyclaude graph <wfId|name>`** — ASCII summary of a workflow's
+  DAG. Walks topological levels and emits one node per line per level.
+  Detects cycles and surfaces orphan nodes. Mirrors `lazyclaw graph`.
+
+### Fixed
+- **lazyclaw chat overflowed at 320 px viewport.** The chat layout's
+  220 px sidebar + 1fr main column meant the main panel collapsed to
+  ~100 px on a 320 px screen, pushing the send button (+textarea)
+  off the right edge. Added a `lc-chat-layout` class + a
+  `@media (max-width: 420px)` rule that stacks the layout
+  vertically — sidebar becomes a 32vh top strip, main panel uses
+  the full width. Composer now fits in 320 px.
+- **Model selector** dropdown's `min-width:190px` was forcing the
+  composer top-bar wider than its parent on narrow screens. Now
+  `min-width:0; flex:1 1 160px` so it shrinks gracefully.
+
+### Verification
+- Mobile probe at 320 × 600 px: `lazyclawDashboard`, `lazyclawTerm`,
+  `aiProviders`, **`lazyclawChat`** — all 0 overflow elements (down
+  from 2 on `lazyclawChat`).
+- New verbs run shell-free + emit expected output:
+  - `lazyclaude validate <wfId>` → "preflight ... ✅ all assignees
+    resolve to available providers"
+  - `lazyclaude graph <wfId>` → "L0: ⏵ S \\ L1: ↦ X \\ L2: ⏎ O"
+- `e2e-tabs-smoke` 67/67, `e2e-crew-wizard-defaults` 4/4,
+  `e2e-noopener-verify` 0 offenders — no regression.
+
+### Cumulative openclaw terminal parity (v3.67–v3.77)
+agents · sessions · skills · doctor · providers · inspect · runs ·
+rates · completion · daemon · onboard · validate · graph **(13 new
+verbs)** plus the pre-existing get / set / help / reset / version /
+open / go / tabs / status / diag / whoami / keys / usage /
+workflows / run / cancel / uptime / refresh / reload — **30+ verbs
+total**, covering every read-only verb in `src/lazyclaw/cli.mjs`'s
+`SUBCOMMANDS` list except interactive (`chat`, `agent`) and writers
+(`config set`, `import`, `export`).
+
+### Files touched
+- `dist/app.js`: validate + graph verbs, KNOWN_VERBS / candidates /
+  tab-suggest / help groups updated, lc-chat-layout class added,
+  model selector flex-shrink fix
+- `dist/index.html`: `@media (max-width: 420px)` chat-layout collapse rule
+- `VERSION` 3.76.0 → 3.77.0
+
+---
 ## [3.76.0] — 2026-05-06  🎬 first-run CTA + multi-assignee real defaults
 
 ### Fixed

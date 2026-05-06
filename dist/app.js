@@ -27930,7 +27930,7 @@ VIEWS.lazyclawChat = async () => {
   })();
   const optHtml = opts.map(o => `<option value="${escapeHtml(o.value)}" ${o.value === lastAssignee ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('') || `<option value="">${t('가용 프로바이더 없음')}</option>`;
 
-  return `<div style="display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 108px);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);">
+  return `<div class="lc-chat-layout" style="display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 108px);border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);">
 
     <!-- Session sidebar -->
     <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:rgba(0,0,0,0.12);">
@@ -27949,7 +27949,7 @@ VIEWS.lazyclawChat = async () => {
 
       <!-- Top bar: model selector + actions -->
       <div style="padding:6px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-        <select id="lcChatAssignee" class="input text-xs" style="min-width:190px;max-width:280px;">
+        <select id="lcChatAssignee" class="input text-xs" style="min-width:0;flex:1 1 160px;max-width:280px;">
           ${optHtml}
         </select>
         <button class="btn text-xs" onclick="_lcChatToggleSysPrompt()" title="${t('시스템 프롬프트')}" style="padding:3px 8px;">⚙</button>
@@ -30509,6 +30509,7 @@ function _lcTermSuggest(prefix) {
     'lazyclaude providers', 'lazyclaude inspect ', 'lazyclaude runs', 'lazyclaude rates',
     'lazyclaude completion bash', 'lazyclaude completion zsh',
     'lazyclaude daemon', 'lazyclaude onboard',
+    'lazyclaude validate ', 'lazyclaude graph ',
     'lazyclaude workflows', 'lazyclaude workflows ',
     'lazyclaude run ', 'lazyclaude cancel', 'lazyclaude cancel ',
     'lz get', 'lz set', 'lz help', 'lz version', 'lz status',
@@ -30635,7 +30636,7 @@ function _lcTermBuiltin(cmd) {
   if (/^(?:lazyclaude|lz)\s+(?:--version|-v)\s*$/i.test(trimmed)) {
     return { verb: 'version', rest: '' };
   }
-  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates','completion','daemon','onboard'];
+  const KNOWN_VERBS = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','wfs','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates','completion','daemon','onboard','validate','graph'];
   const m = trimmed.match(/^(?:lazyclaude|lz)\s+(\w[\w-]*)\b\s*(.*)$/i);
   if (!m) return null;
   const verb = m[1].toLowerCase();
@@ -30653,7 +30654,7 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
   if (verb === '__unknown__') {
     // QQ147 — the parser found `lazyclaude <something>` where <something>
     // isn't a known verb. Suggest the closest one by edit distance.
-    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates','completion','daemon','onboard'];
+    const candidates = ['get','set','help','reset','version','open','go','tabs','status','diag','whoami','keys','usage','workflows','run','cancel','uptime','refresh','reload','agents','sessions','skills','doctor','providers','inspect','runs','rates','completion','daemon','onboard','validate','graph'];
     // QQ162 → QQ163 — Levenshtein lives on `window._lcLevenshtein`.
     let best = null, bestScore = 99;
     for (const k of candidates) {
@@ -30687,6 +30688,8 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
         ['lazyclaude workflows [filter]',      'list workflows (id/name substring)'],
         ['lazyclaude run <id|name>',           'start a workflow run'],
         ['lazyclaude cancel [runId|wf]',       'cancel a running workflow'],
+        ['lazyclaude validate <id|name>',      'preflight: every assignee resolves to an available provider'],
+        ['lazyclaude graph <id|name>',         'ASCII summary of the DAG (nodes per topological level)'],
       ]],
       ['Provider / Status', [
         ['lazyclaude whoami',                  'Claude CLI login (email/plan/org)'],
@@ -31404,6 +31407,112 @@ async function _lcTermHandleBuiltin(verb, rest, log) {
     // is interactive there; in the dashboard the dedicated tab covers it.
     if (typeof window.go === 'function') window.go('onboarding');
     log.push({ kind: 'out', text: '→ onboarding', ts: Date.now() });
+    return;
+  }
+  if (verb === 'validate') {
+    // QQ235 — `lazyclaude validate <wfId|name>` — DAG + provider
+    // availability check via /api/workflows/preflight. Mirrors the CLI
+    // `lazyclaw validate`.
+    const id = (rest || '').trim();
+    if (!id) {
+      log.push({ kind: 'err', text: '⚠ ' + t('사용법') + ': lazyclaude validate <wfId|name>', ts: Date.now() });
+      return;
+    }
+    try {
+      const list = await fetch('/api/workflows/list').then(r => r.json());
+      const all = (list && list.workflows) || [];
+      const lc = id.toLowerCase();
+      const wf = all.find(w => w.id === id) || all.find(w => (w.name || '').toLowerCase().includes(lc) || (w.id || '').toLowerCase().includes(lc));
+      if (!wf) {
+        log.push({ kind: 'err', text: '⚠ workflow not found: ' + id, ts: Date.now() });
+        return;
+      }
+      const r = await fetch('/api/workflows/preflight', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wfId: wf.id }),
+      }).then(x => x.json());
+      const issues = (r && r.issues) || [];
+      const lines = [`# preflight ${wf.name || wf.id}`];
+      if (!issues.length) {
+        lines.push('  ✅ all assignees resolve to available providers');
+      } else {
+        lines.push(`  ${issues.length} issue(s):`);
+        for (const iss of issues.slice(0, 30)) {
+          lines.push(`    ❌ ${(iss.nodeId || '?').padEnd(14)} ${(iss.assignee || '?').padEnd(28)} — ${iss.reason || 'unavailable'}`);
+        }
+      }
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
+    return;
+  }
+  if (verb === 'graph') {
+    // QQ235 — `lazyclaude graph <wfId|name>` — ASCII summary of a
+    // workflow's DAG. Mirrors `lazyclaw graph`. Walks topo levels and
+    // groups nodes by level so the structure is readable in a
+    // terminal that can't render an SVG.
+    const id = (rest || '').trim();
+    if (!id) {
+      log.push({ kind: 'err', text: '⚠ ' + t('사용법') + ': lazyclaude graph <wfId|name>', ts: Date.now() });
+      return;
+    }
+    try {
+      const list = await fetch('/api/workflows/list').then(r => r.json());
+      const all = (list && list.workflows) || [];
+      const lc = id.toLowerCase();
+      const wf = all.find(w => w.id === id) || all.find(w => (w.name || '').toLowerCase().includes(lc) || (w.id || '').toLowerCase().includes(lc));
+      if (!wf) {
+        log.push({ kind: 'err', text: '⚠ workflow not found: ' + id, ts: Date.now() });
+        return;
+      }
+      const nodes = wf.nodes || [];
+      const edges = wf.edges || [];
+      // Topological levels: O(N + E). Repeatedly emit nodes with 0
+      // unmet incoming edges.
+      const incoming = {};
+      const out = {};
+      for (const n of nodes) { incoming[n.id] = 0; out[n.id] = []; }
+      for (const e of edges) {
+        if (incoming[e.to] != null) incoming[e.to]++;
+        if (out[e.from]) out[e.from].push(e.to);
+      }
+      const levels = [];
+      const remaining = new Set(nodes.map(n => n.id));
+      while (remaining.size) {
+        const ready = [...remaining].filter(nid => incoming[nid] === 0);
+        if (!ready.length) break;  // cycle — bail
+        levels.push(ready);
+        for (const nid of ready) {
+          remaining.delete(nid);
+          for (const next of (out[nid] || [])) {
+            if (incoming[next] != null) incoming[next]--;
+          }
+        }
+      }
+      const titleOf = (nid) => {
+        const n = nodes.find(x => x.id === nid);
+        const meta = n && WF_TYPE_MAP[n.type];
+        const ic = meta ? meta.icon : '·';
+        return `${ic} ${(n && n.title) || nid}`;
+      };
+      const lines = [
+        `# ${wf.name || wf.id}`,
+        `  ${nodes.length} nodes · ${edges.length} edges · ${levels.length} levels`,
+        '',
+      ];
+      levels.forEach((lvl, i) => {
+        lines.push(`L${i}:`);
+        for (const nid of lvl) lines.push(`  ${titleOf(nid)}`);
+      });
+      if (remaining.size) {
+        lines.push('');
+        lines.push(`⚠ cycle detected — ${remaining.size} node(s) unreachable from start`);
+      }
+      log.push({ kind: 'out', text: lines.join('\n'), ts: Date.now() });
+    } catch (e) {
+      log.push({ kind: 'err', text: '⚠ ' + (e && e.message || e), ts: Date.now() });
+    }
     return;
   }
   if (verb === 'rates') {

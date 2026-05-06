@@ -1227,6 +1227,11 @@ window._loadVendor = (() => {
     .grid.grid-cols-2 { grid-template-columns: 1fr !important; }
     #content header { gap: 0.5rem !important; }
     #content #view { padding: 0.5rem !important; }
+    /* QQ236 — collapse the chat layout's session sidebar on tiny
+       viewports. The 220px column becomes a single-row strip above
+       the main panel so the composer + send button can fit in 320px. */
+    .lc-chat-layout { grid-template-columns: 1fr !important; grid-template-rows: auto 1fr !important; }
+    .lc-chat-layout > div:first-child { max-height: 32vh; border-right: 0 !important; border-bottom: 1px solid var(--border) !important; }
   }
   /* Ollama 모델 허브 */
   .ollama-cat-filter.active { background: var(--accent) !important; color: #fff !important; }
