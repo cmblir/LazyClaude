@@ -10,6 +10,41 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.73.0] — 2026-05-06  🧪 workflow-failure E2E + i18n pipeline confirmed clean
+
+### Added
+- **`scripts/e2e-workflow-error-e2e.mjs`** — exercises the failure path
+  end-to-end. Builds a 3-node workflow whose middle HTTP node points at
+  127.0.0.1 (rejected by the SSRF guard). Asserts:
+  - The run reaches `err` status within 8 s (measured 2 ms — the SSRF
+    check fires before any network round-trip).
+  - The HTTP node's result has `status: 'err'` plus a non-empty error
+    string mentioning SSRF / blocked.
+  - The downstream output node is **not** silently `ok` — it carries
+    `status: 'cancelled'` (sibling-cancel) with an empty payload.
+  - The failed run surfaces in `/api/workflows/runs` cross-workflow
+    listing with `status === 'err'`.
+
+### Confirmed
+- **i18n pipeline clean.** `make i18n-refresh` reports 4 735 keys
+  consistent across ko / en / zh, 0 t() calls with Korean residue,
+  and 0 static-DOM Korean phrases without translation. All strings
+  introduced in v3.67–v3.72 (lazyclaw dashboard, terminal verb labels,
+  provider unavailable rows, system-port toggle, recent-runs tile)
+  are fully covered.
+
+### Files touched
+- `scripts/e2e-workflow-error-e2e.mjs`: new failure-path E2E (9/9)
+- `VERSION` 3.72.0 → 3.73.0
+
+### Verification
+- `e2e-workflow-error-e2e` (new) — 9/9
+- `e2e-workflow-run-e2e` — 8/8 (success path still works)
+- `e2e-tabs-smoke` — 67/67
+- `e2e-noopener-verify` — 0 offenders
+- `make i18n-verify` — 0 missing across ko/en/zh
+
+---
 ## [3.72.0] — 2026-05-06  🐛 cross-workflow runs listing + dashboard recent-runs
 
 ### Fixed
