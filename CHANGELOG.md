@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.3] — 2026-05-09  🔍 publish workflow — diagnostics for E401
+
+User report: v3.99.2 trim worked — the
+`*** is not a legal HTTP header value` error is gone — but
+`npm whoami` now returns 401 Unauthorized. Header is well-
+formed, the registry just doesn't recognise the token.
+
+### Diagnostics added
+- Print the token's **byte length** and **prefix family**
+  (`npm_*` vs other) BEFORE the whoami probe. Lets the user
+  cross-check the secret against what npmjs.com showed when
+  the token was created — a truncated paste lights up
+  immediately as a length mismatch.
+- On whoami failure, print a self-service troubleshooting
+  block enumerating the four likely causes (revoked /
+  expired / truncated / wrong account) plus a local
+  verification recipe:
+
+  ```
+  echo "//registry.npmjs.org/:_authToken=<paste>" > /tmp/npmrc.test
+  npm --userconfig=/tmp/npmrc.test whoami
+  rm /tmp/npmrc.test
+  ```
+
+  If the local probe returns the username → secret was
+  pasted dirty / truncated → re-paste cleanly. If it also
+  401s → token itself is invalid → recreate at
+  npmjs.com → Access Tokens → Granular Access Tokens with
+  `Packages: lazyclaw (read & write, Bypass 2FA enabled,
+  expiration ≥ 30 days)`.
+
+### YAML safety
+First pass used a `cat <<'EOF'` heredoc inside the `run: |`
+block; YAML treated heredoc lines at column 1 as a new
+mapping key and choked. Replaced with individual indented
+`echo` lines so the block scalar parses cleanly.
+
+No CLI behaviour change — pure CI plumbing.
+
+---
 ## [3.99.2] — 2026-05-09  🛠 publish workflow — trim NPM_TOKEN whitespace
 
 User report: the v3.99.1 push triggered the publish workflow,

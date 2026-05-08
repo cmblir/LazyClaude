@@ -98,6 +98,20 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$CLEAN"
+          # Diagnostic-but-not-leaky: print the secret's byte length
+          # and the npm-token prefix family. A genuine `npm_` token
+          # is ~36–44 bytes; a truncated paste shows up as a wildly
+          # different number. Granular access tokens always start
+          # with `npm_`; classic / legacy tokens are bare hex. If
+          # the prefix is anything else the token isn't an npm
+          # token at all (wrong field, wrong service).
+          BYTES=${#CLEAN}
+          PREFIX=$(printf '%s' "$CLEAN" | head -c 4)
+          case "$PREFIX" in
+            npm_*) FAMILY="granular/automation (modern)";;
+            *)     FAMILY="classic-hex or unknown — verify on npmjs.com → Access Tokens";;
+          esac
+          echo "ℹ NPM_TOKEN length: $BYTES bytes · prefix family: $FAMILY"
           # Write the registry .npmrc directly so we don't rely on
           # setup-node's env-substitution path. Quote-free, single
           # line, terminating LF only.
@@ -105,7 +119,33 @@ jobs:
           chmod 600 "$HOME/.npmrc"
           # Sanity probe — `npm whoami` exits 0 and prints the
           # account when auth is valid; otherwise it errors clearly.
-          npm whoami
+          # Capture the failure so we can append a self-service hint.
+          if ! WHOAMI=$(npm whoami 2>&1); then
+            echo "✗ npm whoami failed:"
+            printf '%s\n' "$WHOAMI"
+            echo ""
+            echo "Most likely causes of E401 here:"
+            echo "  1. Token was revoked (npm auto-revokes if it appeared publicly)"
+            echo "  2. Token expired (granular tokens have a max lifetime)"
+            echo "  3. Token was truncated when pasted into the GitHub secret —"
+            echo "     compare the byte-count above to what npmjs.com showed when"
+            echo "     you created it"
+            echo "  4. Token belongs to a different npm account that doesn't own"
+            echo "     the lazyclaw package"
+            echo ""
+            echo "To verify locally without exposing the token in logs:"
+            echo '  echo "//registry.npmjs.org/:_authToken=<paste-token>" > /tmp/npmrc.test'
+            echo "  npm --userconfig=/tmp/npmrc.test whoami"
+            echo "  rm /tmp/npmrc.test"
+            echo ""
+            echo "If the local check returns your username, re-paste the token"
+            echo "into the GitHub Secret cleanly. If it also 401s, create a fresh"
+            echo "granular access token at npmjs.com → Access Tokens → Granular"
+            echo "with: Packages = lazyclaw (read & write, Bypass 2FA enabled),"
+            echo "Expiration ≥ 30 days, then update the GitHub Secret."
+            exit 1
+          fi
+          echo "✓ npm whoami: $WHOAMI"
 
       - name: Publish
         if: steps.detect.outputs.changed == 'true'
