@@ -10,6 +10,32 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.89.0] — 2026-05-08  🛠 Makefile shortcuts for npm publish
+
+User report: `npm publish --dry-run` from the repo root crashed
+twice in a row with `Cannot read properties of null (reading
+'prerelease')`. The debug log's `cwd /Users/o/lazyclaude` made
+the cause clear — npm was reading the **root** `package.json`
+(`claude-dashboard`, `private: true`, no `version` field) and
+semver choked on the missing version.
+
+Fixing this user-side requires remembering `cd src/lazyclaw`
+every time. The Makefile already centralises every other run /
+build / i18n flow, so add the publish flow there too.
+
+### New Makefile targets
+- `make lazyclaw-pack` — `npm pack` the CLI tarball into the
+  repo root for offline share / inspection
+- `make lazyclaw-publish-dry` — `npm publish --dry-run` from
+  the correct subdir
+- `make lazyclaw-publish` — real publish, with two guards:
+  refuses when `src/lazyclaw/` has uncommitted changes, and
+  refuses when `npm whoami` fails (so a forgotten `npm login`
+  surfaces immediately instead of mid-upload)
+
+`make help` lists all three.
+
+---
 ## [3.88.0] — 2026-05-08  📦 npm-publishable lazyclaw package
 
 User report: "npm 에 올려줘."
