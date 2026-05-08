@@ -10,6 +10,70 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.97.0] — 2026-05-09  📦 skills install user/repo[@ref][:path]
+
+OpenClaw ships a hosted "ClawHub" registry. We get the same
+end-user feel without operating a service: GitHub IS the
+registry, and a tag is the version pin.
+
+```bash
+lazyclaw skills install anthropic-skills/code-review
+lazyclaw skills install anthropic-skills/code-review@v1.2
+lazyclaw skills install you/your-bundle@main:my/skills
+lazyclaw skills install you/your-bundle --prefix team --force
+```
+
+### Behavior
+- Spec form: `<owner>/<repo>[@<ref>][:<subpath>]`. Default ref
+  is `main`.
+- Tarball is fetched from
+  `https://codeload.github.com/<owner>/<repo>/tar.gz/<ref>` and
+  piped into the host `tar -xz` (zero new dependencies — `tar`
+  is on PATH everywhere lazyclaw runs).
+- File picker (in priority order):
+  1. If the spec includes `:<subpath>`, every `.md` under that.
+  2. Else if the repo has a `skills/` directory, every `.md`
+     under it (recursive).
+  3. Else `.md` at the repo root only (one level deep — README
+     usually IS the skill).
+- Installed names: lowercased basename, `[^a-z0-9_.-]` replaced
+  with `-`. `--prefix foo` prepends `foo-` so a multi-skill
+  repo can't collide with locally-managed skills.
+- Existing skill names are skipped unless `--force`.
+
+### Safety
+- 16 MB compressed tarball cap (`--max-bytes <N>` to override
+  for unusual cases). Refuses 17+ MB downloads with a clear
+  error pointing at the override flag.
+- 30 s fetch timeout via internal `AbortController`.
+- `tar -xz` runs with the temp dir as cwd; we never extract to
+  the user's home directory.
+- Subpath validated — absolute paths and `..` segments
+  rejected up front.
+- Skills are .md only and are NEVER executed; the worst-case
+  ingest is a noisy system prompt that
+  `lazyclaw skills remove` undoes.
+
+### Implementation
+- New `src/lazyclaw/skills_install.mjs` —
+  `parseGithubSpec()`, `tarballUrl()`, `fetchAndExtract()`,
+  `pickSkillFiles()`, `installPickedSkills()`,
+  `installFromGithub()`. Pure ESM.
+- `cli.mjs::cmdSkills install` detects the spec form by a
+  slash in the first positional + absence of `--from*`. Other
+  install forms (single file via `--from`, `--from-url`,
+  stdin) keep working unchanged.
+
+### Verified end-to-end
+- Offline unit-style: parse spec / build URL / pick files
+  (skills/ dir present, root-only fallback, subpath) /
+  install + skip-on-existing / `--force` reinstall.
+- Live: `lazyclaw skills install anthropics/claude-quickstarts
+  @main --max-bytes 67108864` fetches the real tarball,
+  installs `claude.md` + `readme.md` as skills, and
+  `lazyclaw skills list` / `show` round-trip them cleanly.
+
+---
 ## [3.96.0] — 2026-05-09  🐳 sandbox — Docker-wrapped subprocess providers
 
 OpenClaw exposes Docker / SSH / OpenShell sandboxes for non-main

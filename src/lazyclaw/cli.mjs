@@ -1127,7 +1127,7 @@ const HELP_DETAILS = {
   status: 'Usage: lazyclaw status\n  Provider, model, and masked API key. Never prints the raw key.',
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
   sessions: 'Usage: lazyclaw sessions <list [--filter <substr>] [--limit <N>]|show <id>|clear <id>|export <id> [--format md|json|text]|search <query> [--regex]>\n  list — recent sessions by mtime; --filter caps to ids containing substring (case-insensitive); --limit caps result count.\n  export — render in chosen format (md default for human sharing, json for tooling, text for paste).\n  search — case-insensitive substring (or --regex pattern) match across all session content; returns first excerpt + match count per matching session.',
-  skills: 'Usage: lazyclaw skills <list [--filter <substr>] [--limit <N>]|show <name>|install <name> [--from <path> | --from-url <https://...>]|remove <name>|search <query> [--regex]>\n  list — installed skills; --filter caps to names containing substring (case-insensitive); --limit caps result count.\n  --from-url fetches over HTTPS only; 1 MiB body cap.\n  search — case-insensitive substring (or --regex) match across all skill markdown bodies; returns first excerpt + match count per skill.',
+  skills: 'Usage: lazyclaw skills <list [--filter <substr>] [--limit <N>]|show <name>|install <user/repo[@ref][:path]> [--prefix <p>] [--force] | install <name> [--from <path> | --from-url <https://...>]|remove <name>|search <query> [--regex]>\n  list — installed skills; --filter caps to names containing substring (case-insensitive); --limit caps result count.\n  install <user>/<repo>[@<ref>][:<subpath>] — fetch a GitHub tarball, install every .md under skills/ (or the explicit subpath, or repo root). Default ref is `main`.\n    --prefix prepends a name prefix so a multi-skill repo doesn\'t collide with locally-managed skills. --force overwrites existing names.\n  install <name> --from <path> | --from-url <https://...> — single-file install. --from-url is HTTPS-only with a 1 MiB cap.\n  search — case-insensitive substring (or --regex) match across all skill markdown bodies; returns first excerpt + match count per skill.',
   providers: 'Usage: lazyclaw providers <list [--filter <substr>] [--limit <N>] | info <name> | test <name> [--model X] [--prompt T] | test [--all] [--prompt T]>\n  list — registered providers (--filter case-insensitive name substring; --limit caps post-filter count).\n  info — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test — send a 1-token "ping" through the provider and report ok/error + duration.\n         Useful after configuring an API key to verify it works before relying on it.\n         No name OR --all: tests every registered provider in parallel; exits 0 only when ALL pass.',
   daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>] [--cost-cap-<currency> <N> ...] [--workflow-state-dir <dir>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.\n  --cost-cap-usd 100 (or any currency code in lowercase) rejects POST /agent + /chat with 402 once cumulative cost reaches the cap.\n  --workflow-state-dir <dir> backs GET /workflows + GET /workflows/<id> (default .workflow-state, also reads $LAZYCLAW_WORKFLOW_STATE_DIR).',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
@@ -2404,9 +2404,38 @@ async function cmdSkills(sub, positional, flags = {}) {
       return;
     }
     case 'install': {
-      // Three forms: --from <path>, --from-url <https://...>, or stdin.
+      // Four forms:
+      //   1. install user/repo[@ref][:subpath]   — GitHub bundle
+      //   2. install <name> --from <path>
+      //   3. install <name> --from-url <https://...>
+      //   4. install <name>                       — body via stdin
+      // Detect form 1 via a slash in the first positional and the
+      // absence of any --from* flag (so a literal local skill name
+      // with `/` still routes to the explicit-flag branch — though
+      // skillPath() rejects slashes anyway).
       const name = positional[0];
-      if (!name) { console.error('Usage: lazyclaw skills install <name> [--from <path> | --from-url <https://...>]'); process.exit(2); }
+      if (!name) { console.error('Usage: lazyclaw skills install <user/repo[@ref][:path]> | <name> [--from <path> | --from-url <https://...>]'); process.exit(2); }
+      if (name.includes('/') && !flags.from && !flags['from-url']) {
+        const inst = await import('./skills_install.mjs');
+        try {
+          const r = await inst.installFromGithub(name, cfgDir, {
+            prefix: flags.prefix || '',
+            force: !!flags.force,
+            maxBytes: flags['max-bytes'] !== undefined ? parseInt(flags['max-bytes'], 10) : undefined,
+            timeoutMs: flags['timeout-ms'] !== undefined ? parseInt(flags['timeout-ms'], 10) : undefined,
+          });
+          console.log(JSON.stringify({
+            ok: true,
+            spec: `${r.spec.owner}/${r.spec.repo}@${r.spec.ref}${r.spec.subpath ? ':' + r.spec.subpath : ''}`,
+            installed: r.installed,
+            skipped: r.skipped,
+          }, null, 2));
+          return;
+        } catch (e) {
+          console.error(`error: ${e?.message || e}`);
+          process.exit(1);
+        }
+      }
       let content;
       if (flags['from-url']) {
         const url = String(flags['from-url']);
