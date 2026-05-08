@@ -1318,14 +1318,18 @@ async function cmdAgent(prompt, flags) {
 // (replaces rl.line with the full command). Tab still goes through
 // readline's tab-completer for cycling.
 function _attachGhostAutocomplete(rl) {
-  // Returns a `dispose()` callback that detaches the keypress listener
-  // and the rl 'line' listener installed below. Without disposal the
-  // process never exits — Node keeps the event loop alive while
-  // process.stdin has a 'keypress' listener attached. (This was the
-  // root cause of the slow `/exit` users reported.)
-  if (!process.stdout.isTTY) return () => {};
+  // Returns `{ dispose, suspend, resume }`. Dispose detaches the
+  // keypress + rl 'line' listeners (failure to do so leaks the
+  // event-loop ref, which is exactly the slow-exit bug v3.92
+  // fixed). Suspend / resume gate the keypress handler so the
+  // streaming chat output isn't interleaved with `\x1b[s\x1b[K\x1b[u`
+  // ghost-render escapes — that interleaving is what surfaces as
+  // visible gaps between Korean characters in long replies.
+  const noop = () => {};
+  if (!process.stdout.isTTY) return { dispose: noop, suspend: noop, resume: noop };
   const cmds = SLASH_COMMANDS.map((c) => c.cmd);
   let lastGhost = '';
+  let suspended = false;
   // Find the longest match for the current input. Returns '' when
   // nothing matches or when the input already equals a command.
   const findMatch = () => {
@@ -1362,6 +1366,10 @@ function _attachGhostAutocomplete(rl) {
   // _refreshLine, then return without forwarding the keypress.
   const onKeypress = (_str, key) => {
     if (!key) return;
+    // While a streaming response is being printed, do nothing —
+    // any ANSI cursor save / restore we emit would tear the wide-
+    // character (CJK) output apart on the visible terminal.
+    if (suspended) return;
     if (key.name === 'right' && lastGhost && rl.line === rl.line.trim() &&
         rl.cursor === (rl.line || '').length && (rl.line || '').length < lastGhost.length) {
       const accepted = lastGhost;
@@ -1387,12 +1395,22 @@ function _attachGhostAutocomplete(rl) {
   // over between turns.
   const onLine = () => { lastGhost = ''; };
   rl.on('line', onLine);
-  return () => {
+  const dispose = () => {
     try { process.stdin.removeListener('keypress', onKeypress); } catch (_) {}
     try { rl.removeListener('line', onLine); } catch (_) {}
     // Wipe any leftover ghost on screen so the user's terminal doesn't
     // keep a dim suffix after we exit.
     try { process.stdout.write('\x1b[s\x1b[K\x1b[u'); } catch (_) {}
+  };
+  return {
+    dispose,
+    suspend: () => {
+      suspended = true;
+      // Wipe any half-rendered ghost before streaming starts so the
+      // first chunk lands at the same column as the prompt.
+      try { process.stdout.write('\x1b[s\x1b[K\x1b[u'); } catch (_) {}
+    },
+    resume: () => { suspended = false; },
   };
 }
 
@@ -1727,13 +1745,13 @@ async function cmdChat(flags = {}) {
     terminal: useTerminal,
     prompt: useTerminal ? '\x1b[38;5;208m›\x1b[0m ' : '',
   });
-  let _disposeGhost = () => {};
+  let _ghost = { dispose: () => {}, suspend: () => {}, resume: () => {} };
   if (useTerminal) {
     // Cursor-style ghost autocomplete: when the buffer starts with `/`,
     // render the longest matching command after the cursor in dim grey.
     // Right-arrow at end-of-line accepts. Tab still cycles via the
     // existing handleSlash branch; this only adds the inline preview.
-    _disposeGhost = _attachGhostAutocomplete(rl) || (() => {});
+    _ghost = _attachGhostAutocomplete(rl) || _ghost;
     rl.prompt();
   }
 
@@ -1985,6 +2003,32 @@ async function cmdChat(flags = {}) {
       process.stdout.write('\n^C interrupted — prompt is back\n');
     };
     process.on('SIGINT', onSigint);
+    // Pause the ghost-autocomplete keypress handler while the
+    // provider is streaming. Without this, every stale stdin event
+    // would trigger `\x1b[s\x1b[K\x1b[u` cursor save/restore writes
+    // that interleave with the streamed text and surface as visible
+    // gaps between CJK characters (visible in user-reported screen
+    // captures of Korean replies).
+    if (useTerminal) _ghost.suspend();
+    // Buffered writer — coalesce single-character streaming chunks
+    // into ~30 ms windows. Two reasons:
+    //   1. Korean / Japanese / Chinese tokens often arrive as one
+    //      character per chunk. Each individual `process.stdout.write`
+    //      can race against terminal redraw on a wide-cell character,
+    //      producing the same "visible space between every character"
+    //      symptom the suspend above also addresses.
+    //   2. Far fewer syscalls. A 200-char Korean reply was ~200
+    //      separate writes; this collapses to ~7-10.
+    let _writeBuf = '';
+    let _writeTimer = null;
+    const _flush = () => {
+      if (_writeBuf) { process.stdout.write(_writeBuf); _writeBuf = ''; }
+      _writeTimer = null;
+    };
+    const _writeChunk = (s) => {
+      _writeBuf += s;
+      if (!_writeTimer) _writeTimer = setTimeout(_flush, 30);
+    };
     try {
       for await (const chunk of prov.sendMessage(messages, {
         apiKey: _resolveAuthKey(cfg, activeProvName),
@@ -1993,13 +2037,21 @@ async function cmdChat(flags = {}) {
         signal: turnAc.signal,
         onUsage: accumulateUsage,
       })) {
-        process.stdout.write(chunk);
+        _writeChunk(chunk);
         acc += chunk;
       }
+      // Drain anything still buffered before the trailing newline so
+      // the prompt lands on its own line cleanly.
+      if (_writeTimer) clearTimeout(_writeTimer);
+      _flush();
       process.stdout.write('\n');
       messages.push({ role: 'assistant', content: acc });
       persistTurn('assistant', acc);
     } catch (err) {
+      // Drain pending buffer so partial reply stays on screen even
+      // when the stream errors mid-flight.
+      if (_writeTimer) clearTimeout(_writeTimer);
+      _flush();
       // ABORT errors are user-initiated; partial assistant output is
       // discarded (we don't append a half-reply to the message history
       // because the next turn would treat it as a complete reply and
@@ -2009,6 +2061,7 @@ async function cmdChat(flags = {}) {
       }
     } finally {
       process.off('SIGINT', onSigint);
+      if (useTerminal) _ghost.resume();
     }
     if (useTerminal) rl.prompt();
   } } finally {
@@ -2016,7 +2069,7 @@ async function cmdChat(flags = {}) {
     // hung for ~3-5 s while Node waited for stdin's keypress listener
     // and raw mode to release. Tearing them down explicitly drops the
     // exit time to <100 ms.
-    try { _disposeGhost(); } catch (_) {}
+    try { _ghost.dispose(); } catch (_) {}
     try { rl.close(); } catch (_) {}
     if (useTerminal && process.stdin.isTTY && process.stdin.setRawMode) {
       try { process.stdin.setRawMode(false); } catch (_) {}
@@ -3490,32 +3543,46 @@ async function _runFirstTimeOnboard() {
   process.stdout.write('\n');
 }
 
+// Direct dispatch from a launcher pick. Replaces the previous
+// `process.argv = [...]; await main()` round-trip so we can reuse
+// the launcher across multiple iterations without compounding
+// state. Each menu choice maps to its native cmd handler with the
+// same flag defaults the bare CLI would parse.
+async function _dispatchMenuChoice(argv) {
+  const sub = argv[0];
+  const rest = argv.slice(1);
+  switch (sub) {
+    case 'chat':       return cmdChat({});
+    case 'agent':      return cmdAgent(rest[0] || '-', {});
+    case 'onboard':    return cmdOnboard({});
+    case 'setup':      return cmdSetup(undefined, rest, {});
+    case 'workspace':  return cmdWorkspace(rest[0], rest.slice(1), {});
+    case 'browse':     return cmdBrowse(rest[0], {});
+    case 'skills':     return cmdSkills(rest[0], rest.slice(1), {});
+    case 'sessions':   return cmdSessions(rest[0], rest.slice(1), {});
+    case 'providers':  return cmdProviders(rest[0], rest.slice(1), {});
+    case 'cron':       return cmdCron(rest[0], rest.slice(1), {});
+    case 'auth':       return cmdAuth(rest[0], rest.slice(1), {});
+    case 'pairing':    return cmdPairing(rest[0], rest.slice(1), {});
+    case 'nodes':      return cmdNodes(rest[0], rest.slice(1), {});
+    case 'message':    return cmdMessage(rest[0], rest.slice(1), {});
+    case 'doctor':     return cmdDoctor();
+    case 'status':     return cmdStatus();
+    case 'help':       return cmdHelp();
+    case 'dashboard':  return cmdDashboard({});
+    default:           throw new Error(`unknown menu choice: ${sub}`);
+  }
+}
+
 async function cmdLauncher() {
   await ensureRegistry();
-  let cfg = readConfig();
-  // First-run guard: a fresh install has no `provider` set, so any
-  // menu pick that calls a provider (Chat / Agent / Doctor / etc.)
-  // would error halfway through with a confusing "missing api key"
-  // or "unknown provider". Detect that state up front and walk the
-  // user through onboard before showing the menu — once they've
-  // picked, re-read the config and continue normally.
-  if (!cfg.provider) {
-    // Delegate to the full setup wizard rather than the bare onboard
-    // picker — first-time users benefit from the workspace / skill /
-    // ping steps too. cmdSetup exits the process on abort, so the
-    // re-read below only fires when the wizard completed successfully.
-    await cmdSetup(undefined, [], {});
-    cfg = readConfig();
-    if (!cfg.provider) {
-      process.stdout.write('\n  Setup not completed — exiting.\n  Run `lazyclaw setup` when ready, then try `lazyclaw` again.\n\n');
-      process.exit(0);
-    }
-  }
-  const provider = cfg.provider;
-  const model = cfg.model || '(default)';
+  // Item table is fixed across iterations — only the dispatcher and
+  // the per-iteration draw redraw on each loop tick.
   const items = [
     { id: 'chat',      label: 'Chat',          desc: 'interactive REPL with the configured provider', argv: ['chat'] },
     { id: 'agent',     label: 'Agent',         desc: 'one-shot prompt — read text and exit',           argv: ['agent'], promptForBody: true },
+    { id: 'dashboard', label: 'Dashboard',     desc: 'open the lazyclaw web UI in your browser',       argv: ['dashboard'] },
+    { id: 'setup',     label: 'Setup',         desc: 'multi-step provider / workspace / skill wizard', argv: ['setup'] },
     { id: 'onboard',   label: 'Onboard',       desc: 'pick provider / model / api-key',                argv: ['onboard'] },
     { id: 'workspace', label: 'Workspace',     desc: 'AGENTS.md / SOUL.md / TOOLS.md prompt bundles',  argv: ['workspace', 'list'] },
     { id: 'browse',    label: 'Browse',        desc: 'fetch a URL → markdown',                         argv: ['browse'], promptForUrl: true },
@@ -3526,97 +3593,131 @@ async function cmdLauncher() {
     { id: 'doctor',    label: 'Doctor',        desc: 'diagnostic — config, providers, workflows',     argv: ['doctor'] },
     { id: 'status',    label: 'Status',        desc: 'current provider / model / masked key',          argv: ['status'] },
     { id: 'help',      label: 'Help',          desc: 'one-line summary of every subcommand',           argv: ['help'] },
-    { id: 'quit',      label: 'Quit',          desc: 'exit without doing anything',                    argv: null },
+    { id: 'quit',      label: 'Quit',          desc: 'exit lazyclaw',                                  argv: null },
   ];
 
-  const readline = await import('node:readline');
-  readline.emitKeypressEvents(process.stdin);
-  if (process.stdin.setRawMode) process.stdin.setRawMode(true);
-  let idx = 0;
-
-  // Pretty header — same accent palette as _printChatBanner so
-  // returning users recognise it.
   const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
   const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
   const bold   = (s) => `\x1b[1m${s}\x1b[0m`;
   const ok     = (s) => `\x1b[32m${s}\x1b[0m`;
   const warn   = (s) => `\x1b[33m${s}\x1b[0m`;
 
-  const draw = () => {
-    process.stdout.write('\x1b[?25l\x1b[2J\x1b[H'); // hide cursor + clear
-    _renderBanner(readVersionFromRepo()).forEach((l) => process.stdout.write(l + '\n'));
-    process.stdout.write('\n');
-    const provDisplay = provider === '(unset — pick during onboard)'
-      ? warn(provider)
-      : ok(provider);
-    process.stdout.write(`  ${dim('provider ·')} ${provDisplay}\n`);
-    process.stdout.write(`  ${dim('model    ·')} ${ok(model)}\n`);
-    process.stdout.write(`  ${dim('config   ·')} ${dim(configPath())}\n`);
-    process.stdout.write('\n');
-    process.stdout.write(`  ${dim('↑/↓ to move · Enter to select · q or Esc to quit')}\n\n`);
-
-    // Trim list to terminal height so the menu still fits when
-    // someone shrinks the window or runs in a small split pane.
-    const rowsAvail = Math.max(items.length, (process.stdout.rows || 30) - 14);
-    const fromIdx = Math.max(0, Math.min(items.length - rowsAvail, idx - Math.floor(rowsAvail / 2)));
-    const toIdx = Math.min(items.length, fromIdx + rowsAvail);
-    for (let i = fromIdx; i < toIdx; i++) {
-      const it = items[i];
-      const marker = i === idx ? accent('❯ ') : '  ';
-      const lbl = i === idx ? bold(it.label.padEnd(11)) : it.label.padEnd(11);
-      process.stdout.write(`${marker}${lbl}  ${dim(it.desc)}\n`);
+  let idx = 0;
+  // Outer loop — each iteration is one menu render → pick →
+  // dispatch round. Subcommand return drops back here and the menu
+  // is redrawn. Quit / Esc / Ctrl-C breaks the loop and returns,
+  // which lets the calling main() exit naturally (no process.exit
+  // so the buffered writer / open file descriptors close cleanly).
+  while (true) {
+    // First-run / config-missing guard: a fresh install has no
+    // `provider` set, so any menu pick that calls a provider would
+    // error halfway through. Funnel through cmdSetup before
+    // rendering the menu the first time around.
+    let cfg = readConfig();
+    if (!cfg.provider) {
+      try { await cmdSetup(undefined, [], {}); }
+      catch (e) {
+        process.stderr.write(`setup error: ${e?.message || e}\n`);
+      }
+      cfg = readConfig();
+      if (!cfg.provider) {
+        process.stdout.write('\n  Setup not completed — exiting.\n  Run `lazyclaw setup` when ready, then try `lazyclaw` again.\n\n');
+        return;
+      }
     }
-    process.stdout.write('\n');
-  };
+    const provider = cfg.provider;
+    const model = cfg.model || '(default)';
 
-  // Tear down raw mode + listeners cleanly so the next subcommand
-  // starts with a sane stdin (otherwise `chat` after launcher inherits
-  // the launcher's raw mode and behaves weirdly).
-  const teardown = (onKey) => {
-    if (onKey) process.stdin.off('keypress', onKey);
-    if (process.stdin.setRawMode) process.stdin.setRawMode(false);
-    process.stdout.write('\x1b[?25h'); // show cursor
-    process.stdout.write('\x1b[2J\x1b[H'); // clear screen
-  };
+    // Re-establish stdin in raw / ref'd mode. A previous iteration
+    // (e.g. `chat`) deliberately paused + unref'd stdin in its
+    // exit-cleanup path so the process could end on /exit; now that
+    // we want to keep going, re-attach.
+    const readline = await import('node:readline');
+    readline.emitKeypressEvents(process.stdin);
+    if (process.stdin.setRawMode) process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.ref();
 
-  draw();
-  const picked = await new Promise((resolve) => {
-    const onKey = (_str, key) => {
-      if (!key) return;
-      if (key.name === 'up')        { idx = (idx - 1 + items.length) % items.length; draw(); }
-      else if (key.name === 'down') { idx = (idx + 1) % items.length; draw(); }
-      else if (key.name === 'home') { idx = 0; draw(); }
-      else if (key.name === 'end')  { idx = items.length - 1; draw(); }
-      else if (key.name === 'pageup')   { idx = Math.max(0, idx - 5); draw(); }
-      else if (key.name === 'pagedown') { idx = Math.min(items.length - 1, idx + 5); draw(); }
-      else if (key.name === 'return')   { teardown(onKey); resolve(items[idx]); }
-      else if (key.ctrl && key.name === 'c') { teardown(onKey); resolve({ id: 'quit', argv: null }); }
-      else if (key.name === 'escape' || key.name === 'q') { teardown(onKey); resolve({ id: 'quit', argv: null }); }
+    const draw = () => {
+      process.stdout.write('\x1b[?25l\x1b[2J\x1b[H'); // hide cursor + clear
+      _renderBanner(readVersionFromRepo()).forEach((l) => process.stdout.write(l + '\n'));
+      process.stdout.write('\n');
+      process.stdout.write(`  ${dim('provider ·')} ${ok(provider)}\n`);
+      process.stdout.write(`  ${dim('model    ·')} ${ok(model)}\n`);
+      process.stdout.write(`  ${dim('config   ·')} ${dim(configPath())}\n`);
+      process.stdout.write('\n');
+      process.stdout.write(`  ${dim('↑/↓ to move · Enter to select · q or Esc to quit')}\n\n`);
+      const rowsAvail = Math.max(items.length, (process.stdout.rows || 30) - 14);
+      const fromIdx = Math.max(0, Math.min(items.length - rowsAvail, idx - Math.floor(rowsAvail / 2)));
+      const toIdx = Math.min(items.length, fromIdx + rowsAvail);
+      for (let i = fromIdx; i < toIdx; i++) {
+        const it = items[i];
+        const marker = i === idx ? accent('❯ ') : '  ';
+        const lbl = i === idx ? bold(it.label.padEnd(11)) : it.label.padEnd(11);
+        process.stdout.write(`${marker}${lbl}  ${dim(it.desc)}\n`);
+      }
+      process.stdout.write('\n');
     };
-    process.stdin.on('keypress', onKey);
-  });
 
-  if (!picked || !picked.argv) {
-    process.exit(0);
+    draw();
+    const picked = await new Promise((resolve) => {
+      const onKey = (_str, key) => {
+        if (!key) return;
+        if (key.name === 'up')        { idx = (idx - 1 + items.length) % items.length; draw(); }
+        else if (key.name === 'down') { idx = (idx + 1) % items.length; draw(); }
+        else if (key.name === 'home') { idx = 0; draw(); }
+        else if (key.name === 'end')  { idx = items.length - 1; draw(); }
+        else if (key.name === 'pageup')   { idx = Math.max(0, idx - 5); draw(); }
+        else if (key.name === 'pagedown') { idx = Math.min(items.length - 1, idx + 5); draw(); }
+        else if (key.name === 'return')   { cleanup(); resolve(items[idx]); }
+        else if (key.ctrl && key.name === 'c') { cleanup(); resolve({ id: 'quit', argv: null }); }
+        else if (key.name === 'escape' || key.name === 'q') { cleanup(); resolve({ id: 'quit', argv: null }); }
+        function cleanup() {
+          process.stdin.off('keypress', onKey);
+          if (process.stdin.setRawMode) process.stdin.setRawMode(false);
+          process.stdout.write('\x1b[?25h\x1b[2J\x1b[H');
+        }
+      };
+      process.stdin.on('keypress', onKey);
+    });
+
+    if (!picked || picked.id === 'quit' || !picked.argv) {
+      // Plain return so main() can exit naturally.
+      return;
+    }
+
+    // Two menu items need a follow-up question before they can run:
+    // agent (prompt body), browse (URL). Ask once, then dispatch.
+    let argv = picked.argv;
+    if (picked.promptForBody) {
+      const body = await _quickPrompt('prompt: ');
+      if (!body) continue; // back to menu
+      argv = ['agent', body];
+    } else if (picked.promptForUrl) {
+      const url = await _quickPrompt('url: ');
+      if (!url) continue; // back to menu
+      argv = ['browse', url];
+    }
+
+    // Dispatch. Errors don't terminate the launcher — they're
+    // surfaced as a stderr line and the menu redraws. Lets the
+    // user recover from a transient API hiccup without a relaunch.
+    try {
+      await _dispatchMenuChoice(argv);
+    } catch (e) {
+      process.stderr.write(`\n  ${accent('✗')} ${e?.message || String(e)}\n`);
+    }
+
+    // Pause before re-drawing so the user can read the subcommand's
+    // output. `chat` is the special case: its REPL has already kept
+    // the user oriented for a long session, and they typed /exit
+    // explicitly, so jumping straight back to the menu reads as
+    // "ok, done with that conversation, back to the dashboard."
+    if (picked.id !== 'chat') {
+      process.stdout.write('\n');
+      await _quickPrompt(`  ${dim('Press Enter to return to the menu… ')}`);
+    }
   }
-  // Two surfaces need a follow-up question before they can run:
-  // - `agent`: needs a prompt body
-  // - `browse`: needs a URL
-  // Ask via a simple readline prompt so the launcher stays
-  // self-contained instead of forwarding into a half-typed argv.
-  if (picked.promptForBody) {
-    const body = await _quickPrompt('prompt: ');
-    if (!body) process.exit(0);
-    picked.argv = ['agent', body];
-  } else if (picked.promptForUrl) {
-    const url = await _quickPrompt('url: ');
-    if (!url) process.exit(0);
-    picked.argv = ['browse', url];
-  }
-  // Replace argv and re-enter main(). The chosen subcommand sees
-  // the same parser surface as if the user had typed it directly.
-  process.argv = [process.argv[0], process.argv[1], ...picked.argv];
-  await main();
 }
 
 async function _quickPrompt(label) {

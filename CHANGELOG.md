@@ -10,6 +10,84 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.8] — 2026-05-09  🔁 launcher loop + 한글 chat 공백 fix
+
+User: "설정하거나 exit했을 때 처음 화면으로 돌아가게. 지금 모델
+설정하면 바로 꺼져서 사용이 불편해. 채팅할 때 글씨가 하단에
+밀려서 전체적으로 이상하게 나와."
+
+Two coupled regressions surfaced in the user's screenshots:
+
+### 1. Launcher exits after every dispatch
+The v3.99.5 launcher dispatched a chosen subcommand by mutating
+`process.argv` and re-entering `main()`. Worked once, then the
+process ended — including after Onboard / Setup / Doctor /
+basically any pick the user might want to chain. Reads as the
+launcher "crashing on first use" from a UX standpoint.
+
+Replaced with a proper `while (true)` loop in `cmdLauncher`.
+Each iteration:
+  1. Re-reads config (so a Setup pick takes effect immediately).
+  2. Re-establishes raw / ref'd stdin (a previous Chat dispatch
+     paused + unref'd it for the v3.92 fast-exit; we re-attach
+     to keep going).
+  3. Renders banner + status + menu.
+  4. Awaits the arrow-key pick.
+  5. Dispatches via the new `_dispatchMenuChoice(argv)` helper —
+     direct cmd-function calls, no argv mutation. Errors are
+     surfaced as a stderr line and the loop continues; only Esc
+     / q / Ctrl-C / Quit row breaks the loop.
+  6. After non-Chat picks, prompts "Press Enter to return to the
+     menu" so the user can read JSON output before redraw.
+
+### 2. Korean chat output had spaces between every character
+Visible in the user's screenshot:
+
+  > hi
+  안 녕 하 세 요 ! 무 엇 을 도 와 드 릴 까 요 ?
+
+Two compounding causes:
+
+a. The ghost-autocomplete keypress listener was still active
+   during streaming. Every stale stdin event (autorepeat, OS-
+   level focus events, paste residue) fired its `setImmediate(
+   render)` which writes `\x1b[s\x1b[K\x1b[u` (save / clear-to-
+   end / restore) cursor escapes. Interleaving these with mid-
+   stream wide-character (CJK) writes leaves visible cell gaps
+   in the rendered output.
+
+b. `process.stdout.write` is synchronous on a TTY but each
+   write is an opportunity for terminal repaint. CJK tokens
+   often arrive as single characters from the stream; ~200
+   per-char writes for a normal Korean reply gave the
+   terminal repaint loop ~200 chances to insert visual
+   artifacts on wide-cell glyphs.
+
+### Fix
+- `_attachGhostAutocomplete` now returns
+  `{ dispose, suspend, resume }` (was a bare dispose function).
+  `cmdChat` calls `suspend()` before each provider stream and
+  `resume()` afterwards, so ghost-render escapes can't
+  interleave with the streamed text.
+- 30 ms write buffer in the chat streaming path: chunks are
+  appended to a string buffer that flushes via `setTimeout`,
+  collapsing many per-char writes into a few coherent ones.
+  Same effect for any provider whose tokens are very small,
+  not just CJK.
+- `_disposeGhost` callsite renamed to `_ghost.dispose()`.
+
+### Verified
+- Live: `printf '안녕\n/exit\n' | lazyclaw chat` (against the
+  user's claude-cli config) outputs `안녕하세요! 무엇을
+  도와드릴까요?` cleanly — no inter-character spacing.
+- Non-TTY no-arg call still prints the historical `Usage: ...`
+  line so automation / CI is unchanged.
+- Module-load + `lazyclaw version` regression check intact.
+
+src/lazyclaw/package.json 3.99.7 → 3.99.8. Push triggers
+`publish-lazyclaw.yml`.
+
+---
 ## [3.99.7] — 2026-05-09  🪜 picker — 3-step drill-in (auth → provider → model)
 
 User: "모델을 고를때 한꺼번에 많은 모델이 나오는게 아니라,
