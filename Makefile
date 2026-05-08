@@ -75,13 +75,25 @@ lazyclaw-pack:
 lazyclaw-publish-dry:
 	cd src/lazyclaw && npm publish --dry-run
 
-# Real publish — requires `npm login` first and a maintainer's 2FA.
-# Refuses to run when the working tree has uncommitted changes inside
-# src/lazyclaw/, so a half-applied edit can't accidentally ship.
+# Real publish — requires `npm login` first AND a 2FA OTP because
+# npmjs.org enforces 2FA on publish. npm's interactive OTP prompt
+# doesn't fire reliably when run through Make (the publish PUT goes
+# straight out and 403s); pass OTP as a Make variable instead:
+#
+#   make lazyclaw-publish OTP=123456    # 6 digits from authenticator
+#
+# Pre-flight refuses uncommitted edits inside src/lazyclaw and a
+# missing `npm login`, so each surface fails fast with a clear cause.
 lazyclaw-publish:
 	@if ! git diff --quiet src/lazyclaw || ! git diff --cached --quiet src/lazyclaw; then \
 	  echo "✗ src/lazyclaw has uncommitted changes — commit or stash first"; \
 	  exit 1; \
 	fi
 	@npm whoami >/dev/null 2>&1 || { echo "✗ run \`npm login\` first"; exit 1; }
-	cd src/lazyclaw && npm publish
+	@if [ -z "$(OTP)" ]; then \
+	  echo "✗ OTP required: make lazyclaw-publish OTP=123456"; \
+	  echo "  (open your authenticator app for the 6-digit npm code)"; \
+	  echo "  alternative: cd src/lazyclaw && npm publish        # interactive prompt"; \
+	  exit 1; \
+	fi
+	cd src/lazyclaw && npm publish --otp=$(OTP)
