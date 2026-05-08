@@ -10,6 +10,59 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.9] — 2026-05-09  🛡 launcher dispatch — guard against subcommand process.exit
+
+User: "Setup 누르고 엔터 누르니까 바로 꺼져."
+
+The v3.99.5–v3.99.7 launcher used `process.argv = […]; await
+main()` to dispatch a chosen menu pick — the moment the chosen
+subcommand exited (often via `process.exit(0)` in its own
+cleanup), the whole process died. v3.99.8 replaced that with a
+proper while-loop, but the loop is still vulnerable to any
+`process.exit()` call inside a dispatched subcommand. Many
+subcommands DO call it: `cmdDoctor` ends with
+`process.exit(ok ? 0 : 1)`, `cmdOnboard` exits 2 on a missing
+provider, `cmdSetup` itself had a `process.exit(0)` for the
+"setup aborted" path, and so on. Pick any of those from the
+menu and the launcher would crash to the shell.
+
+### Fix
+- `cmdSetup` now `return`s on the abort + onboard-error paths
+  instead of calling `process.exit`. Surface text was reworded
+  to match — "Setup not completed" rather than "exiting".
+- `_dispatchMenuChoice` now wraps every dispatched call with a
+  `process.exit` interceptor:
+    1. Save the real `process.exit`.
+    2. Replace it with a function that throws a `_DispatchExit`
+       carrying the requested code.
+    3. `await` the subcommand inside try / catch / finally.
+    4. Catch `_DispatchExit`, log non-zero codes as a dim hint,
+       continue.
+    5. Restore the real `process.exit` no matter what.
+  Mirrors how Python REPL frameworks intercept `SystemExit` so
+  long-running shells survive subcommand exits.
+
+### Effect
+- Pick **Setup** from the menu → wizard runs → on abort or
+  completion, the menu redraws (was: process died).
+- Pick **Doctor** → JSON prints → menu redraws (was: process
+  exited 0 / 1).
+- Pick **Onboard** → picker → "Press Enter to return to menu"
+  → menu (was: exit 0).
+- Real Ctrl-C inside the launcher screen is still handled by
+  the menu's keypress handler (`key.ctrl && key.name === 'c'`)
+  and breaks the loop cleanly.
+
+### Verified
+- Module loads + `lazyclaw version` reports 3.99.9.
+- Non-TTY no-arg call still prints the historical Usage line.
+- Piped `lazyclaw chat` round-trip with Korean reply renders
+  cleanly (no inter-character spacing).
+
+src/lazyclaw/package.json 3.99.8 → 3.99.9. Push triggers
+`publish-lazyclaw.yml`.
+
+---
 ## [3.99.8] — 2026-05-09  🔁 launcher loop + 한글 chat 공백 fix
 
 User: "설정하거나 exit했을 때 처음 화면으로 돌아가게. 지금 모델

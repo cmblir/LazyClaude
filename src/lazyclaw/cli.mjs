@@ -3407,16 +3407,23 @@ async function cmdSetup(_sub, _positional, flags = {}) {
   try {
     await cmdOnboard({ pick: true });
   } catch (e) {
+    // Don't kill the process — the setup wizard is often called
+    // from inside cmdLauncher's loop, and a process.exit there
+    // would close the launcher entirely (the surface bug the
+    // user reported as "Setup 누르고 엔터 누르니까 바로 꺼져").
+    // Surface the error and let the caller decide.
     process.stderr.write(`onboard error: ${e?.message || e}\n`);
-    process.exit(1);
+    return;
   }
   // Re-read config after onboard wrote it. If the user aborted with
   // no provider set, bail out early — the rest of the wizard depends
-  // on a provider being configured.
+  // on a provider being configured. `return` (not process.exit) so a
+  // launcher caller can re-prompt or fall back gracefully.
   const cfgAfterOnboard = readConfig();
   if (!cfgAfterOnboard.provider) {
-    process.stdout.write(`\n  ${warn('Setup aborted — no provider configured. Run `lazyclaw setup` again when ready.')}\n\n`);
-    process.exit(0);
+    process.stdout.write(`\n  ${warn('Setup not completed — provider was not configured.')}\n`);
+    process.stdout.write(`  ${dim('Run `lazyclaw setup` again when ready, or pick "Onboard" from the menu for a single-step picker.')}\n\n`);
+    return;
   }
   process.stdout.write(`\n  ${ok('✓ provider:')} ${cfgAfterOnboard.provider}  ${dim('model:')} ${cfgAfterOnboard.model || '(default)'}\n\n`);
 
@@ -3543,34 +3550,69 @@ async function _runFirstTimeOnboard() {
   process.stdout.write('\n');
 }
 
+// Marker exception used by the launcher's process.exit guard. See
+// _dispatchMenuChoice below for why intercepting process.exit is
+// the cleanest way to keep the menu loop alive.
+class _DispatchExit extends Error {
+  constructor(code) {
+    super(`subcommand requested exit ${code}`);
+    this.name = 'DispatchExit';
+    this.exitCode = Number.isFinite(code) ? code : 0;
+  }
+}
+
 // Direct dispatch from a launcher pick. Replaces the previous
 // `process.argv = [...]; await main()` round-trip so we can reuse
 // the launcher across multiple iterations without compounding
-// state. Each menu choice maps to its native cmd handler with the
-// same flag defaults the bare CLI would parse.
+// state.
+//
+// Subcommand functions across this CLI freely call `process.exit()`
+// to signal their result — perfectly fine for one-shot CLI use,
+// fatal to a launcher loop because the first exit kills the whole
+// process before we can redraw the menu. Intercept process.exit for
+// the duration of the dispatch and turn it into a thrown exception
+// the loop can catch + log + continue from. This mirrors how Python
+// CLI frameworks handle SystemExit when running inside a REPL.
 async function _dispatchMenuChoice(argv) {
   const sub = argv[0];
   const rest = argv.slice(1);
-  switch (sub) {
-    case 'chat':       return cmdChat({});
-    case 'agent':      return cmdAgent(rest[0] || '-', {});
-    case 'onboard':    return cmdOnboard({});
-    case 'setup':      return cmdSetup(undefined, rest, {});
-    case 'workspace':  return cmdWorkspace(rest[0], rest.slice(1), {});
-    case 'browse':     return cmdBrowse(rest[0], {});
-    case 'skills':     return cmdSkills(rest[0], rest.slice(1), {});
-    case 'sessions':   return cmdSessions(rest[0], rest.slice(1), {});
-    case 'providers':  return cmdProviders(rest[0], rest.slice(1), {});
-    case 'cron':       return cmdCron(rest[0], rest.slice(1), {});
-    case 'auth':       return cmdAuth(rest[0], rest.slice(1), {});
-    case 'pairing':    return cmdPairing(rest[0], rest.slice(1), {});
-    case 'nodes':      return cmdNodes(rest[0], rest.slice(1), {});
-    case 'message':    return cmdMessage(rest[0], rest.slice(1), {});
-    case 'doctor':     return cmdDoctor();
-    case 'status':     return cmdStatus();
-    case 'help':       return cmdHelp();
-    case 'dashboard':  return cmdDashboard({});
-    default:           throw new Error(`unknown menu choice: ${sub}`);
+  const realExit = process.exit.bind(process);
+  process.exit = (code) => { throw new _DispatchExit(code); };
+  try {
+    switch (sub) {
+      case 'chat':       return await cmdChat({});
+      case 'agent':      return await cmdAgent(rest[0] || '-', {});
+      case 'onboard':    return await cmdOnboard({});
+      case 'setup':      return await cmdSetup(undefined, rest, {});
+      case 'workspace':  return await cmdWorkspace(rest[0], rest.slice(1), {});
+      case 'browse':     return await cmdBrowse(rest[0], {});
+      case 'skills':     return await cmdSkills(rest[0], rest.slice(1), {});
+      case 'sessions':   return await cmdSessions(rest[0], rest.slice(1), {});
+      case 'providers':  return await cmdProviders(rest[0], rest.slice(1), {});
+      case 'cron':       return await cmdCron(rest[0], rest.slice(1), {});
+      case 'auth':       return await cmdAuth(rest[0], rest.slice(1), {});
+      case 'pairing':    return await cmdPairing(rest[0], rest.slice(1), {});
+      case 'nodes':      return await cmdNodes(rest[0], rest.slice(1), {});
+      case 'message':    return await cmdMessage(rest[0], rest.slice(1), {});
+      case 'doctor':     return await cmdDoctor();
+      case 'status':     return await cmdStatus();
+      case 'help':       return cmdHelp();
+      case 'dashboard':  return await cmdDashboard({});
+      default:           throw new Error(`unknown menu choice: ${sub}`);
+    }
+  } catch (e) {
+    if (e instanceof _DispatchExit) {
+      // Subcommand wanted to exit. Surface a non-zero code so the
+      // user knows something flagged, but DON'T propagate — we want
+      // the launcher loop to continue.
+      if (e.exitCode !== 0) {
+        process.stderr.write(`  \x1b[2m(subcommand returned exit code ${e.exitCode})\x1b[0m\n`);
+      }
+      return;
+    }
+    throw e;
+  } finally {
+    process.exit = realExit;
   }
 }
 
