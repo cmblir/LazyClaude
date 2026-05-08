@@ -50,15 +50,20 @@ export const mockProvider = {
 
 export { anthropicProvider, openaiProvider, ollamaProvider, geminiProvider, claudeCliProvider };
 
+// Insertion order is the picker order. The list goes first-to-last in
+// rough "user-familiar / popular" order so a first-time onboard lands
+// the cursor on a vendor most users recognise. v3.99.5 reordered per
+// user feedback ("gemini, codex 이런거 먼저 나오게끔").
 export const PROVIDERS = {
-  mock: mockProvider,
-  // claude-cli (subscription-backed, no API key) listed before
-  // anthropic so first-time onboarding surfaces it as the default.
+  // Tier 1 — popular / brand-name vendors users come in looking for.
+  gemini: geminiProvider,
+  openai: openaiProvider,        // surfaces gpt-5-codex / gpt-5 / o3-pro etc.
+  // Tier 2 — Claude. CLI variant first because it's keyless.
   'claude-cli': claudeCliProvider,
   anthropic: anthropicProvider,
-  openai: openaiProvider,
-  gemini: geminiProvider,
+  // Tier 3 — local + dev/test.
   ollama: ollamaProvider,
+  mock: mockProvider,
 };
 
 // Static metadata for `lazyclaw providers list/info`. Kept next to PROVIDERS

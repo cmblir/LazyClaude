@@ -1457,10 +1457,10 @@ async function _pickProviderInteractive() {
     });
     return { provider: ans || providers[0], model: null };
   }
-  // Default cursor: prefer claude-cli (subscription, no key) so first-
-  // time users with Claude Code already installed don't have to scroll.
-  let idx = items.findIndex(it => it.provider === 'claude-cli');
-  if (idx < 0) idx = 0;
+  // Default cursor: lands on item 0 (= the first row from PROVIDERS
+  // insertion order, which registry.mjs deliberately curates as the
+  // most user-familiar vendor — gemini at the time of writing).
+  let idx = 0;
 
   const readline = await import('node:readline');
   readline.emitKeypressEvents(process.stdin);
@@ -3082,10 +3082,69 @@ function parseArgs(argv) {
 // so chat / agent / etc. behave bit-identically to typing them
 // directly. Non-TTY (piped, scripted) callers still see the
 // classic "Usage: …" line so automation isn't surprised.
+// First-run welcome panel + delegated onboard. Drawn once before the
+// main launcher menu when the config has no provider yet. Walks the
+// user through the same arrow-key picker that `lazyclaw onboard`
+// uses; on success the launcher continues, on cancel the launcher
+// exits politely instead of dropping into a menu where every option
+// would error.
+async function _runFirstTimeOnboard() {
+  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
+  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
+  const bold   = (s) => `\x1b[1m${s}\x1b[0m`;
+  process.stdout.write('\x1b[2J\x1b[H');
+  const banner = [
+    accent('  ╭──────────────────────────────╮'),
+    accent('  │   _                          │'),
+    accent('  │  | |__ _ _____  _ _          │'),
+    accent('  │  | / _` |_ / || | \'_|         │'),
+    accent('  │  |_\\__,_/__\\_, |_|            │'),
+    accent('  │  LazyClaw  |__/  ' + (readVersionFromRepo() || '').padEnd(10) + '  │'),
+    accent('  ╰──────────────────────────────╯'),
+  ];
+  banner.forEach((l) => process.stdout.write(l + '\n'));
+  process.stdout.write('\n');
+  process.stdout.write(`  ${bold('👋 Welcome — first-time setup')}\n\n`);
+  process.stdout.write(`  ${dim('No provider configured yet at')} ${configPath()}\n`);
+  process.stdout.write(`  ${dim('Pick a provider + model below; LazyClaw stores it in ~/.lazyclaw/config.json.')}\n\n`);
+  process.stdout.write(`  ${dim('Quick rule of thumb:')}\n`);
+  process.stdout.write(`  ${dim('  · gemini / openai / anthropic — need an API key (sk-... / paste during setup)')}\n`);
+  process.stdout.write(`  ${dim('  · claude-cli / ollama          — keyless (use your existing Claude Code login or local Ollama)')}\n`);
+  process.stdout.write(`  ${dim('  · mock                         — offline echo, only useful for testing')}\n\n`);
+  process.stdout.write(`  ${dim('Press Enter to open the picker · Ctrl+C to abort.')}\n`);
+  await _quickPrompt('  ▶ ');
+  // Delegate to the real onboard flow with --pick so the picker UI
+  // fires regardless of how this entry point was reached. cmdOnboard
+  // owns config writing.
+  try {
+    await cmdOnboard({ pick: true });
+  } catch (e) {
+    process.stderr.write(`onboard error: ${e?.message || e}\n`);
+  }
+  process.stdout.write('\n');
+}
+
 async function cmdLauncher() {
   await ensureRegistry();
-  const cfg = readConfig();
-  const provider = cfg.provider || '(unset — pick during onboard)';
+  let cfg = readConfig();
+  // First-run guard: a fresh install has no `provider` set, so any
+  // menu pick that calls a provider (Chat / Agent / Doctor / etc.)
+  // would error halfway through with a confusing "missing api key"
+  // or "unknown provider". Detect that state up front and walk the
+  // user through onboard before showing the menu — once they've
+  // picked, re-read the config and continue normally.
+  if (!cfg.provider) {
+    await _runFirstTimeOnboard();
+    cfg = readConfig();
+    // If they cancelled / aborted onboard we still don't have a
+    // provider — drop straight out instead of showing a menu where
+    // every item leads to the same error.
+    if (!cfg.provider) {
+      process.stdout.write('\n  Setup not completed — exiting.\n  Run `lazyclaw onboard` when ready, then try `lazyclaw` again.\n\n');
+      process.exit(0);
+    }
+  }
+  const provider = cfg.provider;
   const model = cfg.model || '(default)';
   const items = [
     { id: 'chat',      label: 'Chat',          desc: 'interactive REPL with the configured provider', argv: ['chat'] },

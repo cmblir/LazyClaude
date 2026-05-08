@@ -10,6 +10,56 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.5] — 2026-05-09  🆕 first-run onboard + reordered providers
+
+User: "처음 onboard할때 모델들 전체가 나오는게 아니라 일단
+gemini, codex 이런거 먼저 나오게끔 해줘. lazyclaw를 처음 설정하면
+이 onboard로 바로 넘어가게 해주고. 바로 lazyclaw에서 chat으로
+가니까 오류가 생겨서 유저가 너무 어려울 것 같아."
+
+### Provider order — gemini / openai first
+`registry.mjs::PROVIDERS` insertion order rewritten so the
+arrow-key picker leads with the vendors most users come in
+looking for:
+
+  1. gemini       (API)
+  2. openai       (API — surfaces gpt-5-codex / gpt-5 / o3-pro etc.)
+  3. claude-cli   (subscription, no key)
+  4. anthropic    (API)
+  5. ollama       (local)
+  6. mock         (test only)
+
+Picker default cursor moved from `claude-cli` to row 0
+(= gemini at the top of the new order). The "land on first
+row" comment now points at registry.mjs as the source of
+truth so future tier changes don't have a stale doc string
+in cli.mjs.
+
+### First-run flow — auto-onboard before menu
+`cmdLauncher` now checks `cfg.provider` up front. If unset
+(fresh install, no `~/.lazyclaw/config.json`), it draws a
+welcome panel and routes the user through the picker via
+`cmdOnboard({ pick: true })` BEFORE showing the menu. The
+old behaviour was to drop straight into the menu and let
+`Chat` / `Doctor` etc. fail with "missing api key" /
+"unknown provider" mid-flow, which is confusing for first-
+time users who installed via `npm i -g lazyclaw` and don't
+know any subcommands yet.
+
+If the user cancels onboard mid-flow (Ctrl-C / Esc), the
+launcher exits politely with a tip pointing at
+`lazyclaw onboard`, instead of bouncing them into a menu
+where every option still errors.
+
+### Verified
+- Non-TTY: `lazyclaw` (no args) still prints the historical
+  Usage line; CI / scripts unaffected.
+- Non-TTY onboard --non-interactive still writes config
+  unchanged (regression check).
+- `lazyclaw providers list` confirms the new order.
+- npm pack: 31 files, 122.6 kB — no shape change vs v3.99.4.
+
+---
 ## [3.99.4] — 2026-05-09  🚑 npm package — restore 6 missing modules
 
 User report: after the v3.99.3 publish finally succeeded,
