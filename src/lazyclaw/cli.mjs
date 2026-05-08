@@ -1246,7 +1246,12 @@ async function cmdAgent(prompt, flags) {
 // (replaces rl.line with the full command). Tab still goes through
 // readline's tab-completer for cycling.
 function _attachGhostAutocomplete(rl) {
-  if (!process.stdout.isTTY) return;
+  // Returns a `dispose()` callback that detaches the keypress listener
+  // and the rl 'line' listener installed below. Without disposal the
+  // process never exits — Node keeps the event loop alive while
+  // process.stdin has a 'keypress' listener attached. (This was the
+  // root cause of the slow `/exit` users reported.)
+  if (!process.stdout.isTTY) return () => {};
   const cmds = SLASH_COMMANDS.map((c) => c.cmd);
   let lastGhost = '';
   // Find the longest match for the current input. Returns '' when
@@ -1308,7 +1313,15 @@ function _attachGhostAutocomplete(rl) {
   process.stdin.on('keypress', onKeypress);
   // Clear ghost on each new prompt so a stale dim hint doesn't carry
   // over between turns.
-  rl.on('line', () => { lastGhost = ''; });
+  const onLine = () => { lastGhost = ''; };
+  rl.on('line', onLine);
+  return () => {
+    try { process.stdin.removeListener('keypress', onKeypress); } catch (_) {}
+    try { rl.removeListener('line', onLine); } catch (_) {}
+    // Wipe any leftover ghost on screen so the user's terminal doesn't
+    // keep a dim suffix after we exit.
+    try { process.stdout.write('\x1b[s\x1b[K\x1b[u'); } catch (_) {}
+  };
 }
 
 // LazyClaw banner — printed once at the top of every interactive chat
@@ -1474,12 +1487,13 @@ async function cmdChat(flags = {}) {
     terminal: useTerminal,
     prompt: useTerminal ? '\x1b[38;5;208m›\x1b[0m ' : '',
   });
+  let _disposeGhost = () => {};
   if (useTerminal) {
     // Cursor-style ghost autocomplete: when the buffer starts with `/`,
     // render the longest matching command after the cursor in dim grey.
     // Right-arrow at end-of-line accepts. Tab still cycles via the
     // existing handleSlash branch; this only adds the inline preview.
-    _attachGhostAutocomplete(rl);
+    _disposeGhost = _attachGhostAutocomplete(rl) || (() => {});
     rl.prompt();
   }
 
@@ -1683,7 +1697,7 @@ async function cmdChat(flags = {}) {
     }
   };
 
-  for await (const line of rl) {
+  try { for await (const line of rl) {
     const text = line.trim();
     if (!text) { if (useTerminal) rl.prompt(); continue; }
     if (text.startsWith('/')) {
@@ -1731,6 +1745,21 @@ async function cmdChat(flags = {}) {
       process.off('SIGINT', onSigint);
     }
     if (useTerminal) rl.prompt();
+  } } finally {
+    // Clean shutdown — without this, /exit "worked" but the process
+    // hung for ~3-5 s while Node waited for stdin's keypress listener
+    // and raw mode to release. Tearing them down explicitly drops the
+    // exit time to <100 ms.
+    try { _disposeGhost(); } catch (_) {}
+    try { rl.close(); } catch (_) {}
+    if (useTerminal && process.stdin.isTTY && process.stdin.setRawMode) {
+      try { process.stdin.setRawMode(false); } catch (_) {}
+    }
+    // process.stdin keeps the event loop alive in raw / readline mode.
+    // Pause + unref releases the hold so the process can exit cleanly
+    // from natural completion (no need for a hard process.exit).
+    try { process.stdin.pause(); } catch (_) {}
+    try { process.stdin.unref(); } catch (_) {}
   }
 }
 

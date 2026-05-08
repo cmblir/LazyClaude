@@ -10,6 +10,52 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.92.0] — 2026-05-08  🚪 instant `/exit` from `lazyclaw chat`
+
+User report: "지금 exit 해도 너무 오래 걸려. 최적화해줘."
+
+### Root cause
+After `/exit` broke out of the for-await on `rl`, `cmdChat`
+returned but the process still had three event-loop holds:
+
+1. `process.stdin` had a `keypress` listener attached by
+   `_attachGhostAutocomplete` — never detached. Node keeps the
+   loop alive while there's an active stdin listener.
+2. `process.stdin.setRawMode(true)` was set by terminal-mode
+   readline and never restored, so stdin was still draining.
+3. `rl` was never explicitly closed; relying on the iterator
+   completion left the interface lingering for several seconds
+   on macOS Terminal / iTerm.
+
+Net effect: 3–5 s wait between `/exit` and the shell prompt
+returning. Confirmed locally before the fix.
+
+### Fix
+- `_attachGhostAutocomplete` now returns a `dispose()` callback
+  that detaches both the `keypress` listener and the rl `line`
+  listener it installed. (Also wipes any leftover dim ghost so
+  the user's terminal doesn't keep the suffix.)
+- `cmdChat` wraps the for-await loop in try/finally; the finally
+  block calls `dispose()`, `rl.close()`, restores raw mode, then
+  `process.stdin.pause()` + `unref()` to drop the stdin hold so
+  the process can exit naturally — no need for a hard
+  `process.exit`.
+
+### Measured (after)
+| Path | Time |
+|---|---|
+| `printf '/exit\n' \| lazyclaw chat`           | 57 ms |
+| `printf 'hi\n/exit\n' \| lazyclaw chat`        | 53 ms |
+| `script(1)`-faked TTY + `/exit`                | 73 ms |
+| `lazyclaw version` / `lazyclaw doctor`         | 50 ms |
+
+≈50–100× faster than the pre-fix 3–5 s.
+
+### Auto-publish
+`src/lazyclaw/package.json` 3.91.0 → 3.92.0 triggers the
+publish workflow on push.
+
+---
 ## [3.91.0] — 2026-05-08  🆓 lazyclaw subscription mode + bigger model list
 
 User report: "api 키 안넣고 구독으로 할 수 있게끔 해줘. 그리고
