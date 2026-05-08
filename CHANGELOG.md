@@ -10,6 +10,54 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.10] — 2026-05-09  🧰 stdin handoff — _arrowMenu / _quickPrompt resume defensively
+
+User: "Setup하고 LazyClaw setup — Step 1 of 3 여기서 엔터누르면
+바로 꺼져."
+
+The user is on the `lazyclaw@3.99.7` npm artifact, which still
+has the v3.99.5 launcher (single-shot dispatch + process.exit).
+The v3.99.8 / v3.99.9 fixes are committed locally but not yet
+on npm. Pushing this commit triggers auto-publish and lifts
+them to a build that survives the menu loop and intercepts
+subcommand `process.exit`.
+
+While we're touching the file, also harden the stdin handoff
+between `_quickPrompt` and `_arrowMenu`:
+
+### Defensive stdin
+- `_arrowMenu` now `process.stdin.resume()` + `.ref()` after
+  enabling raw mode. A prior `readline.createInterface(...)
+  .close()` (e.g. the welcome `_quickPrompt` inside `cmdSetup`)
+  pauses stdin in Node's internal book-keeping — without an
+  explicit resume, the picker's keypress listener never fires
+  and the menu appears frozen / instantly resolves on a stray
+  buffered byte.
+- `_quickPrompt` now flips `setRawMode(false)` + resumes stdin
+  before opening readline, so an in-progress raw-mode loop
+  doesn't block the prompt's line-event from firing.
+
+These are belt-and-suspenders fixes that make the picker /
+prompt transitions robust regardless of the previous step's
+stdin state.
+
+### Effect
+- Setup → Step 1 → Enter no longer races: stdin is guaranteed
+  resumed before the picker reads its first keypress.
+- _quickPrompt called immediately after a raw-mode menu (the
+  "Press Enter to return to menu" line) gets a clean
+  line-buffered prompt instead of swallowing the Enter as a
+  raw keypress.
+
+### Verified
+- `lazyclaw version` reports 3.99.10.
+- Non-TTY no-arg call still prints the historical Usage line.
+- Piped chat with Korean reply renders cleanly.
+
+src/lazyclaw/package.json 3.99.9 → 3.99.10. Push triggers
+`publish-lazyclaw.yml`.
+
+---
 ## [3.99.9] — 2026-05-09  🛡 launcher dispatch — guard against subcommand process.exit
 
 User: "Setup 누르고 엔터 누르니까 바로 꺼져."

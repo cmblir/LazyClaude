@@ -1521,6 +1521,13 @@ async function _arrowMenu({ title, subtitle, footer, items, defaultIdx = 0 }) {
   const readline = await import('node:readline');
   readline.emitKeypressEvents(process.stdin);
   if (process.stdin.setRawMode) process.stdin.setRawMode(true);
+  // A previous `readline.createInterface(...).close()` (e.g. from
+  // `_quickPrompt`) leaves stdin paused — the keypress listener we
+  // attach below would never fire and the menu would appear frozen
+  // instead of responding to arrow keys. Resume + ref defensively
+  // before drawing so the picker always receives the first keypress.
+  process.stdin.resume();
+  if (process.stdin.ref) process.stdin.ref();
   let idx = Math.max(0, Math.min(items.length - 1, defaultIdx));
   const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
   const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
@@ -3765,6 +3772,15 @@ async function cmdLauncher() {
 async function _quickPrompt(label) {
   const readline = await import('node:readline');
   process.stdout.write('\n');
+  // Make sure stdin is in cooked / line-buffered mode for the
+  // duration of the prompt — a prior `_arrowMenu` may have left raw
+  // mode on, in which case readline.question() never fires its
+  // line-event because each byte is delivered as a keypress instead.
+  if (process.stdin.isTTY && process.stdin.setRawMode) {
+    try { process.stdin.setRawMode(false); } catch (_) {}
+  }
+  process.stdin.resume();
+  if (process.stdin.ref) process.stdin.ref();
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ans = await new Promise((resolve) => rl.question(label, resolve));
   rl.close();
