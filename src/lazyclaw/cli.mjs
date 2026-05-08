@@ -1049,7 +1049,7 @@ const HELP_DETAILS = {
   validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
   graph: 'Usage: lazyclaw graph <workflow.mjs> [--lr] [--state <session-id>] [--dir <state-dir>]\n  Emit the workflow DAG as Mermaid syntax (graph TD by default; --lr for left-right).\n  --state overlays a persisted run\'s status (success ✓ / running ⏳ / failed ✗ / pending) with classDef styling.\n  Output is paste-ready for GitHub markdown / Notion / Obsidian.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit|validate> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.\n  `validate` checks the structural integrity of the whole config file (typed values, known providers, rate-card shape).',
-  chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.',
+  chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2] [--pick]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.\n  --pick opens an interactive provider/model picker before the prompt (also auto-fires on first run).',
   agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
   doctor: 'Usage: lazyclaw doctor\n  Validates configuration and registered providers. Exits 0 only when no issues.',
   status: 'Usage: lazyclaw status\n  Provider, model, and masked API key. Never prints the raw key.',
@@ -1194,6 +1194,173 @@ async function cmdAgent(prompt, flags) {
   }
 }
 
+// Cursor-style ghost autocomplete for the chat prompt. When the
+// current readline buffer starts with `/` and prefix-matches a known
+// slash command, the rest of the command is rendered in dim grey
+// after the cursor. Right-arrow at end-of-line accepts the suggestion
+// (replaces rl.line with the full command). Tab still goes through
+// readline's tab-completer for cycling.
+function _attachGhostAutocomplete(rl) {
+  if (!process.stdout.isTTY) return;
+  const cmds = SLASH_COMMANDS.map((c) => c.cmd);
+  let lastGhost = '';
+  // Find the longest match for the current input. Returns '' when
+  // nothing matches or when the input already equals a command.
+  const findMatch = () => {
+    const buf = rl.line || '';
+    if (!buf.startsWith('/')) return '';
+    const exact = cmds.find((c) => c === buf);
+    if (exact) return '';
+    const hits = cmds.filter((c) => c.startsWith(buf) && c.length > buf.length);
+    if (!hits.length) return '';
+    return hits[0]; // first match is the shortest matching command
+  };
+  // Render the ghost after the user's cursor. We use ANSI save/restore
+  // (\x1b[s / \x1b[u) so writing the suggestion doesn't move readline's
+  // notion of where the cursor is; we just paint the dim text and snap
+  // back. \x1b[K clears any leftover ghost from the previous keystroke.
+  const render = () => {
+    if (!process.stdout.isTTY) return;
+    const match = findMatch();
+    const buf = rl.line || '';
+    // Always clear leftover ghost first.
+    process.stdout.write('\x1b[s\x1b[K');
+    if (match && match.length > buf.length) {
+      const tail = match.slice(buf.length);
+      process.stdout.write(`\x1b[2m${tail}\x1b[0m`);
+      lastGhost = match;
+    } else {
+      lastGhost = '';
+    }
+    process.stdout.write('\x1b[u');
+  };
+  // Intercept Right-arrow at end-of-line to accept the suggestion.
+  // We attach as a prependListener so we run before readline's own
+  // handler — when we accept, we mutate rl.line ourselves and call
+  // _refreshLine, then return without forwarding the keypress.
+  const onKeypress = (_str, key) => {
+    if (!key) return;
+    if (key.name === 'right' && lastGhost && rl.line === rl.line.trim() &&
+        rl.cursor === (rl.line || '').length && (rl.line || '').length < lastGhost.length) {
+      const accepted = lastGhost;
+      // Clear the dim ghost before redrawing the line (otherwise the
+      // residue overlaps the new line content).
+      process.stdout.write('\x1b[s\x1b[K\x1b[u');
+      rl.line = accepted;
+      rl.cursor = accepted.length;
+      // _refreshLine is private but stable across Node 18+ readline
+      // implementations. Falls back to manual redraw if it ever changes.
+      if (typeof rl._refreshLine === 'function') rl._refreshLine();
+      else { process.stdout.write('\r\x1b[K' + (rl._prompt || '') + accepted); }
+      lastGhost = '';
+      return;
+    }
+    // For any other key, schedule the ghost re-render after readline
+    // has updated rl.line. setImmediate runs after readline's keypress
+    // handler completes.
+    setImmediate(render);
+  };
+  process.stdin.on('keypress', onKeypress);
+  // Clear ghost on each new prompt so a stale dim hint doesn't carry
+  // over between turns.
+  rl.on('line', () => { lastGhost = ''; });
+}
+
+// LazyClaw banner — printed once at the top of every interactive chat
+// session so users see the active provider/model before they start
+// typing. Plain ANSI; auto-skipped when stdout isn't a TTY (so piped
+// invocations stay clean for tests/scripts).
+function _printChatBanner(activeProvName, activeModel, version) {
+  if (!process.stdout.isTTY) return;
+  const dim = (s) => `\x1b[2m${s}\x1b[0m`;
+  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
+  const ok = (s) => `\x1b[32m${s}\x1b[0m`;
+  const lines = [
+    '',
+    accent('  ╭──────────────────────────────╮'),
+    accent('  │   _                          │'),
+    accent('  │  | |__ _ _____  _ _          │'),
+    accent('  │  | / _` |_ / || | \'_|         │'),
+    accent('  │  |_\\__,_/__\\_, |_|            │'),
+    accent('  │  LazyClaw  |__/  ' + (version || '').padEnd(10) + '  │'),
+    accent('  ╰──────────────────────────────╯'),
+    '',
+    `  ${dim('provider ·')} ${ok(activeProvName)}`,
+    `  ${dim('model    ·')} ${ok(activeModel || '(default)')}`,
+    `  ${dim('slash    ·')} /help · /model · /provider · /exit`,
+    `  ${dim('hint     ·')} → ${dim('to accept the suggested command,')} Tab ${dim('to cycle')}`,
+    '',
+  ];
+  process.stdout.write(lines.join('\n') + '\n');
+}
+
+// Interactive provider/model picker. Used on first run (no config) or
+// when the user passes --pick. Falls back to plain stdin reads when
+// stdout isn't a TTY (CI/script callers should pass --non-interactive
+// equivalents instead).
+async function _pickProviderInteractive() {
+  const providers = Object.keys(_registryMod.PROVIDERS);
+  if (!providers.length) return { provider: 'mock', model: null };
+  // Build the picker list: one row per provider, models surfaced inline
+  // when the provider exposes them via a `models` array (anthropic/openai/
+  // gemini/ollama do; mock doesn't).
+  const items = [];
+  for (const name of providers) {
+    const p = _registryMod.PROVIDERS[name];
+    const ms = (p && Array.isArray(p.models) && p.models.length) ? p.models : [null];
+    for (const m of ms) {
+      items.push({ provider: name, model: m, label: m ? `${name}  ${m}` : name });
+    }
+  }
+  if (!process.stdout.isTTY || !process.stdin.isTTY) {
+    // Fall back to a single prompt — the picker UI is purely cosmetic.
+    process.stdout.write(`provider [${providers.join('|')}]: `);
+    const ans = await new Promise((resolve) => {
+      let buf = '';
+      const onData = (chunk) => {
+        buf += chunk.toString();
+        if (buf.includes('\n')) { process.stdin.off('data', onData); resolve(buf.trim()); }
+      };
+      process.stdin.on('data', onData);
+    });
+    return { provider: ans || providers[0], model: null };
+  }
+  const readline = await import('node:readline');
+  readline.emitKeypressEvents(process.stdin);
+  if (process.stdin.setRawMode) process.stdin.setRawMode(true);
+  let idx = 0;
+  const draw = () => {
+    // Move to top of picker block, redraw rows, leave cursor at the bottom.
+    process.stdout.write('\x1b[?25l'); // hide cursor
+    process.stdout.write('\x1b[2J\x1b[H'); // clear screen
+    process.stdout.write('\x1b[38;5;208mLazyClaw — pick a provider/model\x1b[0m\n');
+    process.stdout.write('\x1b[2m↑/↓ to move · Enter to confirm · q to quit\x1b[0m\n\n');
+    items.forEach((it, i) => {
+      const marker = i === idx ? '\x1b[38;5;208m❯\x1b[0m ' : '  ';
+      const text = i === idx ? `\x1b[1m${it.label}\x1b[0m` : it.label;
+      process.stdout.write(`${marker}${text}\n`);
+    });
+  };
+  draw();
+  return await new Promise((resolve) => {
+    const onKey = (_str, key) => {
+      if (!key) return;
+      if (key.name === 'up')   { idx = (idx - 1 + items.length) % items.length; draw(); }
+      else if (key.name === 'down') { idx = (idx + 1) % items.length; draw(); }
+      else if (key.name === 'return') { cleanup(); resolve(items[idx]); }
+      else if (key.ctrl && key.name === 'c') { cleanup(); process.exit(130); }
+      else if (key.name === 'q' || key.name === 'escape') { cleanup(); resolve(items[idx]); }
+    };
+    const cleanup = () => {
+      process.stdin.off('keypress', onKey);
+      if (process.stdin.setRawMode) process.stdin.setRawMode(false);
+      process.stdout.write('\x1b[?25h'); // show cursor
+      process.stdout.write('\x1b[2J\x1b[H');
+    };
+    process.stdin.on('keypress', onKey);
+  });
+}
+
 async function cmdChat(flags = {}) {
   await ensureRegistry();
   const sessionsMod = await import('./sessions.mjs');
@@ -1203,14 +1370,47 @@ async function cmdChat(flags = {}) {
   // touching config.json on disk. The CLI flag form (`chat --provider X`)
   // would normally seed these via cfg, but we leave that to a future
   // iteration; today the slash commands work against the on-disk default.
-  let activeProvName = cfg.provider || 'mock';
+  let activeProvName = cfg.provider || '';
   let activeModel = cfg.model || null;
   const lookupProv = (name) => _registryMod.PROVIDERS[name];
+  // Interactive picker fires when --pick is set OR no provider is
+  // configured yet (first run). Skipped when stdin isn't a TTY so
+  // automation stays predictable.
+  const shouldPick = (!!flags.pick) || (!activeProvName && process.stdin.isTTY);
+  if (shouldPick) {
+    const picked = await _pickProviderInteractive();
+    if (picked && picked.provider) {
+      activeProvName = picked.provider;
+      if (picked.model) activeModel = picked.model;
+    }
+  }
+  if (!activeProvName) activeProvName = 'mock';
   let prov = lookupProv(activeProvName);
   if (!prov) { console.error(`unknown provider: ${activeProvName}`); process.exit(2); }
 
+  // Top-of-session banner so the user can see at a glance what they're
+  // talking to. Cheap (no provider call) and TTY-only.
+  _printChatBanner(activeProvName, activeModel, readVersionFromRepo());
+
   const readline = await import('node:readline');
-  const rl = readline.createInterface({ input: process.stdin, terminal: false });
+  // Use terminal:true when we're attached to a TTY so the prompt shows
+  // and ghost-text autocomplete (below) can render. Falls back to the
+  // plain non-terminal mode for piped/non-TTY callers.
+  const useTerminal = !!process.stdin.isTTY;
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: useTerminal ? process.stdout : undefined,
+    terminal: useTerminal,
+    prompt: useTerminal ? '\x1b[38;5;208m›\x1b[0m ' : '',
+  });
+  if (useTerminal) {
+    // Cursor-style ghost autocomplete: when the buffer starts with `/`,
+    // render the longest matching command after the cursor in dim grey.
+    // Right-arrow at end-of-line accepts. Tab still cycles via the
+    // existing handleSlash branch; this only adds the inline preview.
+    _attachGhostAutocomplete(rl);
+    rl.prompt();
+  }
 
   // Persistent session ID. When --session is set we hydrate prior turns from
   // <configDir>/sessions/<id>.jsonl and append every new turn back to it.
@@ -1414,10 +1614,11 @@ async function cmdChat(flags = {}) {
 
   for await (const line of rl) {
     const text = line.trim();
-    if (!text) continue;
+    if (!text) { if (useTerminal) rl.prompt(); continue; }
     if (text.startsWith('/')) {
       const r = await handleSlash(text);
       if (r === 'EXIT') break;
+      if (useTerminal) rl.prompt();
       continue;
     }
     messages.push({ role: 'user', content: text });
@@ -1458,6 +1659,7 @@ async function cmdChat(flags = {}) {
     } finally {
       process.off('SIGINT', onSigint);
     }
+    if (useTerminal) rl.prompt();
   }
 }
 

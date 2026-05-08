@@ -10,6 +10,42 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.85.0] — 2026-05-08  🦞 lazyclaw CLI banner + picker + slash ghost-text
+
+**User report**: "lazyclaw 설정 터미널 시작하면 openclaw처럼
+인터렉티브한 이미지가 나오게끔 하고, cursor처럼 내가 치는 명령어의
+추천 명령어가 자동으로 우측키를 누르면 자동완성되게끔 해줘."
+
+### What's new
+- **Banner**: `lazyclaw chat` opens with an ASCII LazyClaw logo card
+  showing the active provider/model/version and the available slash
+  commands. TTY-only — piped invocations stay clean for tests.
+- **Interactive picker**: first run (no provider configured) or
+  `lazyclaw chat --pick` opens an inquirer-style menu with ↑/↓ + Enter
+  to select a provider/model. Falls back to a single-line prompt
+  when stdin/stdout isn't a TTY.
+- **Slash ghost-text autocomplete (Cursor-style)**: when the buffer
+  starts with `/` and prefix-matches a known slash command, the rest
+  of the command is rendered in dim grey after the cursor. Press →
+  to accept the suggestion. Tab still cycles through matches via
+  the existing tab-completer.
+
+### Implementation
+- `_printChatBanner(provider, model, version)` — ANSI-coloured card,
+  renders only when `process.stdout.isTTY`.
+- `_pickProviderInteractive()` — uses `readline.emitKeypressEvents` +
+  raw mode for arrow nav. Cleans up the cursor + raw mode on exit
+  (Ctrl-C / Esc / Enter).
+- `_attachGhostAutocomplete(rl)` — prepends a keypress listener that
+  intercepts → at end-of-line to accept the ghost; every other key
+  re-renders the ghost via `\x1b[s\x1b[K` save / clear / restore so
+  the user's cursor position never moves.
+- `cmdChat` now uses terminal-mode readline with a coloured `›`
+  prompt and reprompts cleanly between turns.
+
+`lazyclaw chat --help` mentions `--pick`.
+
+---
 ## [3.84.0] — 2026-05-08  🔌 chat connection gate + ok-false surfacing
 
 **User report**: "/lazyclawChat 채팅을 처음 보내면 중단됨. 이라고
