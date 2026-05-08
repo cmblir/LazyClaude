@@ -18,6 +18,7 @@
 // Both can coexist; users pick at onboard time.
 
 import { spawn } from 'node:child_process';
+import { spawnSandboxed } from '../sandbox.mjs';
 
 class AbortError extends Error {
   constructor(message = 'aborted') {
@@ -130,7 +131,11 @@ export const claudeCliProvider = {
 
     let proc;
     try {
-      proc = spawn(bin, args, {
+      // opts.sandbox (parsed by parseSandboxSpec) routes the spawn
+      // through `docker run` instead of running `claude` on the
+      // host. spawnSandboxed is a no-op when sandbox is null, so
+      // the un-sandboxed path stays bit-identical to before.
+      proc = spawnSandboxed(opts.sandbox || null, bin, args, {
         cwd: opts.cwd || process.cwd(),
         stdio: ['ignore', 'pipe', 'pipe'],
       });

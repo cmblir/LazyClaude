@@ -1121,8 +1121,8 @@ const HELP_DETAILS = {
   validate: 'Usage: lazyclaw validate <workflow.mjs>\n  Static check: load + shape + dep + cycle + parallelism estimate.\n  Exit 0 valid · 1 hard failure (issues populated) · 2 file/import error.',
   graph: 'Usage: lazyclaw graph <workflow.mjs> [--lr] [--state <session-id>] [--dir <state-dir>]\n  Emit the workflow DAG as Mermaid syntax (graph TD by default; --lr for left-right).\n  --state overlays a persisted run\'s status (success ✓ / running ⏳ / failed ✗ / pending) with classDef styling.\n  Output is paste-ready for GitHub markdown / Notion / Obsidian.',
   config: 'Usage: lazyclaw config <get|set|list|delete|path|edit|validate> [key] [value]\n  Local key-value config at $LAZYCLAW_CONFIG_DIR/config.json (default ~/.lazyclaw).\n  `path` prints the file location; `edit` opens it in $EDITOR (or $LAZYCLAW_EDITOR / $VISUAL / vi) and validates JSON on save.\n  `validate` checks the structural integrity of the whole config file (typed values, known providers, rate-card shape).',
-  chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2] [--pick]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.\n  --pick opens an interactive provider/model picker before the prompt (also auto-fires on first run).',
-  agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--thinking N] [--show-thinking] [--usage] [--cost]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.',
+  chat: 'Usage: lazyclaw chat [--session <id>] [--skill name1,name2] [--workspace <name>] [--pick] [--sandbox docker:<image>] [--sandbox-network <net>] [--sandbox-mount <m>] [--sandbox-env <e>]\n  --session persists turns to <configDir>/sessions/<id>.jsonl across invocations.\n  --skill composes named skills into a system message at the head of the conversation.\n  --workspace stitches AGENTS.md/SOUL.md/TOOLS.md from <configDir>/workspaces/<name>/ into the system prompt.\n  --pick opens an interactive provider/model picker before the prompt (also auto-fires on first run).\n  --sandbox routes the underlying claude CLI through `docker run --rm -i --network <net> -v cwd:cwd ...` (default --network=none).',
+  agent: 'Usage: lazyclaw agent <prompt|-> [--provider X] [--model Y] [--skill list] [--workspace <name>] [--thinking N] [--show-thinking] [--usage] [--cost] [--sandbox docker:<image>]\n  One-shot non-interactive call. Pass "-" as the prompt to read from stdin.\n  --workspace stitches AGENTS.md/SOUL.md/TOOLS.md into the system prompt (combines with --skill).\n  --usage prints normalized {inputTokens, outputTokens, ...} to stderr after the response.\n  --cost adds a cost line on stderr when config.rates has a card for the active provider/model.\n  --sandbox docker:<image> wraps the subprocess provider (claude-cli) in a Docker container; --sandbox-network defaults to none.',
   doctor: 'Usage: lazyclaw doctor\n  Validates configuration and registered providers. Exits 0 only when no issues.',
   status: 'Usage: lazyclaw status\n  Provider, model, and masked API key. Never prints the raw key.',
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
@@ -1262,10 +1262,24 @@ async function cmdAgent(prompt, flags) {
     const ratesMod = await import('./providers/rates.mjs');
     costFromUsage = ratesMod.costFromUsage;
   }
+  // --sandbox docker:<image> routes the underlying subprocess
+  // (currently only the claude-cli provider hits this branch)
+  // through `docker run`. parseSandboxSpec returns null when the
+  // flag is absent / "off" so the no-flag path is bit-identical.
+  let sandboxSpec = null;
+  if (flags.sandbox) {
+    const sb = await import('./sandbox.mjs');
+    try { sandboxSpec = sb.parseSandboxSpec(flags.sandbox, flags); }
+    catch (e) { console.error(`error: ${e.message}`); process.exit(2); }
+    if (sandboxSpec && provName !== 'claude-cli') {
+      process.stderr.write(`warn: --sandbox only wraps subprocess providers; ${provName} ignores it\n`);
+    }
+  }
   try {
     for await (const chunk of prov.sendMessage(messages, {
       apiKey: _resolveAuthKey(cfg, provName),
       model: flags.model || cfg.model,
+      sandbox: sandboxSpec,
       thinking: thinkingBudget > 0 ? { enabled: true, budgetTokens: thinkingBudget } : undefined,
       onThinking: showThinking ? t => process.stderr.write(t) : undefined,
       onUsage: (showUsage || showCost) ? (u) => {
@@ -1546,6 +1560,16 @@ async function cmdChat(flags = {}) {
     rl.prompt();
   }
 
+  // --sandbox docker:<image> wraps subprocess-providers (claude-cli)
+  // in a docker container. Parsed once up front so a slash-command
+  // model switch doesn't have to re-parse every turn.
+  let sandboxSpec = null;
+  if (flags.sandbox) {
+    const sb = await import('./sandbox.mjs');
+    try { sandboxSpec = sb.parseSandboxSpec(flags.sandbox, flags); }
+    catch (e) { console.error(`error: ${e.message}`); process.exit(2); }
+  }
+
   // Persistent session ID. When --session is set we hydrate prior turns from
   // <configDir>/sessions/<id>.jsonl and append every new turn back to it.
   // Without --session, chat is in-memory only (matches phase 4 behavior).
@@ -1788,6 +1812,7 @@ async function cmdChat(flags = {}) {
       for await (const chunk of prov.sendMessage(messages, {
         apiKey: _resolveAuthKey(cfg, activeProvName),
         model: activeModel,
+        sandbox: sandboxSpec,
         signal: turnAc.signal,
         onUsage: accumulateUsage,
       })) {

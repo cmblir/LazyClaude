@@ -10,6 +10,62 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.96.0] — 2026-05-09  🐳 sandbox — Docker-wrapped subprocess providers
+
+OpenClaw exposes Docker / SSH / OpenShell sandboxes for non-main
+sessions. We ship the Docker slice, which is the one most users
+actually need: confine the `claude` CLI's filesystem and network
+access for risky / untrusted prompts.
+
+```bash
+lazyclaw chat --sandbox docker:node:20
+lazyclaw agent "..." --sandbox docker:alpine \
+                     --sandbox-network host \
+                     --sandbox-mount "$HOME/.claude:/root/.claude:ro" \
+                     --sandbox-env CLAUDE_HOME
+```
+
+### Defaults
+- `--sandbox docker:<image>` is the only kind supported (SSH /
+  OpenShell deferred — the primitives are similar but the auth
+  story is different per host).
+- `--sandbox-network` defaults to `none`. The container can read
+  the mounted cwd but can't reach the public internet unless you
+  pass `host` / `bridge` / a named network.
+- `cwd` is auto-mounted as `cwd:cwd` (and `--workdir cwd`) so
+  the sandboxed CLI sees the same working tree.
+- `--sandbox-mount host:container[:mode]` repeats. Empty by
+  default — pass `$HOME/.claude:/root/.claude:ro` to expose the
+  user's `claude` login so the sandboxed CLI runs under the
+  existing subscription.
+- `--sandbox-env <NAME>` repeats; whatever's in the host env
+  with that name is passed through to the container.
+
+### Where it applies
+Subprocess providers only — currently just `claude-cli`. API
+providers (anthropic / openai / gemini) hit the network from
+*lazyclaw's* process, not a child, so sandboxing them is a no-op
+and the CLI surfaces a stderr warning instead of silently
+ignoring the flag.
+
+### Implementation
+- New `src/lazyclaw/sandbox.mjs` — `parseSandboxSpec()`,
+  `buildDockerArgs()`, `spawnSandboxed()`. Pure ESM, zero deps,
+  no-op when spec is null.
+- `providers/claude_cli.mjs` swaps its `spawn()` for
+  `spawnSandboxed()`. Un-sandboxed path is bit-identical to
+  before.
+- `cli.mjs`: chat + agent parse `--sandbox` once up front, pass
+  `sandbox: spec` through `prov.sendMessage(opts)`.
+
+### Verified
+parseSandboxSpec / buildDockerArgs unit-style tests cover the
+happy path, network override, mount + env arrays, and both
+error paths. Live docker daemon round-trip is a manual
+verification step (`docker run --rm node:20 echo ok` works on
+the box).
+
+---
 ## [3.95.0] — 2026-05-08  🌐 browse — fetch + markdown-ify a URL
 
 OpenClaw lists a `browser` first-class tool. We ship the LLM-
