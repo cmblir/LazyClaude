@@ -33,19 +33,26 @@ function writeConfig(cfg) {
 // without forcing the dynamic import on every hot-path call.
 //   1. cfg.authProfiles[provider] active label, if set
 //   2. first profile in the array
-//   3. legacy single `cfg["api-key"]` (pre-v3.93 configs)
+//   3. customProviders[<provider>].apiKey (custom OpenAI-compat entries)
+//   4. PROVIDER_INFO[<provider>].envKey / altEnvKeys env var (built-in
+//      OpenAI-compat: nim → NVIDIA_API_KEY, openrouter → OPENROUTER_API_KEY, …)
+//   5. legacy single `cfg["api-key"]` (pre-v3.93 configs)
 function _resolveAuthKey(cfg, provider) {
   const arr = (cfg.authProfiles || {})[provider] || [];
   const active = (cfg.authActiveProfile || {})[provider];
   const hit = arr.find((p) => p && p.label === active) || arr[0];
   if (hit?.key) return hit.key;
-  // Custom OpenAI-compatible providers store their api-key inline in the
-  // customProviders[] entry. Honour that before falling back to the
-  // legacy single-key cfg['api-key'].
   const custom = Array.isArray(cfg.customProviders)
     ? cfg.customProviders.find((p) => p && p.name === provider)
     : null;
   if (custom?.apiKey) return custom.apiKey;
+  // Built-in OpenAI-compat env var fallback. Skipped silently when the
+  // registry module isn't loaded yet (every chat / agent path calls
+  // ensureRegistry() before _resolveAuthKey, so this is just defence-in-depth).
+  if (_registryMod && typeof _registryMod.resolveBuiltinEnvKey === 'function') {
+    const envHit = _registryMod.resolveBuiltinEnvKey(provider);
+    if (envHit) return envHit;
+  }
   return cfg['api-key'] || '';
 }
 
@@ -1798,17 +1805,58 @@ async function _pickProviderInteractive() {
   }
 
   // ── Step 3 — model ────────────────────────────────────────────
-  const meta = info[provider.id] || {};
+  const picked = await _pickModelInteractive(provider.id, {
+    titlePrefix: 'LazyClaw setup — Step 3 of 3:',
+    onBack: 'restart',
+  });
+  if (picked === 'CANCEL') return null;
+  if (picked === 'BACK')   return _pickProviderInteractive();
+  return { provider: provider.id, model: picked };
+}
+
+// Pause the chat REPL's readline + ghost-autocomplete while a sub-picker
+// (provider / model arrow menu) takes over the terminal. The sub-picker
+// installs its own `keypress` listener and toggles raw mode; the chat's
+// readline would race it for stdin if we left it active. After `body`
+// returns we re-emit keypress events, restore raw mode, and re-prompt
+// so the chat resumes cleanly. `body` is awaited — exceptions propagate.
+async function _pauseChatForSubMenu(rl, ghost, body) {
+  if (ghost && typeof ghost.suspend === 'function') ghost.suspend();
+  try { rl.pause(); } catch (_) {}
+  // Drop the readline keypress hook so the picker's own listener has
+  // sole ownership while it's open. We re-arm it on the way out.
+  if (process.stdin.setRawMode) {
+    try { process.stdin.setRawMode(false); } catch (_) {}
+  }
+  try {
+    await body();
+  } finally {
+    const readline = await import('node:readline');
+    try { readline.emitKeypressEvents(process.stdin); } catch (_) {}
+    if (process.stdin.setRawMode && process.stdin.isTTY) {
+      try { process.stdin.setRawMode(false); } catch (_) {}
+    }
+    process.stdin.resume();
+    if (process.stdin.ref) process.stdin.ref();
+    if (ghost && typeof ghost.resume === 'function') ghost.resume();
+    try { rl.resume(); } catch (_) {}
+    try { rl.prompt(); } catch (_) {}
+  }
+}
+
+// Standalone model picker for the chat REPL's `/model` slash. Returns
+// the chosen model id (string), 'BACK', or 'CANCEL'. Falls through to
+// null when the provider has no curated models and no live-fetch surface
+// (mock) — the caller should treat that as "use the provider default".
+async function _pickModelInteractive(providerId, opts = {}) {
+  const info = _registryMod.PROVIDER_INFO || {};
+  const meta = info[providerId] || {};
   const baseModels = Array.isArray(meta.suggestedModels) ? meta.suggestedModels.slice() : [];
   const isCustom = !!meta.custom;
-  const supportsLiveFetch = !!meta.baseUrl || provider.id === 'openai' || provider.id === 'ollama';
+  const isBuiltinCompat = !!meta.builtinOpenAICompat;
+  const supportsLiveFetch = !!meta.baseUrl || providerId === 'openai' || providerId === 'ollama' || isBuiltinCompat;
 
-  if (!baseModels.length && !supportsLiveFetch) {
-    // Provider has no curated models AND no live-fetch surface (mock) —
-    // return without a model so the underlying call uses the provider
-    // default.
-    return { provider: provider.id, model: null };
-  }
+  if (!baseModels.length && !supportsLiveFetch) return null;
 
   let dynamicModels = [];
   while (true) {
@@ -1818,7 +1866,7 @@ async function _pickProviderInteractive() {
       modelItems.unshift({
         id: '__fetch_models__',
         label: '↻ Fetch live model list from /v1/models',
-        desc: isCustom ? `GET ${meta.baseUrl}/models` : 'pulls the up-to-date catalogue from the provider',
+        desc: isCustom || isBuiltinCompat ? `GET ${meta.baseUrl}/models` : 'pulls the up-to-date catalogue from the provider',
         tag: '\x1b[38;5;245m[live]\x1b[0m',
       });
     }
@@ -1832,24 +1880,25 @@ async function _pickProviderInteractive() {
     const defaultIdx = supportsLiveFetch
       ? Math.max(0, 1 + allModels.indexOf(meta.defaultModel || allModels[0]))
       : Math.max(0, allModels.indexOf(meta.defaultModel || allModels[0]));
+    const titlePrefix = opts.titlePrefix ? `${opts.titlePrefix}  ` : '';
     const picked = await _arrowMenu({
-      title: `LazyClaw setup — Step 3 of 3:  pick a model for ${provider.id}`,
+      title: `${titlePrefix}pick a model for ${providerId}`,
       subtitle: `Type to filter ${allModels.length} model(s). Enter to confirm. Backspace clears one char, Ctrl+U clears the filter.`,
       items: modelItems,
       defaultIdx,
       searchable: true,
     });
-    if (picked === 'CANCEL') return null;
-    if (picked === 'BACK')   return _pickProviderInteractive(); // back to step 1
+    if (picked === 'CANCEL') return 'CANCEL';
+    if (picked === 'BACK')   return 'BACK';
     if (picked.id === '__custom_model__') {
-      const typed = (await _quickPrompt(`  model id for ${provider.id}: `)).trim();
+      const typed = (await _quickPrompt(`  model id for ${providerId}: `)).trim();
       if (!typed) continue;
-      return { provider: provider.id, model: typed };
+      return typed;
     }
     if (picked.id === '__fetch_models__') {
       try {
-        process.stdout.write(`\n  fetching ${provider.id} model list…\n`);
-        const fetched = await _fetchModelsForProvider(provider.id);
+        process.stdout.write(`\n  fetching ${providerId} model list…\n`);
+        const fetched = await _fetchModelsForProvider(providerId);
         if (!fetched.length) {
           process.stdout.write(`  ${'\x1b[33m'}no models returned${'\x1b[0m'} — falling back to the suggested list.\n`);
           await _quickPrompt('  press Enter to continue ');
@@ -1864,7 +1913,7 @@ async function _pickProviderInteractive() {
       }
       continue;
     }
-    return { provider: provider.id, model: picked.id };
+    return picked.id;
   }
 }
 
@@ -1877,6 +1926,12 @@ function _modelCatalogueFor(providerId) {
   if (meta.custom && meta.baseUrl) {
     const entry = (cfg.customProviders || []).find((p) => p && p.name === providerId) || {};
     return { baseUrl: meta.baseUrl, apiKey: entry.apiKey || cfg['api-key'] || '' };
+  }
+  // Built-in OpenAI-compatible vendors (nim / openrouter / groq / together /
+  // xai / deepseek / mistral / fireworks). The registry exposes a baseUrl
+  // and the auth-key resolver already knows about the env-var fallback.
+  if (meta.builtinOpenAICompat && meta.baseUrl) {
+    return { baseUrl: meta.baseUrl, apiKey: _resolveAuthKey(cfg, providerId) };
   }
   if (providerId === 'openai') {
     return { baseUrl: 'https://api.openai.com/v1', apiKey: _resolveAuthKey(cfg, 'openai') };
@@ -2133,10 +2188,28 @@ async function cmdChat(flags = {}) {
         // `/provider <name>` switches the active provider for subsequent
         // turns. The conversation history stays put — the next user
         // message goes to the new provider with the existing context.
-        // `/provider` (no arg) prints the current name.
+        // `/provider` (no arg) opens the family/provider/model picker so
+        // the user can switch with arrow keys instead of memorising names.
         const arg = line.slice('/provider'.length).trim();
         if (!arg) {
-          process.stdout.write(`provider: ${activeProvName}\n`);
+          if (!useTerminal) {
+            process.stdout.write(`provider: ${activeProvName}\n`);
+            return true;
+          }
+          await _pauseChatForSubMenu(rl, _ghost, async () => {
+            const picked = await _pickProviderInteractive();
+            if (picked && picked.provider) {
+              const next = lookupProv(picked.provider);
+              if (!next) {
+                process.stdout.write(`unknown provider: ${picked.provider}\n`);
+                return;
+              }
+              activeProvName = picked.provider;
+              prov = next;
+              if (picked.model) activeModel = picked.model;
+              process.stdout.write(`provider → ${activeProvName}${picked.model ? ` · model → ${picked.model}` : ''}\n`);
+            }
+          });
           return true;
         }
         const next = lookupProv(arg);
@@ -2151,10 +2224,20 @@ async function cmdChat(flags = {}) {
       }
       case '/model': {
         // `/model <name>` updates the active model without touching the
-        // provider. `/model` (no arg) prints the current value.
+        // provider. `/model` (no arg) opens the per-provider model picker
+        // — same UX as setup step 3, scoped to the active provider.
         const arg = line.slice('/model'.length).trim();
         if (!arg) {
-          process.stdout.write(`model: ${activeModel || '(default)'}\n`);
+          if (!useTerminal) {
+            process.stdout.write(`model: ${activeModel || '(default)'}\n`);
+            return true;
+          }
+          await _pauseChatForSubMenu(rl, _ghost, async () => {
+            const chosen = await _pickModelInteractive(activeProvName, { titlePrefix: 'LazyClaw chat —' });
+            if (chosen === 'CANCEL' || chosen === 'BACK' || !chosen) return;
+            activeModel = chosen;
+            process.stdout.write(`model → ${activeModel}\n`);
+          });
           return true;
         }
         // Honor unified provider/model: `/model anthropic/claude-opus-4-7`
@@ -2259,18 +2342,12 @@ async function cmdChat(flags = {}) {
     }
   };
 
-  // Tracks whether the loop ended because the user explicitly typed
-  // /exit (vs. natural EOF / Ctrl-D). When set, cmdChat returns the
-  // 'LAZYCLAW_EXIT' sentinel so cmdLauncher knows to break its outer
-  // menu loop instead of redrawing — /exit means "leave lazyclaw",
-  // not "leave just this chat REPL and bounce back to the menu."
-  let userRequestedExit = false;
   try { for await (const line of rl) {
     const text = line.trim();
     if (!text) { if (useTerminal) rl.prompt(); continue; }
     if (text.startsWith('/')) {
       const r = await handleSlash(text);
-      if (r === 'EXIT') { userRequestedExit = true; break; }
+      if (r === 'EXIT') break;
       if (useTerminal) rl.prompt();
       continue;
     }
@@ -2365,11 +2442,6 @@ async function cmdChat(flags = {}) {
     try { process.stdin.pause(); } catch (_) {}
     try { process.stdin.unref(); } catch (_) {}
   }
-  // Sentinel — picked up by cmdLauncher's dispatch loop. Returning
-  // anything else (undefined / EOF) leaves the launcher free to
-  // redraw its menu, which is the right behavior for natural stream
-  // exhaustion (e.g. a script piping prompts on stdin).
-  if (userRequestedExit) return 'LAZYCLAW_EXIT';
 }
 
 // Light wrapper around the daemon — meant for users who installed
@@ -4095,7 +4167,7 @@ async function cmdLauncher() {
       process.stdout.write(`  ${dim('model    ·')} ${ok(model)}\n`);
       process.stdout.write(`  ${dim('config   ·')} ${dim(configPath())}\n`);
       process.stdout.write('\n');
-      process.stdout.write(`  ${dim('↑/↓ to move · Enter to select · q or Esc to quit')}\n\n`);
+      process.stdout.write(`  ${dim('↑/↓ to move · Enter to select · / for slash command (e.g. /exit) · q or Esc to quit')}\n\n`);
       const rowsAvail = Math.max(items.length, (process.stdout.rows || 30) - 14);
       const fromIdx = Math.max(0, Math.min(items.length - rowsAvail, idx - Math.floor(rowsAvail / 2)));
       const toIdx = Math.min(items.length, fromIdx + rowsAvail);
@@ -4108,10 +4180,74 @@ async function cmdLauncher() {
       process.stdout.write('\n');
     };
 
+    // Slash-command mini prompt rendered just below the menu. Lets users
+    // type `/exit` / `/quit` / `/help` to leave (or get a list of slash
+    // commands) without hunting for the right special key. The menu is
+    // raw-mode and never sees a newline-terminated line, so we accumulate
+    // keystrokes locally instead of round-tripping through readline.
+    let slashBuffer = null; // null = menu mode; string = slash mode (always starts with '/')
+    let slashNotice = '';   // one-line hint shown after the buffer (e.g. "unknown command")
+    const LAUNCHER_SLASH_HELP = [
+      { cmd: '/exit',    help: 'leave lazyclaw' },
+      { cmd: '/quit',    help: 'alias for /exit' },
+      { cmd: '/help',    help: 'list slash commands' },
+      { cmd: '/version', help: 'print version + node + platform' },
+    ];
+    const drawWithSlash = () => {
+      draw();
+      process.stdout.write(`  ${dim('slash ›')} ${slashBuffer}`);
+      if (slashNotice) process.stdout.write(`   ${slashNotice}`);
+      process.stdout.write('\x1b[?25h'); // show cursor while typing
+    };
+
     draw();
     const picked = await new Promise((resolve) => {
-      const onKey = (_str, key) => {
+      const onKey = (str, key) => {
         if (!key) return;
+
+        // ── Slash-command input mode ─────────────────────────────────
+        if (slashBuffer !== null) {
+          if (key.ctrl && key.name === 'c') { cleanup(); resolve({ id: 'quit', argv: null }); return; }
+          if (key.name === 'escape') { slashBuffer = null; slashNotice = ''; draw(); return; }
+          if (key.name === 'return') {
+            const cmd = slashBuffer.trim().toLowerCase();
+            if (cmd === '/exit' || cmd === '/quit') { cleanup(); resolve({ id: 'quit', argv: null }); return; }
+            if (cmd === '/help') {
+              slashBuffer = '/';
+              slashNotice = dim(LAUNCHER_SLASH_HELP.map(c => `${c.cmd} (${c.help})`).join(' · '));
+              drawWithSlash();
+              return;
+            }
+            if (cmd === '/version') {
+              const v = readVersionFromRepo();
+              slashNotice = ok(`v${v} · node ${process.version} · ${process.platform}-${process.arch}`);
+              drawWithSlash();
+              return;
+            }
+            // Unknown command — keep the buffer so the user can edit it
+            // rather than retyping from scratch. Esc / Backspace bails.
+            slashNotice = warn(`unknown — try ${LAUNCHER_SLASH_HELP.map(c => c.cmd).join(' · ')}`);
+            drawWithSlash();
+            return;
+          }
+          if (key.name === 'backspace') {
+            slashNotice = '';
+            if (slashBuffer.length > 1) slashBuffer = slashBuffer.slice(0, -1);
+            else slashBuffer = null;
+            slashBuffer === null ? draw() : drawWithSlash();
+            return;
+          }
+          // Append printable characters. Filter control / meta chords so
+          // Ctrl+L etc. don't pollute the buffer.
+          if (str && str.length === 1 && !key.ctrl && !key.meta && str >= ' ') {
+            slashBuffer += str;
+            slashNotice = '';
+            drawWithSlash();
+          }
+          return;
+        }
+
+        // ── Menu navigation mode ─────────────────────────────────────
         if (key.name === 'up')        { idx = (idx - 1 + items.length) % items.length; draw(); }
         else if (key.name === 'down') { idx = (idx + 1) % items.length; draw(); }
         else if (key.name === 'home') { idx = 0; draw(); }
@@ -4121,6 +4257,7 @@ async function cmdLauncher() {
         else if (key.name === 'return')   { cleanup(); resolve(items[idx]); }
         else if (key.ctrl && key.name === 'c') { cleanup(); resolve({ id: 'quit', argv: null }); }
         else if (key.name === 'escape' || key.name === 'q') { cleanup(); resolve({ id: 'quit', argv: null }); }
+        else if (str === '/') { slashBuffer = '/'; slashNotice = ''; drawWithSlash(); }
         function cleanup() {
           process.stdin.off('keypress', onKey);
           if (process.stdin.setRawMode) process.stdin.setRawMode(false);
@@ -4151,18 +4288,11 @@ async function cmdLauncher() {
     // Dispatch. Errors don't terminate the launcher — they're
     // surfaced as a stderr line and the menu redraws. Lets the
     // user recover from a transient API hiccup without a relaunch.
-    let dispatchResult;
     try {
-      dispatchResult = await _dispatchMenuChoice(argv);
+      await _dispatchMenuChoice(argv);
     } catch (e) {
       process.stderr.write(`\n  ${accent('✗')} ${e?.message || String(e)}\n`);
     }
-    // Subcommand asked for full lazyclaw exit (currently only chat's
-    // /exit). Break the launcher loop so the finally block tears
-    // down stdin and the process ends naturally — without this, the
-    // user has to /exit out of chat AND pick Quit from the menu to
-    // actually leave.
-    if (dispatchResult === 'LAZYCLAW_EXIT') return;
 
     // Pause before re-drawing so the user can read the subcommand's
     // output. `chat` is the special case: its REPL has already kept

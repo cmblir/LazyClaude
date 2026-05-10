@@ -54,6 +54,54 @@ lazyclaw onboard --non-interactive --provider openai \
 
 `onboard` only prompts for an api-key when the picked provider's `requiresApiKey` is true (the picker labels each row `[subscription]` / `[api key]` / `[no key]` so the choice is explicit).
 
+### Built-in OpenAI-compatible vendors
+
+Eight popular OpenAI-compatible services ship as first-class providers — pick one in the setup picker (no `+ Add custom` walkthrough needed) or set the matching environment variable and they Just Work:
+
+| Provider | Models include | Env var |
+|---|---|---|
+| `nim`        | `meta/llama-3.1-405b-instruct`, `nvidia/llama-3.1-nemotron-70b-instruct`, `deepseek-ai/deepseek-r1`, `mistralai/mixtral-8x22b-instruct-v0.1` | `NVIDIA_API_KEY` (or `NIM_API_KEY`) |
+| `openrouter` | `anthropic/claude-3.5-sonnet`, `openai/gpt-4o`, `meta-llama/llama-3.1-405b-instruct`, `deepseek/deepseek-r1` | `OPENROUTER_API_KEY` |
+| `groq`       | `llama-3.3-70b-versatile`, `mixtral-8x7b-32768`, `deepseek-r1-distill-llama-70b` | `GROQ_API_KEY` |
+| `together`   | `meta-llama/Llama-3.3-70B-Instruct-Turbo`, `Qwen/Qwen2.5-72B-Instruct-Turbo`, `deepseek-ai/DeepSeek-V3` | `TOGETHER_API_KEY` |
+| `xai`        | `grok-2-latest`, `grok-2-vision-1212` | `XAI_API_KEY` (or `GROK_API_KEY`) |
+| `deepseek`   | `deepseek-chat`, `deepseek-reasoner` | `DEEPSEEK_API_KEY` |
+| `mistral`    | `mistral-large-latest`, `codestral-latest`, `pixtral-large-latest` | `MISTRAL_API_KEY` |
+| `fireworks`  | `accounts/fireworks/models/llama-v3p3-70b-instruct`, `…/deepseek-r1` | `FIREWORKS_API_KEY` |
+
+```bash
+# NVIDIA NIM via env var — no `lazyclaw onboard` needed
+export NVIDIA_API_KEY=nvapi-...
+lazyclaw chat --provider nim --model meta/llama-3.1-405b-instruct
+
+# Or commit the choice to ~/.lazyclaw/config.json
+lazyclaw onboard --non-interactive --provider nim \
+  --model nvidia/llama-3.1-nemotron-70b-instruct --api-key nvapi-...
+```
+
+Need a vendor that's **not** built-in? `+ Add a custom OpenAI-compatible endpoint…` inside the setup picker (or `lazyclaw providers add <name> --base-url <url>`) still works for vLLM / LM Studio / private gateways / anything else that speaks the OpenAI v1 wire format.
+
+## Launcher (no-arg `lazyclaw`)
+
+Running `lazyclaw` with no subcommand drops into an arrow-key launcher with every subcommand laid out as a menu. Navigation:
+
+| Key | What it does |
+|---|---|
+| `↑` / `↓` / `Home` / `End` / `PgUp` / `PgDn` | Move the selection |
+| `Enter` | Run the highlighted item |
+| `q` / `Esc` / `Ctrl-C` | Leave lazyclaw |
+| `/` | Open an inline slash-command prompt |
+
+Slash commands at the launcher (typed after `/`):
+
+| Slash | What it does |
+|---|---|
+| `/exit` / `/quit` | Leave lazyclaw |
+| `/help` | List launcher slash commands inline |
+| `/version` | Print version + node + platform |
+
+The slash buffer lives just below the menu — backspace edits it, deleting past `/` returns to menu mode, and `Esc` cancels slash mode without leaving lazyclaw.
+
 ## Interactive chat
 
 ```bash
@@ -88,12 +136,14 @@ Slash commands inside the REPL:
 |---|---|
 | `/help` | List slash commands |
 | `/status` | Print provider + model + masked key |
-| `/provider X` | Switch active provider mid-session (history kept) |
-| `/model X` | Switch model. Accepts unified `provider/model` form |
+| `/provider` | Open the family / provider / model arrow picker |
+| `/provider X` | Switch active provider directly by name |
+| `/model` | Open the per-provider model picker (type-filter + live `/v1/models` fetch) |
+| `/model X` | Switch model directly. Accepts unified `provider/model` form |
 | `/skill a,b` | Replace the system prompt with a composition of named skills |
 | `/usage` | Message count + chars + cumulative token totals |
 | `/new` / `/reset` | Wipe history and start over |
-| `/exit` | Quit |
+| `/exit` | Leave the chat REPL (returns to the launcher when chat was opened from it) |
 
 **Cursor-style ghost autocomplete**: type `/` and the longest matching slash command appears in dim grey after the cursor. **`→`** accepts; **`Tab`** cycles. **Ctrl-C** during a streaming reply aborts that turn (not the whole process); **Ctrl-C** at an empty prompt exits.
 

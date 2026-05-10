@@ -10,6 +10,120 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.14] — 2026-05-10  🔁 chat `/exit` — back to leaving only the chat REPL · ⌨️ launcher slash commands · 🧠 8 built-in OpenAI-compatible vendors (NIM / OpenRouter / Groq / Together / xAI / DeepSeek / Mistral / Fireworks) · 🎚 in-chat `/provider` + `/model` arrow picker
+
+User: "지금 채팅에서 /exit하면 꺼져서 문제 다시 원래대로 만들어주고, lazyclaw 처음 상태에서 /exit했을 때 안꺼지는 오류를 수정해줘. 그리고 opencode같이 여러 모델들을 사용할 수 있는 기능도 추가해줘. nim과 같은 nvidia 모델도."
+
+Four threads in one cut:
+
+### 1. Revert chat `/exit` to "leave the chat REPL only" (rolls back v3.99.13)
+
+v3.99.13 made `/exit` from the chat REPL terminate `lazyclaw` even
+when the chat was opened from the launcher. After living with it,
+the user wanted the original behaviour back: `/exit` should leave
+the chat and bounce to the launcher menu, not kill the process.
+The launcher's own `Quit` / `Esc` / `q` / `/exit` (new — see below)
+is the way to leave lazyclaw.
+
+  - Removed the `userRequestedExit` flag in `cmdChat` and the
+    `'LAZYCLAW_EXIT'` sentinel. `/exit` once again returns `'EXIT'`
+    from `handleSlash`, the for-await loop breaks, and `cmdChat`
+    returns naturally — same as before v3.99.13.
+  - Removed `cmdLauncher`'s dispatch-result capture; the launcher
+    now treats every subcommand return identically and redraws the
+    menu. The `chat`-special-case "skip the press-Enter prompt" is
+    preserved because the chat REPL already kept the user oriented.
+  - Direct `lazyclaw chat` + `/exit` still exits the process — that
+    path goes through `main()` and naturally completes.
+
+### 2. Slash commands on the launcher main menu
+
+The arrow-key launcher only listened for `↑/↓ · Enter · q · Esc ·
+Ctrl-C`. Typing `/exit` did nothing visible (the keypress for `/`
+was simply ignored), which mismatched the user's mental model
+("`/exit` is the universal way to leave"). Added a tiny in-place
+slash-input mode rendered just below the menu:
+
+  - Pressing `/` from the menu enters slash mode; the buffer shows
+    after the menu as `slash › /…`.
+  - `/exit` and `/quit` close the launcher (same path as picking
+    `Quit`).
+  - `/help` lists the available slash commands inline.
+  - `/version` shows the current version + node + platform.
+  - Backspace edits the buffer; deleting past `/` returns to menu
+    mode. `Esc` cancels slash mode without leaving lazyclaw.
+  - `Ctrl-C` still terminates from either mode.
+
+### 3. Eight built-in OpenAI-compatible vendors — `nim` for NVIDIA NIM, plus seven more
+
+The setup picker had a `+ Add a custom OpenAI-compatible endpoint…`
+escape hatch since v3.99.12, but every popular OpenAI-compatible
+service still required the user to walk through that wizard with
+URL + key by hand. We now ship them as **first-class built-ins**:
+
+| Provider | Base URL | Env var |
+|---|---|---|
+| `nim`        | `https://integrate.api.nvidia.com/v1` | `NVIDIA_API_KEY` (alt: `NIM_API_KEY`) |
+| `openrouter` | `https://openrouter.ai/api/v1`        | `OPENROUTER_API_KEY` |
+| `groq`       | `https://api.groq.com/openai/v1`      | `GROQ_API_KEY` |
+| `together`   | `https://api.together.xyz/v1`         | `TOGETHER_API_KEY` |
+| `xai`        | `https://api.x.ai/v1`                 | `XAI_API_KEY` (alt: `GROK_API_KEY`) |
+| `deepseek`   | `https://api.deepseek.com/v1`         | `DEEPSEEK_API_KEY` |
+| `mistral`    | `https://api.mistral.ai/v1`           | `MISTRAL_API_KEY` |
+| `fireworks`  | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` |
+
+  - Wired through the existing `makeOpenAICompatProvider` factory in
+    `providers/openai_compat.mjs` — no new wire-format code.
+  - Each entry ships a curated `suggestedModels` list (e.g. NIM
+    starts with `meta/llama-3.1-405b-instruct`, `nvidia/llama-3.1-
+    nemotron-70b-instruct`, `deepseek-ai/deepseek-r1`, …).
+  - `_resolveAuthKey` falls back to `PROVIDER_INFO[name].envKey`
+    (and `altEnvKeys`) so chats Just Work when the standard env var
+    is set — no `lazyclaw onboard` required.
+  - `_modelCatalogueFor` recognises `meta.builtinOpenAICompat` so
+    the picker's `↻ Fetch live model list from /v1/models` works
+    against every built-in too.
+  - `RESERVED_PROVIDER_NAMES` was extended automatically from
+    `OPENAI_COMPAT_BUILTINS` so a custom-provider registration can
+    no longer collide with a built-in name.
+  - `lazyclaw providers list` / `lazyclaw providers info nim` / etc.
+    return the same shape as for hand-written providers.
+
+### 4. In-chat `/provider` and `/model` arrow picker
+
+`/provider` and `/model` (no-arg) used to just print the current
+value. Now they open the same drill-in picker that `setup` uses,
+scoped appropriately:
+
+  - `/provider` → full family / provider / model picker, switches
+    `activeProvName` (and `activeModel` when the picker also picks
+    one) for subsequent chat turns. Conversation history is
+    preserved.
+  - `/model` → per-provider model picker (skips the family/provider
+    steps). Type-filter, live `/v1/models` fetch, "type a custom
+    model id" — the same UX users already know from setup step 3.
+  - `/provider <name>` and `/model <name>` (with arg) keep their
+    existing direct-switch behaviour for scripts and muscle memory.
+  - The picker is wrapped in `_pauseChatForSubMenu` which pauses
+    the readline + ghost autocomplete, lets the picker own raw mode
+    and `keypress`, then re-arms readline + redraws the chat prompt.
+
+### Migration
+
+None.
+
+  - Existing `cfg.customProviders[]` entries continue to load after
+    the built-ins, so a user who hand-registered `nim` as a custom
+    entry will still find it (the custom registration overrides the
+    built-in by being registered later in `ensureRegistry`).
+  - Existing `--provider <name>` / `/provider <name>` flows are
+    unchanged for every provider that already worked.
+  - Anyone scripting around the `'LAZYCLAW_EXIT'` sentinel from
+    v3.99.13 will need to rely on `chat` returning naturally — but
+    the sentinel was internal and lived for half a day, so that's
+    unlikely.
+
+---
 ## [3.99.13] — 2026-05-10  🚪 chat `/exit` — actually leave lazyclaw, not just the chat REPL
 
 User: "exit했는데 안꺼져. 이것도 고쳐."
