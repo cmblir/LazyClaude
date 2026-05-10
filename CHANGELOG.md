@@ -10,6 +10,79 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.16] — 2026-05-11  🐰 lazyclaude mascot lands in lazyclaw · 🛠 dashboard mutation: providers / rates / config edit · 🔍 single-provider live test
+
+User: "dashboard 미구현 항목이 지금 너무 많음. 수정필요. 그리고 lazyclaw 좌측 상단 캐릭터 lazyclaud의 캐릭터로 변경 필요함."
+
+Two threads.
+
+### 1. The lazyclaude mascot now wears both hats
+
+The web dashboard's header used to show `🦞 LazyClaw` (lobster emoji + wordmark). The CLI launcher / chat banner had a sleepy ASCII cat (`( -.- )  z z`) on the right side. Both are now the same orange pixel-art rabbit mascot the lazyclaude SPA already uses.
+
+  - **Web dashboard** (`src/lazyclaw/web/dashboard.html`): the lobster emoji is replaced with the inline SVG mascot lifted verbatim from `dist/index.html`. The orange (`#d97757`) matches the dashboard's existing accent colour. The CSS keyframes (`mj-jump` / `mj-sh` / `mj-wl` / `mj-wr` / `mj-ear`) keep the bunny hopping with bobbing ears at 1 s cadence. `prefers-reduced-motion: reduce` halts the animation.
+  - **CLI banner** (`_renderBanner` in `src/lazyclaw/cli.mjs`): the sleepy-cat side panel is replaced with a 5-row ASCII pixel-art version of the same mascot rendered with `█` block characters and 24-bit ANSI orange. The wordmark column is unchanged.
+
+### 2. Web dashboard — mutation surface + live tests
+
+The dashboard shipped in v3.99.12 was list-only on every tab except chat. Eight tabs surfaced data without a way to act on it. v3.99.16 wires the missing actions:
+
+**New shared modal** (`#modal-backdrop`) backs every detail / form view. ESC + backdrop click close.
+
+**Sessions tab**
+
+  - Row click → modal with full turn log (`GET /sessions/<id>`), each turn rendered as a coloured bubble (user / assistant / system).
+  - **Export** button per row → markdown export modal with copy-to-clipboard (`GET /sessions/<id>/export?format=md`).
+  - **Delete** button per row (`DELETE /sessions/<id>`).
+
+**Workflows tab**
+
+  - Row click → modal with stat grid (total / done / failed / running) + per-node table (status pill · duration · output / error preview, truncated at 240 chars). Backed by `GET /workflows/<id>`.
+  - **Delete** button per row (`DELETE /workflows/<id>`).
+
+**Skills tab**
+
+  - Row click → modal with full markdown body (`GET /skills/<name>`) + copy-to-clipboard.
+  - **Delete** button per row (`DELETE /skills/<name>`).
+
+**Providers tab**
+
+  - **+ Add custom OpenAI-compat** toolbar button → modal with name / baseUrl / api-key / default-model fields. Saving POSTs to `POST /providers` (new endpoint — see daemon section). Built-in OpenAI-compat names (`nim`, `openrouter`, …) are accepted; the response surfaces `overridesBuiltin: true` and the dashboard shows it inline.
+  - **Test** button per provider → `GET /providers/<name>/test` (new endpoint, single-provider 1-token reachability probe, distinct from the existing all-providers `GET /providers/test`). Returns ok/duration/replyLength/reply (truncated at 500); the dashboard renders ok in green / fail in red inline under the card.
+  - **Remove** button on `custom: true` providers → `DELETE /providers/<name>`.
+  - GET /providers response now includes `endpoint`, `docs`, `custom`, `builtinOpenAICompat`, `baseUrl`, `envKey`, `keyPrefix` so the dashboard renders proper pills + tooltips. Existing fields (`name`, `requiresApiKey`, `defaultModel`, `suggestedModels`) untouched — additive change, CLI parity tests still pass.
+
+**Rates tab**
+
+  - **+ Add / edit rate card** toolbar button → modal with provider/model key + in/out/cache-read/cache-create/currency fields. `PUT /rates/<key>` (new endpoint).
+  - **Edit** + **Delete** buttons per row. `DELETE /rates/<key>` is idempotent (200 with `removed: false` when missing).
+
+**Config tab**
+
+  - **+ Set key** toolbar button + per-row **Edit** / **Delete** buttons. JSON-aware value field: looks like JSON → parsed; otherwise stored as a string. Mirrors `lazyclaw config set` behaviour. `PUT /config/<key>` + `DELETE /config/<key>` (new endpoints).
+  - Nested stores (`customProviders`, `rates`, `authProfiles`, `authActiveProfile`) are flagged read-only on the row and rejected by the endpoint with 400 — they have their own dedicated endpoints (`POST /providers`, `PUT /rates/<key>`, `lazyclaw auth …`).
+
+### Daemon mutation endpoints — new in v3.99.16
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET`    | `/providers/<name>/test`   | single-provider 1-token probe; returns `ok`, `model`, `durationMs`, `replyLength`, `reply` (truncated). 503 on failure. |
+| `POST`   | `/providers`               | body `{ name, baseUrl, apiKey?, defaultModel? }`; persists into `cfg.customProviders[]`, hot-registers via the registry. Built-in alias names allowed (override). |
+| `DELETE` | `/providers/<name>`        | drops a custom registration. Idempotent. |
+| `PUT`    | `/rates/<key>`             | body is the rate-card object; full `cfg.rates` re-validated, 422 on failure. |
+| `DELETE` | `/rates/<key>`             | idempotent. |
+| `PUT`    | `/config/<key>`            | body `{ value }`; nested keys (`customProviders`/`rates`/`authProfiles`) rejected with 400. Whole config re-validated, 422 on failure. |
+| `DELETE` | `/config/<key>`            | idempotent. |
+
+Mutation endpoints require `ctx.writeConfig` to be set when the daemon is constructed (via `makeHandler`). When omitted, every mutation route returns 405 Method Not Allowed. The CLI's `cmdDashboard` always sets it. The bare `lazyclaw daemon` subcommand sets it **only when an auth token is configured** — without one the daemon is loopback-only but still untrusted (any process on the box can hit it), so we keep the daemon read-only by default.
+
+### Migration
+
+  - Existing dashboards: redeploy / refresh — pure additive UI.
+  - Scripts hitting `GET /providers`: response gains optional fields (`endpoint`, `docs`, `custom`, `builtinOpenAICompat`, `baseUrl`, `envKey`, `keyPrefix`). Existing fields and shape unchanged.
+  - `lazyclaw daemon` callers wanting mutation endpoints exposed: pass `--auth-token <token>` (or `LAZYCLAW_AUTH_TOKEN`). No-token daemons stay read-only.
+
+---
 ## [3.99.15] — 2026-05-10  🪶 setup picker — declutter step 2 rows · 🔓 custom-add can override built-in OpenAI-compat names
 
 User: "name (short id, e.g. \"nim\", \"openrouter\"): nim → custom provider name \"nim\" is reserved (built-in) — try again. 그리고 처음 모델 고를 때 gemini 이런식으로만 나왔으면 좋겠어. 지금 gemini 밑에 gemini-flash .. 등등 너무 많이 표기되어서 불편해. gemini 선택 -> gemini-flash -> .. 이런식으로 되게끔 해줘."

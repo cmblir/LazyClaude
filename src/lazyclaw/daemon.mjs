@@ -245,6 +245,7 @@ function isOriginAllowed(req, allowedOrigins) {
 /**
  * @param {{
  *   readConfig: () => Record<string, unknown>,
+ *   writeConfig?: (cfg: Record<string, unknown>) => void,
  *   sessionsDirGetter: () => string,
  *   sessionsMod: typeof import('./sessions.mjs'),
  *   version: () => string,
@@ -256,6 +257,12 @@ function isOriginAllowed(req, allowedOrigins) {
  *   logger?: ReturnType<typeof createLogger> | null,
  *   costCap?: Record<string, number> | null,
  * }} ctx
+ *
+ * `writeConfig` is optional; when omitted the mutation endpoints (POST
+ * /providers, DELETE /providers/<name>, PUT/DELETE /rates/<key>, PUT
+ * /config/<key>) reject with 405 Method Not Allowed. The CLI's
+ * `cmdDashboard` always supplies it; bare `lazyclaw daemon --once` callers
+ * can opt out by leaving it undefined.
  */
 export function makeHandler(ctx) {
   const authToken = ctx.authToken || null;
@@ -373,10 +380,12 @@ export function makeHandler(ctx) {
       const route = `${req.method} ${url.pathname}`;
       const sessionMatch = url.pathname.match(/^\/sessions\/([^/]+)$/);
       const providerMatch = url.pathname.match(/^\/providers\/([^/]+)$/);
+      const providerTestMatch = url.pathname.match(/^\/providers\/([^/]+)\/test$/);
       const sessionExportMatch = url.pathname.match(/^\/sessions\/([^/]+)\/export$/);
       const skillMatch = url.pathname.match(/^\/skills\/([^/]+)$/);
       const workflowMatch = url.pathname.match(/^\/workflows\/([^/]+)$/);
       const configKeyMatch = url.pathname.match(/^\/config\/([^/]+)$/);
+      const ratesKeyMatch = url.pathname.match(/^\/rates\/([^/]+)$/);
       switch (true) {
         case route === 'GET /' || route === 'GET /dashboard': {
           // Serve the lazyclaw-only web dashboard (a single static
@@ -487,9 +496,25 @@ export function makeHandler(ctx) {
         }
         case route === 'GET /providers': {
           // ?filter=<substr>&limit=<N> mirror v3.33+ list flags.
+          // The dashboard reads `custom` / `builtinOpenAICompat` / `endpoint`
+          // / `docs` to render the right pills + tooltips; CLI callers only
+          // need `name` / `requiresApiKey` / `suggestedModels` and ignore
+          // the extras (additive change, no migration).
           let out = Object.keys(PROVIDERS).map(name => {
             const meta = PROVIDER_INFO[name] || { name };
-            return { name, requiresApiKey: !!meta.requiresApiKey, defaultModel: meta.defaultModel || null, suggestedModels: meta.suggestedModels || [] };
+            return {
+              name,
+              requiresApiKey: !!meta.requiresApiKey,
+              defaultModel: meta.defaultModel || null,
+              suggestedModels: meta.suggestedModels || [],
+              endpoint: meta.endpoint || null,
+              docs: meta.docs || null,
+              custom: !!meta.custom,
+              builtinOpenAICompat: !!meta.builtinOpenAICompat,
+              baseUrl: meta.baseUrl || null,
+              envKey: meta.envKey || null,
+              keyPrefix: meta.keyPrefix || null,
+            };
           });
           const filter = url.searchParams.get('filter');
           if (filter) {
@@ -569,6 +594,100 @@ export function makeHandler(ctx) {
             results,
           });
         }
+        case req.method === 'GET' && !!providerTestMatch: {
+          // GET /providers/<name>/test — single-provider 1-token reachability
+          // probe. Same shape as one entry of GET /providers/test, but the
+          // endpoint stops on the first failure and exposes the reply body
+          // (truncated) so the dashboard can show a real signal of life.
+          const name = providerTestMatch[1];
+          const provider = PROVIDERS[name];
+          if (!provider) return writeJson(res, 404, { error: `unknown provider: ${name}` });
+          const cfg = ctx.readConfig();
+          const apiKey = cfg['api-key'] || '';
+          const meta = PROVIDER_INFO[name] || {};
+          const model = url.searchParams.get('model') || cfg.model || meta.defaultModel || 'unknown';
+          const prompt = url.searchParams.get('prompt') || 'ping';
+          const t0 = Date.now();
+          try {
+            let reply = '';
+            const stream = provider.sendMessage([{ role: 'user', content: prompt }], { apiKey, model });
+            for await (const chunk of stream) {
+              if (typeof chunk === 'string') reply += chunk;
+            }
+            return writeJson(res, reply.length > 0 ? 200 : 503, {
+              ok: reply.length > 0,
+              name, model,
+              durationMs: Date.now() - t0,
+              replyLength: reply.length,
+              reply: reply.slice(0, 500),
+            });
+          } catch (err) {
+            return writeJson(res, 503, {
+              ok: false, name, model,
+              durationMs: Date.now() - t0,
+              error: err?.message || String(err),
+              code: err?.code || null,
+            });
+          }
+        }
+        case route === 'POST /providers': {
+          // Register or overwrite a custom OpenAI-compatible provider.
+          // Body: { name, baseUrl, apiKey?, defaultModel? }. Persists into
+          // cfg.customProviders[] and hot-registers via the registry's
+          // registerCustomProviders() so the new entry is callable in this
+          // same process. 405 when the daemon was started without
+          // writeConfig (read-only mode). The same name as a built-in
+          // OpenAI-compat alias is allowed and overrides the built-in.
+          if (typeof ctx.writeConfig !== 'function') {
+            return writeJson(res, 405, { error: 'mutation disabled — daemon was started without writeConfig' });
+          }
+          let body;
+          try { body = await readJson(req); }
+          catch (e) { return writeJson(res, 400, { error: e?.message || String(e) }); }
+          const reg = await import('./providers/registry.mjs');
+          let name;
+          try { name = reg.validateCustomProviderName(body.name); }
+          catch (e) { return writeJson(res, 400, { error: e.message }); }
+          if (!body.baseUrl || typeof body.baseUrl !== 'string' || !/^https?:\/\//i.test(body.baseUrl)) {
+            return writeJson(res, 400, { error: 'baseUrl must be a string starting with http:// or https://' });
+          }
+          const cfg = ctx.readConfig();
+          cfg.customProviders = Array.isArray(cfg.customProviders) ? cfg.customProviders : [];
+          const idx = cfg.customProviders.findIndex((p) => p && p.name === name);
+          const entry = {
+            name,
+            baseUrl: String(body.baseUrl).replace(/\/+$/, ''),
+            apiKey: body.apiKey || undefined,
+            defaultModel: body.defaultModel || undefined,
+          };
+          if (idx >= 0) cfg.customProviders[idx] = { ...cfg.customProviders[idx], ...entry };
+          else cfg.customProviders.push(entry);
+          ctx.writeConfig(cfg);
+          try { reg.registerCustomProviders(cfg); } catch { /* keep going */ }
+          const overridesBuiltin = typeof reg.isBuiltinOpenAICompatName === 'function'
+            ? reg.isBuiltinOpenAICompatName(name)
+            : false;
+          return writeJson(res, 200, { ok: true, name, baseUrl: entry.baseUrl, overridesBuiltin });
+        }
+        case req.method === 'DELETE' && !!providerMatch && providerMatch[1] !== 'test': {
+          // DELETE /providers/<name> — drop a custom registration. Idempotent:
+          // 200 with `removed: false` when the name wasn't a custom entry.
+          // Built-in providers can't be deleted; their PROVIDERS row is
+          // restored on next process boot if the user previously overrode it.
+          if (typeof ctx.writeConfig !== 'function') {
+            return writeJson(res, 405, { error: 'mutation disabled' });
+          }
+          const name = providerMatch[1];
+          const cfg = ctx.readConfig();
+          if (!Array.isArray(cfg.customProviders) || cfg.customProviders.length === 0) {
+            return writeJson(res, 200, { ok: true, name, removed: false });
+          }
+          const before = cfg.customProviders.length;
+          cfg.customProviders = cfg.customProviders.filter((p) => !(p && p.name === name));
+          const removed = cfg.customProviders.length < before;
+          if (removed) ctx.writeConfig(cfg);
+          return writeJson(res, 200, { ok: true, name, removed });
+        }
         case route === 'GET /rates': {
           // Read-only view of cfg.rates so a dashboard's cost panel
           // can render the configured cards without shelling to the
@@ -607,6 +726,42 @@ export function makeHandler(ctx) {
           // or a script that scaffolds a new card can get the required
           // fields without shelling to the CLI.
           return writeJson(res, 200, RATE_CARD_SHAPE);
+        }
+        case req.method === 'PUT' && !!ratesKeyMatch && ratesKeyMatch[1] !== 'validate' && ratesKeyMatch[1] !== 'shape': {
+          // PUT /rates/<key> — set a rate card. Body is the card object
+          // ({ in, out, "cache-read"?, "cache-create"?, currency? }). The
+          // payload is merged into cfg.rates and validated as a whole;
+          // 422 on validation failure. 405 when writeConfig is unset.
+          if (typeof ctx.writeConfig !== 'function') {
+            return writeJson(res, 405, { error: 'mutation disabled' });
+          }
+          const key = decodeURIComponent(ratesKeyMatch[1]);
+          let body;
+          try { body = await readJson(req); }
+          catch (e) { return writeJson(res, 400, { error: e?.message || String(e) }); }
+          if (!body || typeof body !== 'object') return writeJson(res, 400, { error: 'body must be a JSON object' });
+          const cfg = ctx.readConfig();
+          cfg.rates = cfg.rates && typeof cfg.rates === 'object' ? cfg.rates : {};
+          cfg.rates[key] = body;
+          const v = validateRates(cfg.rates, PROVIDERS);
+          if (!v.ok) return writeJson(res, 422, v);
+          ctx.writeConfig(cfg);
+          return writeJson(res, 200, { ok: true, key, card: cfg.rates[key] });
+        }
+        case req.method === 'DELETE' && !!ratesKeyMatch && ratesKeyMatch[1] !== 'validate' && ratesKeyMatch[1] !== 'shape': {
+          // DELETE /rates/<key> — idempotent: 200 with `removed: false`
+          // when the card didn't exist.
+          if (typeof ctx.writeConfig !== 'function') {
+            return writeJson(res, 405, { error: 'mutation disabled' });
+          }
+          const key = decodeURIComponent(ratesKeyMatch[1]);
+          const cfg = ctx.readConfig();
+          if (!cfg.rates || typeof cfg.rates !== 'object' || !(key in cfg.rates)) {
+            return writeJson(res, 200, { ok: true, key, removed: false });
+          }
+          delete cfg.rates[key];
+          ctx.writeConfig(cfg);
+          return writeJson(res, 200, { ok: true, key, removed: true });
         }
         case route === 'GET /status': {
           const cfg = ctx.readConfig();
@@ -653,6 +808,52 @@ export function makeHandler(ctx) {
           const raw = cfg[key];
           const value = key === 'api-key' ? maskApiKey(raw) : raw;
           return writeJson(res, 200, { key, value });
+        }
+        case req.method === 'PUT' && !!configKeyMatch && configKeyMatch[1] !== 'validate': {
+          // PUT /config/<key>  body: { value: <any> }
+          // Mirror of `lazyclaw config set <key> <value>`. Re-validates the
+          // whole config after the write so we never persist a broken state.
+          // Nested cargo (customProviders / rates / authProfiles) goes
+          // through its own dedicated endpoint — guarded here so a
+          // dashboard PUT can't bypass schema validation.
+          if (typeof ctx.writeConfig !== 'function') {
+            return writeJson(res, 405, { error: 'mutation disabled' });
+          }
+          const key = configKeyMatch[1];
+          if (key === 'customProviders' || key === 'rates' || key === 'authProfiles') {
+            return writeJson(res, 400, {
+              error: `use the dedicated endpoint for "${key}" — POST /providers · PUT /rates/<key> · authProfiles via CLI`,
+            });
+          }
+          let body;
+          try { body = await readJson(req); }
+          catch (e) { return writeJson(res, 400, { error: e?.message || String(e) }); }
+          const value = body && Object.prototype.hasOwnProperty.call(body, 'value') ? body.value : undefined;
+          const cfg = ctx.readConfig();
+          if (value === null || value === undefined) delete cfg[key];
+          else cfg[key] = value;
+          const v = validateConfig(cfg, PROVIDERS);
+          if (!v.ok) return writeJson(res, 422, v);
+          ctx.writeConfig(cfg);
+          const stored = key === 'api-key' && typeof cfg[key] === 'string' ? maskApiKey(cfg[key]) : cfg[key];
+          return writeJson(res, 200, { ok: true, key, value: stored });
+        }
+        case req.method === 'DELETE' && !!configKeyMatch && configKeyMatch[1] !== 'validate': {
+          // DELETE /config/<key> — same as `lazyclaw config delete`.
+          // Idempotent: 200 with `removed: false` when the key wasn't
+          // present.
+          if (typeof ctx.writeConfig !== 'function') {
+            return writeJson(res, 405, { error: 'mutation disabled' });
+          }
+          const key = configKeyMatch[1];
+          if (key === 'customProviders' || key === 'rates' || key === 'authProfiles') {
+            return writeJson(res, 400, { error: `delete via the dedicated endpoint for "${key}"` });
+          }
+          const cfg = ctx.readConfig();
+          if (!(key in cfg)) return writeJson(res, 200, { ok: true, key, removed: false });
+          delete cfg[key];
+          ctx.writeConfig(cfg);
+          return writeJson(res, 200, { ok: true, key, removed: true });
         }
         case route === 'GET /doctor': {
           // Mirror the CLI doctor output — same field set so any tool that

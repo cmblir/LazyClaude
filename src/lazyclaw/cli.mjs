@@ -1455,7 +1455,10 @@ function _attachGhostAutocomplete(rl) {
 function _renderBanner(version) {
   const W = 30;
   const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
-  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
+  // 24-bit color so the mascot reads in the same warm orange as the
+  // dist/index.html SVG (#d97757). Falls back gracefully on terminals
+  // that ignore truecolor — the glyphs are visible regardless.
+  const orange = (s) => `\x1b[38;2;217;119;87m${s}\x1b[0m`;
   // Inner content of each banner row — DO NOT pad here, the wrapper
   // does it. Backslashes are JS-escaped so each `\\` renders as one
   // literal `\` in the output.
@@ -1466,16 +1469,18 @@ function _renderBanner(version) {
     '  |_\\__,_/__\\_, |_|',
     '  LazyClaw  |__/  ' + String(version || '?.?.?').padEnd(10).slice(0, 10),
   ];
-  // Sleepy-cat mascot on the right, lined up with the busiest part
-  // of the wordmark. Three rows of ASCII art + "zz" trail. Plain
-  // ASCII (no box-drawing on the cat) so it lands well in any font.
+  // Pixel-art mascot mirrored from the lazyclaude SPA's #claudeMascot
+  // SVG (orange rectangles → block characters). Squashed to 5 rows so
+  // it lines up with `inner` in the banner. Eye sockets are left blank
+  // (the SVG fills them with #000); a hollow gap reads as eyes against
+  // the orange body in any monospace font.
   const mascot = [
     '',
-    '',
-    '   /\\_/\\',
-    '  ( -.- )  ' + dim('z z'),
-    '   > ^ <    ' + dim('z'),
-    '',
+    orange('   ██      ██'),
+    orange('  ██████████████'),
+    orange('  ██  ') + '██' + orange('  ') + '██' + orange('  ██'),
+    orange('  ██████████████'),
+    orange('   ██      ██'),
     '',
   ];
   const banner = [
@@ -2493,6 +2498,7 @@ async function cmdDashboard(flags = {}) {
     port,
     once: false,
     readConfig,
+    writeConfig,
     sessionsDirGetter: () => cfgDir,
     sessionsMod,
     version: () => readVersionFromRepo(),
@@ -2598,6 +2604,12 @@ async function cmdDaemon(flags) {
     port: Number.isFinite(port) ? port : 0,
     once,
     readConfig,
+    // `lazyclaw daemon` exposes mutation endpoints (POST /providers,
+    // PUT /rates/<key>, etc.) only when an auth token is configured
+    // — without one the daemon is loopback-only but still untrusted
+    // (any process on the box can hit it). dashboard subcommand sets
+    // writeConfig unconditionally because it always runs as the user.
+    writeConfig: authToken ? writeConfig : undefined,
     sessionsDirGetter: () => cfgDir,
     sessionsMod,
     version: () => readVersionFromRepo(),
