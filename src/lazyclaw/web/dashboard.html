@@ -164,6 +164,69 @@
       border-radius: 6px;
       font: inherit;
     }
+    .toolbar input[type="text"], .toolbar input[type="search"] {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font: inherit;
+      min-width: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .stat .label { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat .value { font-size: 22px; font-weight: 600; margin-top: 4px; word-break: break-all; }
+    .stat .sub   { color: var(--dim); font-size: 11px; margin-top: 4px; }
+    table.tbl {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 13px;
+    }
+    table.tbl th, table.tbl td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    table.tbl th { color: var(--dim); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(255,255,255,0.02); }
+    table.tbl tr:last-child td { border-bottom: 0; }
+    table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .banner {
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .banner.ok   { border-color: rgba(74, 222, 128, 0.4); background: rgba(74, 222, 128, 0.06); }
+    .banner.warn { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.06); }
+    .banner.err  { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.06); }
+    .banner ul { margin: 6px 0 0 18px; padding: 0; }
+    .banner li { font-size: 12px; }
+    @media (max-width: 480px) {
+      main { padding: 14px; }
+      .grid { grid-template-columns: 1fr; }
+      table.tbl { font-size: 12px; }
+      table.tbl th, table.tbl td { padding: 6px 8px; }
+    }
     footer {
       padding: 10px 22px;
       border-top: 1px solid var(--border);
@@ -183,8 +246,13 @@
   <nav class="tabs">
     <button data-tab="chat" class="active">Chat</button>
     <button data-tab="sessions">Sessions</button>
+    <button data-tab="workflows">Workflows</button>
     <button data-tab="skills">Skills</button>
     <button data-tab="providers">Providers</button>
+    <button data-tab="rates">Rates</button>
+    <button data-tab="metrics">Metrics</button>
+    <button data-tab="doctor">Doctor</button>
+    <button data-tab="config">Config</button>
     <button data-tab="status">Status</button>
   </nav>
 
@@ -222,6 +290,68 @@
       <h2>Status</h2>
       <div id="status-card"><div class="empty">Loading…</div></div>
     </section>
+
+    <section id="tab-workflows">
+      <h2>Workflows</h2>
+      <div class="toolbar">
+        <select id="wf-status">
+          <option value="">all</option>
+          <option value="running">running</option>
+          <option value="resumable">resumable</option>
+          <option value="failed">failed</option>
+          <option value="done">done</option>
+        </select>
+        <input type="search" id="wf-filter" placeholder="filter by id substring">
+        <button class="btn btn-secondary" onclick="LOADERS.workflows()">Refresh</button>
+        <span class="dim" id="wf-meta"></span>
+      </div>
+      <div id="wf-summary" class="grid"></div>
+      <div id="wf-list"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section id="tab-rates">
+      <h2>Rates</h2>
+      <div class="toolbar">
+        <input type="search" id="rates-filter" placeholder="filter by provider/model">
+        <button class="btn btn-secondary" onclick="LOADERS.rates()">Refresh</button>
+        <span class="dim" id="rates-meta"></span>
+      </div>
+      <div id="rates-validate"></div>
+      <div id="rates-table"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section id="tab-metrics">
+      <h2>Metrics</h2>
+      <div class="toolbar">
+        <button class="btn btn-secondary" onclick="LOADERS.metrics()">Refresh</button>
+        <span class="dim" id="metrics-meta"></span>
+      </div>
+      <div id="metrics-cards" class="grid"></div>
+      <div id="metrics-detail"></div>
+    </section>
+
+    <section id="tab-doctor">
+      <h2>Doctor</h2>
+      <div class="toolbar">
+        <button class="btn btn-secondary" onclick="LOADERS.doctor()">Run</button>
+        <span class="dim" id="doctor-meta"></span>
+      </div>
+      <div id="doctor-card"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section id="tab-config">
+      <h2>Config</h2>
+      <div class="toolbar">
+        <button class="btn btn-secondary" onclick="LOADERS.config()">Refresh</button>
+        <span class="dim" id="config-meta"></span>
+      </div>
+      <div id="config-validate"></div>
+      <div id="config-table"><div class="empty">Loading…</div></div>
+      <details style="margin-top:12px;">
+        <summary class="dim" style="cursor:pointer;">Raw JSON</summary>
+        <pre id="config-raw"></pre>
+      </details>
+    </section>
   </main>
 
   <footer>
@@ -251,6 +381,34 @@
         throw new Error(`${r.status} ${r.statusText}${body ? ' — ' + body : ''}`);
       }
       return r.json();
+    }
+    // Soft variant: returns { status, body } no matter what — used by the
+    // /doctor (503 on issues), /rates/validate (422), /config/validate (422)
+    // endpoints where a non-200 carries a meaningful payload, not an error.
+    async function apiSoft(path, opts = {}) {
+      const r = await fetch(path, opts);
+      let body = null;
+      try { body = await r.json(); } catch {}
+      return { status: r.status, ok: r.ok, body };
+    }
+    function escHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function fmtDuration(ms) {
+      if (!Number.isFinite(ms) || ms < 0) return '—';
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'm ' + (s % 60) + 's';
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + 'h ' + (m % 60) + 'm';
+      return Math.floor(h / 24) + 'd ' + (h % 24) + 'h';
+    }
+    function fmtBytes(n) {
+      if (!Number.isFinite(n)) return '—';
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+      return (n / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
     // ── Status / version (always shown in header) ────────────────
@@ -374,6 +532,234 @@
         root.innerHTML = `<div class="card"><pre>${JSON.stringify(r, null, 2)}</pre></div>`;
       } catch (e) {
         root.innerHTML = `<div class="empty">⚠ ${e.message}</div>`;
+      }
+    };
+
+    // ── Workflows ────────────────────────────────────────────────
+    document.getElementById('wf-status').addEventListener('change', () => LOADERS.workflows());
+    document.getElementById('wf-filter').addEventListener('input', debounce(() => LOADERS.workflows(), 250));
+    function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+    LOADERS.workflows = async function loadWorkflows() {
+      const list = document.getElementById('wf-list');
+      const grid = document.getElementById('wf-summary');
+      const meta = document.getElementById('wf-meta');
+      list.innerHTML = '<div class="empty">Loading…</div>';
+      grid.innerHTML = '';
+      try {
+        const status = document.getElementById('wf-status').value;
+        const filter = document.getElementById('wf-filter').value.trim();
+        const qs = new URLSearchParams();
+        if (status) qs.set('status', status);
+        if (filter) qs.set('filter', filter);
+        const url = '/workflows' + (qs.toString() ? '?' + qs : '');
+        const [r, agg] = await Promise.all([api(url), api('/workflows/aggregate').catch(() => null)]);
+        const sessions = r.sessions || [];
+        meta.textContent = `${sessions.length} session${sessions.length === 1 ? '' : 's'} · dir ${r.dir || '?'}`;
+        const counts = sessions.reduce((acc, s) => {
+          const sm = s.summary || {};
+          if (sm.done)        acc.done++;
+          if (sm.resumable)   acc.resumable++;
+          if (sm.failed > 0)  acc.failed++;
+          if (sm.running > 0) acc.running++;
+          return acc;
+        }, { done: 0, resumable: 0, failed: 0, running: 0 });
+        grid.innerHTML = `
+          <div class="stat"><div class="label">Total</div><div class="value">${sessions.length}</div></div>
+          <div class="stat"><div class="label">Running</div><div class="value">${counts.running}</div></div>
+          <div class="stat"><div class="label">Resumable</div><div class="value">${counts.resumable}</div></div>
+          <div class="stat"><div class="label">Failed</div><div class="value" style="color:${counts.failed ? 'var(--err)' : 'inherit'};">${counts.failed}</div></div>
+          <div class="stat"><div class="label">Done</div><div class="value" style="color:${counts.done ? 'var(--ok)' : 'inherit'};">${counts.done}</div></div>
+          ${agg && agg.sessionCount != null ? `<div class="stat"><div class="label">Aggregate sessions</div><div class="value">${agg.sessionCount}</div><div class="sub">${Object.keys(agg.nodeStats || {}).length} distinct nodes</div></div>` : ''}
+        `;
+        if (sessions.length === 0) {
+          list.innerHTML = '<div class="empty">No workflow runs yet. Run one with <code>lazyclaw run &lt;id&gt; ./flow.mjs</code>.</div>';
+          return;
+        }
+        const rows = sessions.map((s) => {
+          const sm = s.summary || {};
+          const tags = [];
+          if (sm.running > 0) tags.push('<span class="pill warn">running</span>');
+          if (sm.failed > 0)  tags.push('<span class="pill err">failed</span>');
+          if (sm.resumable)   tags.push('<span class="pill warn">resumable</span>');
+          if (sm.done)        tags.push('<span class="pill ok">done</span>');
+          const total = sm.total ?? '';
+          return `<tr>
+            <td><code>${escHtml(s.sessionId)}</code></td>
+            <td>${tags.join(' ') || '<span class="dim">—</span>'}</td>
+            <td class="num">${sm.done ?? 0} / ${total}</td>
+            <td class="num">${sm.failed ?? 0}</td>
+            <td class="dim">${escHtml(s.updatedAt || s.startedAt || '')}</td>
+          </tr>`;
+        }).join('');
+        list.innerHTML = `<table class="tbl">
+          <thead><tr><th>Session</th><th>State</th><th>Done / Total</th><th>Failed</th><th>Updated</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      } catch (e) {
+        list.innerHTML = `<div class="empty">⚠ ${escHtml(e.message)}</div>`;
+      }
+    };
+
+    // ── Rates ────────────────────────────────────────────────────
+    document.getElementById('rates-filter').addEventListener('input', debounce(() => LOADERS.rates(), 250));
+
+    LOADERS.rates = async function loadRates() {
+      const root = document.getElementById('rates-table');
+      const meta = document.getElementById('rates-meta');
+      const banner = document.getElementById('rates-validate');
+      root.innerHTML = '<div class="empty">Loading…</div>';
+      banner.innerHTML = '';
+      try {
+        const filter = document.getElementById('rates-filter').value.trim();
+        const url = '/rates' + (filter ? '?filter=' + encodeURIComponent(filter) : '');
+        const [rates, validate] = await Promise.all([api(url), apiSoft('/rates/validate')]);
+        const entries = Object.entries(rates || {});
+        meta.textContent = `${entries.length} card${entries.length === 1 ? '' : 's'}`;
+        // Validation banner
+        if (validate.body) {
+          const v = validate.body;
+          const issues = (v.issues || []).map((i) => `<li>${escHtml(typeof i === 'string' ? i : JSON.stringify(i))}</li>`).join('');
+          const warnings = (v.warnings || []).map((w) => `<li>${escHtml(typeof w === 'string' ? w : JSON.stringify(w))}</li>`).join('');
+          if (v.ok && !warnings) {
+            banner.innerHTML = '<div class="banner ok">All rate cards valid.</div>';
+          } else {
+            const cls = v.ok ? 'warn' : 'err';
+            banner.innerHTML = `<div class="banner ${cls}">
+              <div><strong>${v.ok ? 'Warnings' : 'Validation issues'}</strong>
+                <ul>${issues}${warnings}</ul>
+              </div>
+            </div>`;
+          }
+        }
+        if (entries.length === 0) {
+          root.innerHTML = '<div class="empty">No rate cards configured. Add one with <code>lazyclaw rates set &lt;provider/model&gt; --in &lt;usd&gt; --out &lt;usd&gt;</code>.</div>';
+          return;
+        }
+        const rows = entries.map(([key, card]) => {
+          const c = card || {};
+          return `<tr>
+            <td><code>${escHtml(key)}</code></td>
+            <td class="num">${c.in ?? '—'}</td>
+            <td class="num">${c.out ?? '—'}</td>
+            <td class="num">${c['cache-read'] ?? '—'}</td>
+            <td class="num">${c['cache-create'] ?? '—'}</td>
+            <td class="dim">${escHtml(c.currency || 'USD')} / 1M tok</td>
+          </tr>`;
+        }).join('');
+        root.innerHTML = `<table class="tbl">
+          <thead><tr><th>Provider / Model</th><th>In</th><th>Out</th><th>Cache read</th><th>Cache create</th><th>Unit</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      } catch (e) {
+        root.innerHTML = `<div class="empty">⚠ ${escHtml(e.message)}</div>`;
+      }
+    };
+
+    // ── Metrics ──────────────────────────────────────────────────
+    LOADERS.metrics = async function loadMetrics() {
+      const cards = document.getElementById('metrics-cards');
+      const detail = document.getElementById('metrics-detail');
+      const meta = document.getElementById('metrics-meta');
+      cards.innerHTML = '';
+      detail.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const m = await api('/metrics');
+        meta.textContent = m.timestamp ? new Date(m.timestamp).toLocaleString() : '';
+        const cache = m.cache || { hits: 0, misses: 0, size: 0 };
+        const totalCache = (cache.hits || 0) + (cache.misses || 0);
+        const hitRate = totalCache > 0 ? ((cache.hits / totalCache) * 100).toFixed(1) + '%' : '—';
+        const tokens = m.tokensTotal || {};
+        const tokIn = tokens.inputTokens || tokens.input || tokens.in || 0;
+        const tokOut = tokens.outputTokens || tokens.output || tokens.out || 0;
+        const wf = m.workflows || {};
+        const costs = m.costsByCurrency || {};
+        const costPairs = Object.entries(costs);
+        const costStr = costPairs.length ? costPairs.map(([cur, n]) => `${n.toFixed(4)} ${cur}`).join(' · ') : '—';
+        cards.innerHTML = `
+          <div class="stat"><div class="label">Uptime</div><div class="value">${fmtDuration(m.uptimeMs)}</div></div>
+          <div class="stat"><div class="label">Requests</div><div class="value">${m.requestsTotal ?? 0}</div><div class="sub">denied ${m.rateLimitDenied ?? 0}</div></div>
+          <div class="stat"><div class="label">Cache hit rate</div><div class="value">${hitRate}</div><div class="sub">${cache.hits || 0} hits / ${cache.misses || 0} misses · ${cache.size || 0} entries</div></div>
+          <div class="stat"><div class="label">Tokens (in / out)</div><div class="value">${tokIn.toLocaleString()} / ${tokOut.toLocaleString()}</div></div>
+          <div class="stat"><div class="label">Cost</div><div class="value" style="font-size:16px;">${costStr}</div></div>
+          ${wf && wf.total != null ? `<div class="stat"><div class="label">Workflows</div><div class="value">${wf.total}</div><div class="sub">${wf.running || 0} running · ${wf.failed || 0} failed · ${wf.done || 0} done</div></div>` : ''}
+        `;
+        const byStatus = m.requestsByStatus || {};
+        const statusRows = Object.keys(byStatus).sort().map((s) => `<tr><td>${escHtml(s)}</td><td class="num">${byStatus[s]}</td></tr>`).join('');
+        detail.innerHTML = `<div class="card">
+          <div class="dim" style="margin-bottom:6px;">Requests by status</div>
+          ${statusRows ? `<table class="tbl"><thead><tr><th>Status</th><th>Count</th></tr></thead><tbody>${statusRows}</tbody></table>` : '<div class="empty">No requests served yet.</div>'}
+        </div>`;
+      } catch (e) {
+        detail.innerHTML = `<div class="empty">⚠ ${escHtml(e.message)}</div>`;
+      }
+    };
+
+    // ── Doctor ───────────────────────────────────────────────────
+    LOADERS.doctor = async function loadDoctor() {
+      const root = document.getElementById('doctor-card');
+      const meta = document.getElementById('doctor-meta');
+      root.innerHTML = '<div class="empty">Running…</div>';
+      const r = await apiSoft('/doctor');
+      const d = r.body || {};
+      meta.textContent = d.timestamp ? new Date(d.timestamp).toLocaleString() : '';
+      const issues = d.issues || [];
+      const okBanner = d.ok
+        ? '<div class="banner ok"><strong>All checks passed.</strong></div>'
+        : `<div class="banner err"><div><strong>${issues.length} issue${issues.length === 1 ? '' : 's'}:</strong>
+            <ul>${issues.map((i) => `<li>${escHtml(i)}</li>`).join('')}</ul>
+           </div></div>`;
+      root.innerHTML = okBanner + `
+        <div class="card">
+          <div class="row"><div class="name">Provider</div><div class="dim" style="margin-left:auto;">${escHtml(d.provider || '—')}</div></div>
+          <div class="row"><div class="name">Model</div><div class="dim" style="margin-left:auto;">${escHtml(d.model || '—')}</div></div>
+          <div class="row"><div class="name">API key</div><div class="dim" style="margin-left:auto;">${d.hasApiKey ? '<span class="pill ok">present</span>' : '<span class="pill warn">none</span>'}</div></div>
+          <div class="row"><div class="name">Node</div><div class="dim" style="margin-left:auto;">${escHtml(d.nodeVersion || '—')}</div></div>
+          <div class="row"><div class="name">Platform</div><div class="dim" style="margin-left:auto;">${escHtml(d.platform || '—')}</div></div>
+          <div class="row"><div class="name">Known providers</div><div class="dim" style="margin-left:auto;">${(d.knownProviders || []).map(escHtml).join(' · ') || '—'}</div></div>
+        </div>`;
+    };
+
+    // ── Config ───────────────────────────────────────────────────
+    LOADERS.config = async function loadConfig() {
+      const root = document.getElementById('config-table');
+      const banner = document.getElementById('config-validate');
+      const raw = document.getElementById('config-raw');
+      const meta = document.getElementById('config-meta');
+      root.innerHTML = '<div class="empty">Loading…</div>';
+      banner.innerHTML = '';
+      raw.textContent = '';
+      try {
+        const [cfg, validate] = await Promise.all([api('/config'), apiSoft('/config/validate')]);
+        const keys = Object.keys(cfg);
+        meta.textContent = `${keys.length} key${keys.length === 1 ? '' : 's'}`;
+        if (validate.body) {
+          const v = validate.body;
+          const issues = (v.issues || []).map((i) => `<li>${escHtml(typeof i === 'string' ? i : JSON.stringify(i))}</li>`).join('');
+          const warnings = (v.warnings || []).map((w) => `<li>${escHtml(typeof w === 'string' ? w : JSON.stringify(w))}</li>`).join('');
+          if (v.ok && !warnings) {
+            banner.innerHTML = '<div class="banner ok">Config valid.</div>';
+          } else {
+            const cls = v.ok ? 'warn' : 'err';
+            banner.innerHTML = `<div class="banner ${cls}"><div><strong>${v.ok ? 'Warnings' : 'Validation issues'}</strong><ul>${issues}${warnings}</ul></div></div>`;
+          }
+        }
+        if (keys.length === 0) {
+          root.innerHTML = '<div class="empty">No config yet. Run <code>lazyclaw onboard</code>.</div>';
+          return;
+        }
+        const rows = keys.sort().map((k) => {
+          const v = cfg[k];
+          const display = v && typeof v === 'object' ? JSON.stringify(v) : String(v);
+          return `<tr><td><code>${escHtml(k)}</code></td><td>${escHtml(display)}</td></tr>`;
+        }).join('');
+        root.innerHTML = `<table class="tbl">
+          <thead><tr><th style="width:30%">Key</th><th>Value</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+        raw.textContent = JSON.stringify(cfg, null, 2);
+      } catch (e) {
+        root.innerHTML = `<div class="empty">⚠ ${escHtml(e.message)}</div>`;
       }
     };
 

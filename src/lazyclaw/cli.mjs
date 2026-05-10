@@ -39,6 +39,13 @@ function _resolveAuthKey(cfg, provider) {
   const active = (cfg.authActiveProfile || {})[provider];
   const hit = arr.find((p) => p && p.label === active) || arr[0];
   if (hit?.key) return hit.key;
+  // Custom OpenAI-compatible providers store their api-key inline in the
+  // customProviders[] entry. Honour that before falling back to the
+  // legacy single-key cfg['api-key'].
+  const custom = Array.isArray(cfg.customProviders)
+    ? cfg.customProviders.find((p) => p && p.name === provider)
+    : null;
+  if (custom?.apiKey) return custom.apiKey;
   return cfg['api-key'] || '';
 }
 
@@ -684,6 +691,15 @@ function require_registry_sync() {
 }
 async function ensureRegistry() {
   if (!_registryMod) _registryMod = await import('./providers/registry.mjs');
+  // Re-run registration on every call so config changes within the same
+  // process (e.g. setup wizard adding a custom endpoint mid-session) take
+  // effect for the next chat / agent / picker invocation. registerCustom-
+  // Providers is idempotent — re-registering the same name is a no-op.
+  try {
+    if (typeof _registryMod.registerCustomProviders === 'function') {
+      _registryMod.registerCustomProviders(readConfig());
+    }
+  } catch { /* never let a malformed cfg.customProviders block startup */ }
   return _registryMod;
 }
 
@@ -885,7 +901,7 @@ const SUBCOMMAND_SUBS = {
   config:    ['get', 'set', 'list', 'delete', 'unset', 'path', 'edit', 'validate'],
   sessions:  ['list', 'show', 'clear', 'export', 'search'],
   skills:    ['list', 'show', 'install', 'remove', 'search'],
-  providers: ['list', 'info', 'test'],
+  providers: ['list', 'info', 'test', 'add', 'remove', 'models'],
   rates:     ['list', 'set', 'delete', 'shape', 'validate', 'copy'],
   completion: ['bash', 'zsh'],
   auth:      ['list', 'add', 'remove', 'use', 'rotate'],
@@ -1095,7 +1111,7 @@ const HELP_SUMMARIES = {
   onboard:    'Guided setup (use --non-interactive for scripts)',
   sessions:   'Persistent chat sessions (list|show|clear|export)',
   skills:     'Markdown skill bundles (list|show|install|remove)',
-  providers:  'Inspect registered providers (list|info <name>)',
+  providers:  'Inspect / register providers (list|info|test|add|remove|models)',
   daemon:     'Run the local HTTP gateway (--port, --auth-token, --allow-origin)',
   version:    'Print VERSION + node + platform as JSON',
   completion: 'Emit shell completion script (completion <bash|zsh>)',
@@ -1134,7 +1150,7 @@ const HELP_DETAILS = {
   onboard: 'Usage: lazyclaw onboard [--non-interactive] [--provider X] [--model Y] [--api-key Z]\n  --model accepts the unified "provider/model" string (e.g. anthropic/claude-opus-4-7).',
   sessions: 'Usage: lazyclaw sessions <list [--filter <substr>] [--limit <N>]|show <id>|clear <id>|export <id> [--format md|json|text]|search <query> [--regex]>\n  list — recent sessions by mtime; --filter caps to ids containing substring (case-insensitive); --limit caps result count.\n  export — render in chosen format (md default for human sharing, json for tooling, text for paste).\n  search — case-insensitive substring (or --regex pattern) match across all session content; returns first excerpt + match count per matching session.',
   skills: 'Usage: lazyclaw skills <list [--filter <substr>] [--limit <N>]|show <name>|install <user/repo[@ref][:path]> [--prefix <p>] [--force] | install <name> [--from <path> | --from-url <https://...>]|remove <name>|search <query> [--regex]>\n  list — installed skills; --filter caps to names containing substring (case-insensitive); --limit caps result count.\n  install <user>/<repo>[@<ref>][:<subpath>] — fetch a GitHub tarball, install every .md under skills/ (or the explicit subpath, or repo root). Default ref is `main`.\n    --prefix prepends a name prefix so a multi-skill repo doesn\'t collide with locally-managed skills. --force overwrites existing names.\n  install <name> --from <path> | --from-url <https://...> — single-file install. --from-url is HTTPS-only with a 1 MiB cap.\n  search — case-insensitive substring (or --regex) match across all skill markdown bodies; returns first excerpt + match count per skill.',
-  providers: 'Usage: lazyclaw providers <list [--filter <substr>] [--limit <N>] | info <name> | test <name> [--model X] [--prompt T] | test [--all] [--prompt T]>\n  list — registered providers (--filter case-insensitive name substring; --limit caps post-filter count).\n  info — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test — send a 1-token "ping" through the provider and report ok/error + duration.\n         Useful after configuring an API key to verify it works before relying on it.\n         No name OR --all: tests every registered provider in parallel; exits 0 only when ALL pass.',
+  providers: 'Usage: lazyclaw providers <list [--filter <substr>] [--limit <N>] | info <name> | test <name> [--model X] [--prompt T] | test [--all] [--prompt T] | add <name> --base-url <url> [--api-key <k>] [--default-model <id>] [--no-probe] | remove <name> | models <name> [--filter <substr>]>\n  list   — registered providers (--filter case-insensitive name substring; --limit caps post-filter count).\n  info   — static metadata: requiresApiKey, defaultModel, suggestedModels, endpoint.\n  test   — send a 1-token "ping" through the provider and report ok/error + duration.\n           Useful after configuring an API key to verify it works before relying on it.\n           No name OR --all: tests every registered provider in parallel; exits 0 only when ALL pass.\n  add    — register a custom OpenAI-compatible endpoint (NIM / OpenRouter / Together / Groq / vLLM / LM Studio / …).\n           Probes /v1/models on success unless --no-probe is set; persists to cfg.customProviders[].\n  remove — drop a custom provider entry from cfg.customProviders[].\n  models — fetch + print the live model catalogue from <provider>/v1/models (works for openai / ollama / custom).',
   daemon: 'Usage: lazyclaw daemon [--port <N>] [--once] [--auth-token <token>] [--allow-origin <origin>] [--rate-limit <N>] [--response-cache] [--log <level>] [--shutdown-timeout-ms <N>] [--cost-cap-<currency> <N> ...] [--workflow-state-dir <dir>]\n  Always binds 127.0.0.1. --port 0 picks a random port and prints the URL.\n  --auth-token also reads $LAZYCLAW_AUTH_TOKEN; --allow-origin also reads $LAZYCLAW_ALLOW_ORIGINS.\n  --rate-limit <N> caps each remote IP at N requests / 60 s.\n  --response-cache enables process-scoped memoization; per-request opt-in via body.cache.\n  --log <debug|info|warn|error> emits JSON-line access logs on stderr (also reads $LAZYCLAW_LOG_LEVEL).\n  --shutdown-timeout-ms <N> caps graceful drain on SIGINT/SIGTERM (default 10000). Second signal forces immediate exit.\n  --cost-cap-usd 100 (or any currency code in lowercase) rejects POST /agent + /chat with 402 once cumulative cost reaches the cap.\n  --workflow-state-dir <dir> backs GET /workflows + GET /workflows/<id> (default .workflow-state, also reads $LAZYCLAW_WORKFLOW_STATE_DIR).',
   version: 'Usage: lazyclaw version\n  Aliases: --version, -v.',
   completion: 'Usage: lazyclaw completion <bash|zsh>\n  bash:   eval "$(lazyclaw completion bash)"\n  zsh:    lazyclaw completion zsh > "${fpath[1]}/_lazyclaw"',
@@ -1495,7 +1511,7 @@ function _printChatBanner(activeProvName, activeModel, version) {
 // optional pre-coloured pill (e.g. "[api key]") that lands on the
 // right side of the row. `defaultIdx` lets the caller pin where the
 // cursor lands; default 0.
-async function _arrowMenu({ title, subtitle, footer, items, defaultIdx = 0 }) {
+async function _arrowMenu({ title, subtitle, footer, items, defaultIdx = 0, searchable = false }) {
   if (!process.stdout.isTTY || !process.stdin.isTTY) {
     // Non-TTY fallback: print the labels on stderr and read a single
     // line of stdin. Used when somebody pipes input to `lazyclaw
@@ -1528,24 +1544,68 @@ async function _arrowMenu({ title, subtitle, footer, items, defaultIdx = 0 }) {
   // before drawing so the picker always receives the first keypress.
   process.stdin.resume();
   if (process.stdin.ref) process.stdin.ref();
-  let idx = Math.max(0, Math.min(items.length - 1, defaultIdx));
   const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
   const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
   const bold   = (s) => `\x1b[1m${s}\x1b[0m`;
+
+  // Typeahead state. `query` accumulates printable chars when searchable
+  // is on; the visible item slice is recomputed on every keystroke. We
+  // keep `defaultIdx` semantics by mapping it to the unfiltered list and
+  // tracking selection inside the filtered view via the item identity.
+  let query = '';
+  const matchScore = (it, q) => {
+    if (!q) return 0;
+    const hay = `${it.label || ''}  ${it.desc || ''}  ${it.id || ''}`.toLowerCase();
+    const needle = q.toLowerCase();
+    if (hay.includes(needle)) return hay.indexOf(needle) === 0 ? 2 : 1;
+    // simple subsequence fallback so "g4o" matches "gpt-4o".
+    let i = 0; let matched = 0;
+    for (const ch of hay) {
+      if (ch === needle[matched]) { matched++; if (matched === needle.length) break; }
+      i++;
+    }
+    return matched === needle.length ? 0.5 : 0;
+  };
+  const filterItems = () => {
+    if (!searchable || !query) return items.slice();
+    const scored = items
+      .map((it) => ({ it, s: matchScore(it, query) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s);
+    return scored.map((x) => x.it);
+  };
+  let view = filterItems();
+  let idx = Math.max(0, Math.min(view.length - 1, defaultIdx));
+  if (idx < 0) idx = 0;
 
   const draw = () => {
     process.stdout.write('\x1b[?25l\x1b[2J\x1b[H');
     process.stdout.write(accent(title) + '\n');
     if (subtitle) process.stdout.write(dim(subtitle) + '\n');
-    process.stdout.write(dim('↑/↓ to move · Enter to confirm · Esc to back · q to quit') + '\n\n');
-    const rows = Math.max(6, (process.stdout.rows || 24) - 8);
+    const help = searchable
+      ? '↑/↓ to move · Enter to confirm · type to search · Esc to back · Ctrl+U to clear · q to quit'
+      : '↑/↓ to move · Enter to confirm · Esc to back · q to quit';
+    process.stdout.write(dim(help) + '\n');
+    if (searchable) {
+      const q = query ? bold(query) : dim('(type to filter)');
+      process.stdout.write(dim('  search: ') + q + dim(`   ${view.length}/${items.length} match`) + '\n\n');
+    } else {
+      process.stdout.write('\n');
+    }
+    if (view.length === 0) {
+      process.stdout.write('  ' + dim('(no matches — backspace or Ctrl+U to clear the filter)') + '\n');
+      if (footer) process.stdout.write('\n' + dim(footer) + '\n');
+      return;
+    }
+    const headerLines = subtitle ? 4 : 3;
+    const rows = Math.max(6, (process.stdout.rows || 24) - (headerLines + (searchable ? 3 : 4)));
     let from = Math.max(0, idx - Math.floor(rows / 2));
-    if (from + rows > items.length) from = Math.max(0, items.length - rows);
-    const to = Math.min(items.length, from + rows);
+    if (from + rows > view.length) from = Math.max(0, view.length - rows);
+    const to = Math.min(view.length, from + rows);
     // Pre-compute label width so descriptions line up across rows.
-    const labelW = items.reduce((w, it) => Math.max(w, (it.label || '').length), 12);
+    const labelW = view.reduce((w, it) => Math.max(w, (it.label || '').length), 12);
     for (let i = from; i < to; i++) {
-      const it = items[i];
+      const it = view[i];
       const marker = i === idx ? accent('❯ ') : '  ';
       const lbl = (it.label || '').padEnd(labelW);
       const lblOut = i === idx ? bold(lbl) : lbl;
@@ -1553,26 +1613,50 @@ async function _arrowMenu({ title, subtitle, footer, items, defaultIdx = 0 }) {
       const tag = it.tag ? '  ' + it.tag : '';
       process.stdout.write(`${marker}${lblOut}${desc}${tag}\n`);
     }
-    if (to < items.length) {
-      process.stdout.write(`${dim(`  …(${items.length - to} more)`)}\n`);
+    if (to < view.length) {
+      process.stdout.write(`${dim(`  …(${view.length - to} more)`)}\n`);
     }
     if (footer) process.stdout.write('\n' + dim(footer) + '\n');
   };
 
   draw();
   return await new Promise((resolve) => {
-    const onKey = (_str, key) => {
+    const recompute = () => {
+      view = filterItems();
+      if (idx >= view.length) idx = Math.max(0, view.length - 1);
+      draw();
+    };
+    const onKey = (str, key) => {
       if (!key) return;
-      if (key.name === 'up')   { idx = (idx - 1 + items.length) % items.length; draw(); }
-      else if (key.name === 'down') { idx = (idx + 1) % items.length; draw(); }
+      if (key.name === 'up')   { if (view.length) { idx = (idx - 1 + view.length) % view.length; draw(); } }
+      else if (key.name === 'down') { if (view.length) { idx = (idx + 1) % view.length; draw(); } }
       else if (key.name === 'pageup')   { idx = Math.max(0, idx - 10); draw(); }
-      else if (key.name === 'pagedown') { idx = Math.min(items.length - 1, idx + 10); draw(); }
+      else if (key.name === 'pagedown') { idx = Math.min(view.length - 1, idx + 10); draw(); }
       else if (key.name === 'home') { idx = 0; draw(); }
-      else if (key.name === 'end')  { idx = items.length - 1; draw(); }
-      else if (key.name === 'return') { cleanup(); resolve(items[idx]); }
+      else if (key.name === 'end')  { idx = view.length - 1; draw(); }
+      else if (key.name === 'return') {
+        if (view.length === 0) return;
+        cleanup();
+        resolve(view[idx]);
+      }
       else if (key.ctrl && key.name === 'c') { cleanup(); process.exit(130); }
-      else if (key.name === 'escape') { cleanup(); resolve('BACK'); }
-      else if (key.name === 'q')      { cleanup(); resolve('CANCEL'); }
+      else if (key.ctrl && key.name === 'u') { if (searchable) { query = ''; recompute(); } }
+      else if (key.name === 'escape') {
+        if (searchable && query) { query = ''; recompute(); return; }
+        cleanup(); resolve('BACK');
+      }
+      else if (key.name === 'backspace') {
+        if (searchable && query.length > 0) { query = query.slice(0, -1); recompute(); }
+      }
+      else if (searchable && str && str.length === 1 && str >= ' ' && str !== '\x7f' && !key.ctrl && !key.meta) {
+        // Printable char → append to filter buffer. We deliberately do not
+        // intercept 'q' as a shortcut when searchable is on, because the
+        // user might be typing a model id that contains 'q'. Use Esc / Ctrl+C
+        // to bail out instead.
+        query += str;
+        recompute();
+      }
+      else if (!searchable && key.name === 'q') { cleanup(); resolve('CANCEL'); }
     };
     const cleanup = () => {
       process.stdin.off('keypress', onKey);
@@ -1659,55 +1743,243 @@ async function _pickProviderInteractive() {
   let provider = null;
   while (!provider) {
     const memberNames = families[family.id].members;
-    if (memberNames.length === 1) {
-      // Auto-advance — no point making the user pick from a single
-      // row.
-      provider = { id: memberNames[0] };
-      break;
-    }
     const provItems = memberNames.map((name) => {
       const meta = info[name] || {};
       const models = (meta.suggestedModels || []).slice(0, 4).join(' · ') || '(default)';
+      const isCustom = !!meta.custom;
       return {
         id: name,
         label: name,
-        desc: `models: ${models}`,
-        tag: meta.requiresApiKey ? '\x1b[38;5;245m[api key]\x1b[0m' : '\x1b[38;5;208m[no key]\x1b[0m',
+        desc: isCustom
+          ? `custom · ${meta.baseUrl || ''}`
+          : `models: ${models}`,
+        tag: isCustom
+          ? '\x1b[38;5;213m[custom]\x1b[0m'
+          : (meta.requiresApiKey ? '\x1b[38;5;245m[api key]\x1b[0m' : '\x1b[38;5;208m[no key]\x1b[0m'),
       };
     });
+    // Surface a "+ Add a new custom endpoint…" entry inside the API-key
+    // family. NIM, OpenRouter, vLLM, LM Studio, Together, Groq, etc. all
+    // speak the OpenAI Chat-Completions wire format — this single hook
+    // covers every one of them without shipping a per-vendor provider.
+    if (family.id === 'api') {
+      provItems.push({
+        id: '__add_custom__',
+        label: '+ Add a custom OpenAI-compatible endpoint…',
+        desc: 'NVIDIA NIM · OpenRouter · Together · Groq · vLLM · LM Studio · …',
+        tag: '\x1b[38;5;213m[new]\x1b[0m',
+      });
+    }
+    if (memberNames.length === 1 && family.id !== 'api') {
+      // Auto-advance — no point making the user pick from a single row,
+      // unless we just appended the "+ Add custom" entry above.
+      provider = { id: memberNames[0] };
+      break;
+    }
     const picked = await _arrowMenu({
       title: `LazyClaw setup — Step 2 of 3:  pick a ${family.label} provider`,
-      subtitle: `Showing ${memberNames.length} ${family.label.toLowerCase()} provider(s).`,
+      subtitle: `Showing ${provItems.length} ${family.label.toLowerCase()} option(s). Type to filter.`,
       items: provItems,
+      searchable: true,
     });
     if (picked === 'CANCEL') return null;
     if (picked === 'BACK')   { family = null; return _pickProviderInteractive(); }
+    if (picked && picked.id === '__add_custom__') {
+      const added = await _addCustomProviderInteractive();
+      if (!added) continue; // back to provider list
+      // Force the registry to pick up the new entry and recompute the
+      // family bucket for the next loop iteration.
+      await ensureRegistry();
+      Object.assign(families, _providerFamilies());
+      provider = { id: added.name };
+      break;
+    }
     provider = picked;
   }
 
   // ── Step 3 — model ────────────────────────────────────────────
   const meta = info[provider.id] || {};
-  const models = Array.isArray(meta.suggestedModels) ? meta.suggestedModels : [];
-  if (!models.length) {
-    // Provider has no curated models (mock) — return without a
-    // model so the underlying call uses the provider default.
+  const baseModels = Array.isArray(meta.suggestedModels) ? meta.suggestedModels.slice() : [];
+  const isCustom = !!meta.custom;
+  const supportsLiveFetch = !!meta.baseUrl || provider.id === 'openai' || provider.id === 'ollama';
+
+  if (!baseModels.length && !supportsLiveFetch) {
+    // Provider has no curated models AND no live-fetch surface (mock) —
+    // return without a model so the underlying call uses the provider
+    // default.
     return { provider: provider.id, model: null };
   }
+
+  let dynamicModels = [];
   while (true) {
-    const modelItems = models.map((m) => ({ id: m, label: m, desc: '' }));
-    // Pin the cursor to the provider's defaultModel so Enter without
-    // navigation picks the most-recommended one.
-    const defaultIdx = Math.max(0, models.indexOf(meta.defaultModel || models[0]));
+    const allModels = Array.from(new Set([...baseModels, ...dynamicModels]));
+    const modelItems = allModels.map((m) => ({ id: m, label: m, desc: '' }));
+    if (supportsLiveFetch) {
+      modelItems.unshift({
+        id: '__fetch_models__',
+        label: '↻ Fetch live model list from /v1/models',
+        desc: isCustom ? `GET ${meta.baseUrl}/models` : 'pulls the up-to-date catalogue from the provider',
+        tag: '\x1b[38;5;245m[live]\x1b[0m',
+      });
+    }
+    modelItems.push({
+      id: '__custom_model__',
+      label: '… type a custom model id',
+      desc: 'use any model id supported by this provider, even if not listed above',
+      tag: '\x1b[38;5;245m[free]\x1b[0m',
+    });
+
+    const defaultIdx = supportsLiveFetch
+      ? Math.max(0, 1 + allModels.indexOf(meta.defaultModel || allModels[0]))
+      : Math.max(0, allModels.indexOf(meta.defaultModel || allModels[0]));
     const picked = await _arrowMenu({
       title: `LazyClaw setup — Step 3 of 3:  pick a model for ${provider.id}`,
-      subtitle: `Showing ${models.length} suggested model(s). Type the model id directly later via /model in chat to use anything not listed here.`,
+      subtitle: `Type to filter ${allModels.length} model(s). Enter to confirm. Backspace clears one char, Ctrl+U clears the filter.`,
       items: modelItems,
       defaultIdx,
+      searchable: true,
     });
     if (picked === 'CANCEL') return null;
     if (picked === 'BACK')   return _pickProviderInteractive(); // back to step 1
+    if (picked.id === '__custom_model__') {
+      const typed = (await _quickPrompt(`  model id for ${provider.id}: `)).trim();
+      if (!typed) continue;
+      return { provider: provider.id, model: typed };
+    }
+    if (picked.id === '__fetch_models__') {
+      try {
+        process.stdout.write(`\n  fetching ${provider.id} model list…\n`);
+        const fetched = await _fetchModelsForProvider(provider.id);
+        if (!fetched.length) {
+          process.stdout.write(`  ${'\x1b[33m'}no models returned${'\x1b[0m'} — falling back to the suggested list.\n`);
+          await _quickPrompt('  press Enter to continue ');
+        } else {
+          dynamicModels = fetched;
+          process.stdout.write(`  fetched ${fetched.length} model(s).\n`);
+          await _quickPrompt('  press Enter to pick one ');
+        }
+      } catch (e) {
+        process.stdout.write(`\n  ${'\x1b[33m'}fetch failed:${'\x1b[0m'} ${e?.message || e}\n`);
+        await _quickPrompt('  press Enter to continue ');
+      }
+      continue;
+    }
     return { provider: provider.id, model: picked.id };
   }
+}
+
+// Resolve {baseUrl, apiKey} for a provider so we can call /v1/models on
+// its behalf. Returns null when the provider doesn't expose an OpenAI-
+// compatible model catalogue (e.g. anthropic, gemini, claude-cli).
+function _modelCatalogueFor(providerId) {
+  const cfg = readConfig();
+  const meta = (_registryMod.PROVIDER_INFO || {})[providerId] || {};
+  if (meta.custom && meta.baseUrl) {
+    const entry = (cfg.customProviders || []).find((p) => p && p.name === providerId) || {};
+    return { baseUrl: meta.baseUrl, apiKey: entry.apiKey || cfg['api-key'] || '' };
+  }
+  if (providerId === 'openai') {
+    return { baseUrl: 'https://api.openai.com/v1', apiKey: _resolveAuthKey(cfg, 'openai') };
+  }
+  if (providerId === 'ollama') {
+    const host = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+    return { baseUrl: `${host.replace(/\/$/, '')}/v1`, apiKey: '' };
+  }
+  return null;
+}
+
+async function _fetchModelsForProvider(providerId) {
+  const c = _modelCatalogueFor(providerId);
+  if (!c) throw new Error(`provider "${providerId}" does not expose an OpenAI-compatible /v1/models endpoint`);
+  const { fetchOpenAICompatModels } = await import('./providers/openai_compat.mjs');
+  return fetchOpenAICompatModels({ baseUrl: c.baseUrl, apiKey: c.apiKey });
+}
+
+// Walk the user through registering a new OpenAI-compatible custom
+// provider (NIM, OpenRouter, vLLM, LM Studio, Together, Groq, …).
+// Persists into cfg.customProviders[] and returns { name } on success,
+// or null when the user backs out.
+async function _addCustomProviderInteractive() {
+  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
+  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
+  const bold   = (s) => `\x1b[1m${s}\x1b[0m`;
+  const ok     = (s) => `\x1b[32m${s}\x1b[0m`;
+
+  process.stdout.write('\x1b[2J\x1b[H');
+  process.stdout.write(accent('Add a custom OpenAI-compatible endpoint') + '\n');
+  process.stdout.write(dim('Works with any service that speaks the OpenAI v1 wire format.') + '\n');
+  process.stdout.write(dim('Examples:') + '\n');
+  process.stdout.write(dim('  · NVIDIA NIM       https://integrate.api.nvidia.com/v1') + '\n');
+  process.stdout.write(dim('  · OpenRouter       https://openrouter.ai/api/v1') + '\n');
+  process.stdout.write(dim('  · Together AI      https://api.together.xyz/v1') + '\n');
+  process.stdout.write(dim('  · Groq             https://api.groq.com/openai/v1') + '\n');
+  process.stdout.write(dim('  · vLLM / LM Studio http://localhost:8000/v1') + '\n\n');
+
+  const { validateCustomProviderName, registerCustomProviders, fetchOpenAICompatModels } = _registryMod;
+  let name;
+  while (true) {
+    const raw = (await _quickPrompt(`  ${bold('name')} ${dim('(short id, e.g. "nim", "openrouter"):')} `)).trim();
+    if (!raw) {
+      process.stdout.write(dim('  cancelled — back to the picker.\n'));
+      return null;
+    }
+    try { name = validateCustomProviderName(raw); break; }
+    catch (e) { process.stdout.write(`  \x1b[33m${e.message}\x1b[0m — try again.\n`); }
+  }
+  const baseUrlRaw = (await _quickPrompt(`  ${bold('baseUrl')} ${dim('(must end in /v1, no trailing slash needed):')} `)).trim();
+  if (!baseUrlRaw) { process.stdout.write(dim('  cancelled — baseUrl is required.\n')); return null; }
+  if (!/^https?:\/\//i.test(baseUrlRaw)) {
+    process.stdout.write('  \x1b[33mbaseUrl must start with http:// or https://\x1b[0m — cancelled.\n');
+    return null;
+  }
+  const apiKey = (await _quickPrompt(`  ${bold('api-key')} ${dim('(blank if the endpoint is auth-less, e.g. local vLLM):')} `)).trim();
+
+  // Persist to cfg.customProviders[]. Overwrite an existing entry of the
+  // same name so re-running setup with a corrected URL just works.
+  const cfg = readConfig();
+  cfg.customProviders = Array.isArray(cfg.customProviders) ? cfg.customProviders : [];
+  const existingIdx = cfg.customProviders.findIndex((p) => p && p.name === name);
+  const entry = {
+    name,
+    baseUrl: baseUrlRaw.replace(/\/+$/, ''),
+    apiKey: apiKey || undefined,
+  };
+  if (existingIdx >= 0) cfg.customProviders[existingIdx] = { ...cfg.customProviders[existingIdx], ...entry };
+  else cfg.customProviders.push(entry);
+  writeConfig(cfg);
+
+  // Hot-register so the provider is callable in this same process.
+  registerCustomProviders(cfg);
+
+  // Best-effort live model probe so the user sees we can reach it. Skip
+  // silently on failure — registration still succeeds and /v1/models can
+  // be re-tried from the model picker.
+  let probeMsg = '';
+  try {
+    const list = await fetchOpenAICompatModels({ baseUrl: entry.baseUrl, apiKey: entry.apiKey || '' });
+    if (list.length) {
+      probeMsg = `  ${ok('✓')} reachable — ${list.length} model(s) advertised at ${entry.baseUrl}/models\n`;
+      // Persist the catalogue so the picker can show it without re-fetching.
+      const updated = readConfig();
+      const i = (updated.customProviders || []).findIndex((p) => p && p.name === name);
+      if (i >= 0) {
+        updated.customProviders[i].suggestedModels = list.slice(0, 50);
+        if (!updated.customProviders[i].defaultModel) updated.customProviders[i].defaultModel = list[0];
+        writeConfig(updated);
+        registerCustomProviders(updated);
+      }
+    } else {
+      probeMsg = `  ${ok('✓')} registered — /v1/models returned no entries (will rely on free-text model id).\n`;
+    }
+  } catch (e) {
+    probeMsg = `  \x1b[33m!\x1b[0m registered, but /v1/models probe failed: ${e?.message || e}\n`;
+  }
+  process.stdout.write('\n');
+  process.stdout.write(`  ${ok(bold('✓ custom provider saved:'))} ${name}  ${dim('→')} ${entry.baseUrl}\n`);
+  process.stdout.write(probeMsg);
+  process.stdout.write(dim(`  Removable any time via:  lazyclaw providers remove ${name}\n`));
+  await _quickPrompt('  press Enter to continue ');
+  return { name };
 }
 
 async function cmdChat(flags = {}) {
@@ -3113,8 +3385,116 @@ async function cmdProviders(sub, positional, flags = {}) {
         process.exit(1);
       }
     }
+    case 'add': {
+      // Register an OpenAI-compatible custom endpoint non-interactively.
+      // Mirrors the picker's "+ Add custom" flow but scriptable, so users
+      // can wire NIM / OpenRouter / vLLM into config without entering the
+      // arrow-key UI.
+      //   lazyclaw providers add nim \
+      //     --base-url https://integrate.api.nvidia.com/v1 \
+      //     --api-key nvapi-xxx \
+      //     [--default-model meta/llama-3.1-70b] \
+      //     [--no-probe]
+      const name = positional[0];
+      const baseUrl = flags['base-url'] || flags.baseUrl;
+      const apiKey = flags['api-key'] || flags.apiKey || '';
+      if (!name || !baseUrl) {
+        console.error('Usage: lazyclaw providers add <name> --base-url <url> [--api-key <key>] [--default-model <id>] [--no-probe]');
+        process.exit(2);
+      }
+      let validName;
+      try { validName = _registryMod.validateCustomProviderName(name); }
+      catch (e) { console.error(e.message); process.exit(2); }
+      if (!/^https?:\/\//i.test(String(baseUrl))) {
+        console.error('--base-url must start with http:// or https://');
+        process.exit(2);
+      }
+      const cfg = readConfig();
+      cfg.customProviders = Array.isArray(cfg.customProviders) ? cfg.customProviders : [];
+      const idx = cfg.customProviders.findIndex((p) => p && p.name === validName);
+      const entry = {
+        name: validName,
+        baseUrl: String(baseUrl).replace(/\/+$/, ''),
+        apiKey: apiKey || undefined,
+      };
+      if (flags['default-model']) entry.defaultModel = flags['default-model'];
+      if (idx >= 0) cfg.customProviders[idx] = { ...cfg.customProviders[idx], ...entry };
+      else cfg.customProviders.push(entry);
+      writeConfig(cfg);
+      _registryMod.registerCustomProviders(cfg);
+
+      let probe = null;
+      if (!flags['no-probe']) {
+        try {
+          const list = await _registryMod.fetchOpenAICompatModels({
+            baseUrl: entry.baseUrl, apiKey: entry.apiKey || '',
+          });
+          probe = { ok: true, modelCount: list.length, sample: list.slice(0, 8) };
+          if (list.length) {
+            const updated = readConfig();
+            const i = (updated.customProviders || []).findIndex((p) => p && p.name === validName);
+            if (i >= 0) {
+              updated.customProviders[i].suggestedModels = list.slice(0, 50);
+              if (!updated.customProviders[i].defaultModel) updated.customProviders[i].defaultModel = list[0];
+              writeConfig(updated);
+              _registryMod.registerCustomProviders(updated);
+            }
+          }
+        } catch (e) {
+          probe = { ok: false, error: e?.message || String(e) };
+        }
+      }
+      console.log(JSON.stringify({
+        ok: true, added: validName, baseUrl: entry.baseUrl, hasApiKey: !!entry.apiKey, probe,
+      }, null, 2));
+      return;
+    }
+    case 'remove': {
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw providers remove <name>'); process.exit(2); }
+      const cfg = readConfig();
+      const list = Array.isArray(cfg.customProviders) ? cfg.customProviders : [];
+      const before = list.length;
+      cfg.customProviders = list.filter((p) => !(p && p.name === name));
+      if (cfg.customProviders.length === before) {
+        console.error(`no custom provider named "${name}" — registered: ${list.map((p) => p.name).join(', ') || '(none)'}`);
+        process.exit(2);
+      }
+      writeConfig(cfg);
+      // The in-memory PROVIDERS map keeps the dropped entry until process
+      // restart — fine for the CLI (each invocation re-registers from
+      // disk). We don't try to mutate it here.
+      console.log(JSON.stringify({ ok: true, removed: name }, null, 2));
+      return;
+    }
+    case 'models': {
+      // Fetch + print the live model list from a provider's /v1/models.
+      // Works for any registered OpenAI-compatible endpoint (custom +
+      // openai + ollama). Used by the picker but useful standalone too:
+      //   lazyclaw providers models nim
+      //   lazyclaw providers models openai --filter gpt-4
+      const name = positional[0];
+      if (!name) { console.error('Usage: lazyclaw providers models <name> [--filter <substr>]'); process.exit(2); }
+      if (!_registryMod.PROVIDERS[name]) {
+        console.error(`unknown provider: ${name}`);
+        process.exit(2);
+      }
+      try {
+        const list = await _fetchModelsForProvider(name);
+        let out = list;
+        if (flags.filter) {
+          const f = String(flags.filter).toLowerCase();
+          out = out.filter((m) => m.toLowerCase().includes(f));
+        }
+        console.log(JSON.stringify({ ok: true, provider: name, count: out.length, models: out }, null, 2));
+        return;
+      } catch (e) {
+        console.log(JSON.stringify({ ok: false, provider: name, error: e?.message || String(e) }, null, 2));
+        process.exit(1);
+      }
+    }
     default:
-      console.error('Usage: lazyclaw providers <list|info <name>|test <name> [--model X] [--prompt T]>');
+      console.error('Usage: lazyclaw providers <list|info <name>|test <name>|add <name> --base-url <url> [--api-key <k>]|remove <name>|models <name>>');
       process.exit(2);
   }
 }
@@ -3333,6 +3713,8 @@ const BOOLEAN_FLAGS = new Set([
   'aggregate',    // inspect (list mode): per-node stats across sessions
   'all',          // providers test: run all providers in parallel
   'with-turn-count', // sessions list: include turn count per session
+  'no-probe',     // providers add: skip the /v1/models reachability probe
+  'pick',         // onboard / chat: force the interactive picker even when provider already set
 ]);
 
 function parseArgs(argv) {

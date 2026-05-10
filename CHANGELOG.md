@@ -10,6 +10,155 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.12] — 2026-05-10  🔌 setup picker — model search + custom OpenAI-compatible endpoints (NIM / OpenRouter / vLLM) + 📊 dashboard — workflows / rates / metrics / doctor / config tabs
+
+User: "현재 lazyclaw setup할 때, model 세팅할 때 모델 검색해서 사용할 수 있게 하는 기능도 추가해줘. 그리고 NIM이나 다른 모델들도 API로 등록할 수 있게 해줘."
+
+Two related gaps in the setup picker:
+
+1. **No model search.** `_pickProviderInteractive` step 3 listed
+   `meta.suggestedModels` as a flat arrow-key menu — fine for the
+   curated 6-10 entries, painful once a custom endpoint advertises
+   100+. There was no way to type-filter and no escape hatch for a
+   model id that isn't in the suggested list.
+2. **No way to register NVIDIA NIM / OpenRouter / vLLM / LM Studio
+   / Together / Groq / etc.** — the registry shipped a fixed set of
+   per-vendor providers (`anthropic`, `openai`, `gemini`, `ollama`,
+   `claude-cli`). Anyone wanting a different OpenAI-compatible
+   endpoint had to fork and add a provider file.
+
+### What changed
+
+**New: `providers/openai_compat.mjs`** — a parameterised OpenAI Chat
+Completions provider factory + a `/v1/models` catalogue fetcher.
+`makeOpenAICompatProvider({name, baseUrl, apiKey, defaultModel,
+headers})` returns a Provider object the registry can drop into
+`PROVIDERS` as-is. Same SSE wire format as `openai.mjs`, just with
+the URL configurable.
+
+**New: `cfg.customProviders[]`** — array of
+`{name, baseUrl, apiKey?, defaultModel?, suggestedModels?,
+headers?}` entries persisted in `~/.lazyclaw/config.json`.
+`registerCustomProviders(cfg)` (in `providers/registry.mjs`) merges
+them into `PROVIDERS` / `PROVIDER_INFO`. `ensureRegistry()` now
+re-runs registration on every call so additions take effect within
+the same process.
+
+**New picker affordances** in `_arrowMenu`:
+
+  - `searchable: true` opt-in — printable chars accumulate into a
+    type-filter buffer, items are scored by substring + subsequence.
+    Backspace deletes one char, Ctrl+U clears the buffer, Esc clears
+    or backs out.
+  - The model picker now shows
+    `↻ Fetch live model list from /v1/models` (where supported) and
+    `… type a custom model id` (always) at the head/tail of the
+    list, alongside the suggested entries.
+
+**New picker step** — inside the **API key** family, step 2 now
+appends `+ Add a custom OpenAI-compatible endpoint…`. Picking it
+prompts for `name` / `baseUrl` / `api-key`, persists to
+`cfg.customProviders[]`, hot-registers the provider, probes
+`/v1/models`, and stores the catalogue back into the config so the
+next picker run shows the live list immediately.
+
+**New CLI surface** — `lazyclaw providers add|remove|models` for
+non-interactive equivalents:
+
+```
+lazyclaw providers add nim \
+  --base-url https://integrate.api.nvidia.com/v1 \
+  --api-key  nvapi-... \
+  [--default-model meta/llama-3.1-70b] \
+  [--no-probe]
+
+lazyclaw providers models nim
+lazyclaw providers remove nim
+```
+
+**Auth-key resolver upgrade** — `_resolveAuthKey(cfg, provider)`
+now checks `cfg.customProviders[i].apiKey` before falling back to
+the legacy `cfg['api-key']`, so a custom endpoint's key flows into
+chat / agent without per-call flag plumbing.
+
+### Tested endpoints
+
+NIM, OpenRouter, Together, Groq, vLLM, LM Studio, llama.cpp,
+text-generation-inference all speak the same `/v1/chat/completions`
++ `/v1/models` shape and work as-is. Local auth-less endpoints
+(vLLM defaults) accept a blank api-key.
+
+### Migration
+
+None — `cfg.customProviders` is opt-in. Existing configs continue
+to use the built-in providers unchanged.
+
+---
+
+### Dashboard — surface the daemon's existing API
+
+User: "lazyclaw도 openclaw처럼 대시보드를 열어서 관리하는 기능이 있으면 좋겠어."
+
+`src/lazyclaw/web/dashboard.html` already shipped Chat / Sessions /
+Skills / Providers / Status, but the daemon exposed a much richer
+read surface (`/workflows`, `/rates`, `/metrics`, `/doctor`,
+`/config` and their `*/validate` siblings) that the UI had no way
+to reach. This release wires those endpoints into five new tabs
+without breaking the single-file, no-build, vanilla-DOM constraint.
+
+**New tabs**
+
+  - **Workflows** — calls `/workflows` and `/workflows/aggregate`.
+    Per-bucket count cards (running / resumable / failed / done /
+    total + aggregate session count) plus a sortable session table.
+    `?status=` and `?filter=` controls in the toolbar.
+  - **Rates** — calls `/rates` + `/rates/validate`. Validation
+    banner (ok / warn / err) + provider-model rate-card table
+    (in / out / cache-read / cache-create per 1M tokens). Filterable.
+  - **Metrics** — calls `/metrics`. Headline cards for uptime,
+    request count, **cache hit rate**, token in/out, cost by
+    currency, workflow snapshot. Detail card breaks requests down
+    by HTTP status.
+  - **Doctor** — calls `/doctor`. Issue banner + provider / model /
+    api-key / node / platform / known-providers card. Handles 503
+    payloads as data, not error.
+  - **Config** — calls `/config` + `/config/validate`. Validation
+    banner + key/value table + Raw JSON `<details>` toggle. api-key
+    is masked by the daemon — the UI just renders what it's given.
+
+**New helpers** (inline in `dashboard.html`)
+
+  - `apiSoft(path)` — returns `{ status, ok, body }` regardless of
+    HTTP code, so the validate / doctor endpoints' 422 / 503 bodies
+    flow through to the UI instead of throwing.
+  - `escHtml`, `fmtDuration`, `fmtBytes` — small string helpers.
+  - Shared `.grid`, `.stat`, `table.tbl`, `.banner` CSS so future
+    tabs can adopt the same shapes without re-styling.
+
+**Mobile**
+
+  - `@media (max-width: 480px)` collapses `.grid` to a single
+    column and tightens table padding so the new tabs work on a
+    320 px viewport (CLAUDE.md §8.3).
+
+**Verification**
+
+  - Daemon endpoint smoke test (curl-equivalent via `node fetch`)
+    confirmed all five endpoints return the JSON shapes the
+    LOADERS expect; `/metrics.tokensTotal` was `inputTokens` /
+    `outputTokens`, the LOADER fallback chain was extended to
+    cover that key style.
+  - Playwright 3-viewport visual verification (CLAUDE.md §8.4)
+    deferred — `node_modules/playwright` isn't installed in this
+    checkout. Run `npm i && node src/lazyclaw/cli.mjs daemon` to
+    inspect the new tabs in a browser.
+
+### Migration (dashboard)
+
+None — purely additive. The existing Chat / Sessions / Skills /
+Providers / Status tabs are untouched.
+
+---
 ## [3.99.11] — 2026-05-09  🚪 launcher Quit — actually exit the process
 
 User: "Quit 했는데 터미널 종료가 안되고 있어."
