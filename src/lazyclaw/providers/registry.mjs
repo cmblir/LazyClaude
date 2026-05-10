@@ -12,6 +12,7 @@ import { openaiProvider } from './openai.mjs';
 import { ollamaProvider } from './ollama.mjs';
 import { geminiProvider } from './gemini.mjs';
 import { claudeCliProvider } from './claude_cli.mjs';
+import { makeOpenAICompatProvider, fetchOpenAICompatModels } from './openai_compat.mjs';
 
 /**
  * @typedef {{ role: 'user'|'assistant'|'system', content: string }} ChatMessage
@@ -49,6 +50,7 @@ export const mockProvider = {
 };
 
 export { anthropicProvider, openaiProvider, ollamaProvider, geminiProvider, claudeCliProvider };
+export { makeOpenAICompatProvider, fetchOpenAICompatModels };
 
 // Insertion order is the picker order. The list goes first-to-last in
 // rough "user-familiar / popular" order so a first-time onboard lands
@@ -192,6 +194,77 @@ export function parseProviderModel(s) {
  * @param {string|undefined|null} key
  * @returns {string}
  */
+// Reserved provider names — built-in providers and meta-keywords the picker
+// uses internally. Custom registrations must not collide with these.
+const RESERVED_PROVIDER_NAMES = new Set([
+  'mock', 'claude-cli', 'anthropic', 'openai', 'gemini', 'ollama',
+  '__add_custom__', '__custom_model__', '__fetch_models__',
+]);
+
+/**
+ * Validate a custom provider name. Allowed: lowercase alnum + dash + dot.
+ * Returns the trimmed name on success; throws on collision / bad format.
+ */
+export function validateCustomProviderName(raw) {
+  const name = String(raw || '').trim().toLowerCase();
+  if (!name) throw new Error('custom provider name is required');
+  if (!/^[a-z0-9][a-z0-9._-]{0,31}$/.test(name)) {
+    throw new Error('custom provider name must match [a-z0-9][a-z0-9._-]{0,31}');
+  }
+  if (RESERVED_PROVIDER_NAMES.has(name)) {
+    throw new Error(`custom provider name "${name}" is reserved (built-in)`);
+  }
+  return name;
+}
+
+/**
+ * Merge user-defined OpenAI-compatible custom providers into PROVIDERS /
+ * PROVIDER_INFO. Idempotent — safe to call multiple times; later calls
+ * overwrite earlier registrations of the same name. Returns the list of
+ * names that were added.
+ *
+ * Each entry shape (cfg.customProviders is an array):
+ *   {
+ *     name: 'nim',
+ *     baseUrl: 'https://integrate.api.nvidia.com/v1',
+ *     apiKey: 'nvapi-...',                  // optional — falls back to opts.apiKey
+ *     defaultModel: 'meta/llama-3.1-70b',   // optional
+ *     suggestedModels: ['meta/...', ...],   // optional — surfaced in the picker
+ *     headers: { 'x-foo': 'bar' },          // optional — extra request headers
+ *     docs: 'NVIDIA NIM hosted endpoint',   // optional
+ *   }
+ */
+export function registerCustomProviders(cfg) {
+  const list = Array.isArray(cfg?.customProviders) ? cfg.customProviders : [];
+  const added = [];
+  for (const entry of list) {
+    if (!entry || typeof entry !== 'object') continue;
+    let name;
+    try { name = validateCustomProviderName(entry.name); }
+    catch { continue; }
+    if (!entry.baseUrl) continue;
+    PROVIDERS[name] = makeOpenAICompatProvider({
+      name,
+      baseUrl: entry.baseUrl,
+      apiKey: entry.apiKey,
+      defaultModel: entry.defaultModel,
+      headers: entry.headers,
+    });
+    PROVIDER_INFO[name] = {
+      name,
+      requiresApiKey: !!entry.apiKey || entry.requiresApiKey !== false,
+      docs: entry.docs || `Custom OpenAI-compatible endpoint registered via setup. baseUrl=${entry.baseUrl}`,
+      endpoint: `${entry.baseUrl}/chat/completions`,
+      defaultModel: entry.defaultModel || null,
+      suggestedModels: Array.isArray(entry.suggestedModels) ? entry.suggestedModels.slice() : [],
+      custom: true,
+      baseUrl: entry.baseUrl,
+    };
+    added.push(name);
+  }
+  return added;
+}
+
 const KNOWN_KEY_PREFIXES = ['sk-ant-', 'sk-or-', 'sk-'];
 export function maskApiKey(key) {
   if (!key) return '';
