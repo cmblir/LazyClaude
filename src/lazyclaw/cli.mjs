@@ -2541,6 +2541,13 @@ async function cmdDashboard(flags = {}) {
     // LAZYCLAW_AUTH_TOKEN + --allow-origin via the daemon command.
     authToken: undefined,
     allowedOrigins: [],
+    // The dashboard's browser tab posts back to the same loopback URL
+    // it was served from (e.g. `http://127.0.0.1:19600`). Without this
+    // opt-in every chat send / mutation tripped the daemon's CSRF gate
+    // with `403 forbidden origin`. Safe — the daemon binds 127.0.0.1
+    // only, so an attacker can't reach it with a loopback origin
+    // unless they're already on the machine.
+    allowLoopbackOrigin: true,
     rateLimit: null,
     responseCache: null,
     logger: null,

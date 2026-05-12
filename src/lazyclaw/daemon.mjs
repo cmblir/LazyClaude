@@ -231,13 +231,22 @@ function isAuthorized(req, expectedToken) {
  *   - `Origin` set → must be in `allowedOrigins`. Empty allowlist
  *     means "reject all browser-originated requests" — the default,
  *     because the daemon is designed for CLI/script callers.
+ *   - `allowLoopback: true` (set by `lazyclaw dashboard`) additionally
+ *     accepts any `Origin` that looks like loopback (`http://127.0.0.1:*`,
+ *     `http://localhost:*`, `http://[::1]:*`). Safe because the daemon
+ *     binds only to 127.0.0.1, so an attacker can't reach us with a
+ *     loopback Origin unless they're already on the box. DNS rebinding
+ *     can't forge `127.0.0.1` as a hostname — that resolves before
+ *     `fetch()` ever issues the request.
  *
  * Returns true when the request should proceed, false when it should
  * be rejected with 403.
  */
-function isOriginAllowed(req, allowedOrigins) {
+const LOOPBACK_ORIGIN_RE = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+function isOriginAllowed(req, allowedOrigins, allowLoopback) {
   const origin = req.headers['origin'];
   if (!origin) return true;
+  if (allowLoopback && LOOPBACK_ORIGIN_RE.test(origin)) return true;
   if (!allowedOrigins || allowedOrigins.length === 0) return false;
   return allowedOrigins.includes(origin);
 }
@@ -267,6 +276,10 @@ function isOriginAllowed(req, allowedOrigins) {
 export function makeHandler(ctx) {
   const authToken = ctx.authToken || null;
   const allowedOrigins = Array.isArray(ctx.allowedOrigins) ? ctx.allowedOrigins : [];
+  // dashboard subcommand opts in so the browser tab it just opened can
+  // actually call its own daemon. Bare `lazyclaw daemon` leaves this off
+  // and the explicit allowlist (or no-browser default) stays in force.
+  const allowLoopback = !!ctx.allowLoopbackOrigin;
   // Default state dir matches the CLI's default. Callers can override
   // via ctx.workflowStateDir or LAZYCLAW_WORKFLOW_STATE_DIR env var.
   const workflowStateDir = ctx.workflowStateDir
@@ -345,7 +358,7 @@ export function makeHandler(ctx) {
     try {
       // Origin gate runs *before* auth so a browser-originated request
       // can't even probe whether a token is required.
-      if (!isOriginAllowed(req, allowedOrigins)) {
+      if (!isOriginAllowed(req, allowedOrigins, allowLoopback)) {
         return writeJson(res, 403, { error: 'forbidden origin' });
       }
       // Authentication gate — when authToken is set, every request must

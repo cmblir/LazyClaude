@@ -10,6 +10,23 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.18] — 2026-05-11  🛂 dashboard — accept its own loopback origin (no more `403 forbidden origin` on chat send)
+
+User: "⚠ 403 Forbidden — {\"error\":\"forbidden origin\"} 대시보드에서 hi라고 보냈는데 에러가 나와."
+
+The CSRF / DNS-rebinding gate in `makeHandler` rejected every browser-originated request when `allowedOrigins` was empty — the lazyclaw `dashboard` subcommand's default. The dashboard tab posts back to the **same** loopback URL it was served from (`http://127.0.0.1:<port>`), so every chat send / mutation hit the gate with a 403 even though it was structurally same-origin.
+
+  - New `ctx.allowLoopbackOrigin: boolean` option on `makeHandler`. When set, the origin gate additionally accepts any `Origin` matching `http(s)://(127.0.0.1|localhost|[::1])(:port)?`. Loopback origins are safe in this context because the daemon binds 127.0.0.1 only — an attacker can't reach us with a loopback origin unless they're already on the machine, and DNS rebinding can't forge `127.0.0.1` as a hostname (it resolves before `fetch()` issues the request).
+  - `lazyclaw dashboard` now sets `allowLoopbackOrigin: true` so its own browser tab works out of the box. Explicit `allowedOrigins` are still honoured on top — useful if you ever serve the dashboard via a reverse proxy.
+  - `lazyclaw daemon` keeps the strict default: bare-daemon callers continue to ship an explicit `--allow-origin` (or none, and stay headless).
+
+Verified with a smoke test: loopback `Origin` → 200, external `Origin` → 403, missing `Origin` → 200.
+
+### Migration
+
+None. Pure bug fix; no surface change for scripted callers (the option is off by default).
+
+---
 ## [3.99.17] — 2026-05-11  🩹 dashboard fixes — chat assignee + EADDRINUSE crash
 
 User: "lazyclaw 상태에서 대시보드에 채팅보내면 No provider selected. Run `lazyclaw onboard` first. 에러가 나오고, onboard한 다음 대시보드열면 listen EADDRINUSE: address already in use 127.0.0.1:19600 에러가 나."
