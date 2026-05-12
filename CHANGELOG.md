@@ -10,6 +10,25 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.28] — 2026-05-12  🩹 launcher Quit actually quits + mascot ASCII aligned
+
+User: "터미널에서 quit 누르면 [...] 사진처럼 되고 quit이 안되고 있어." + "마스코트도 확인해주고".
+
+Two regressions surfaced after v3.99.26/27 ship:
+
+### Quit didn't quit
+
+`cmdLauncher` has an explicit `process.exit(0)` at its tail (line ~4861) precisely because background work imported during boot (ollama auto-start probe, registry retry timers, response-cache sweepers) keeps the Node event loop alive for several seconds after the menu loop ends. When the user picked Quit / Esc / Ctrl-C, the launcher executed `return` from inside the `while (true)` loop, which jumped out of the function body *over* the explicit exit — only the `finally` ran (stdin.unref + cursor restore), then control bubbled up to `main()` and Node tried to drain a still-busy event loop. Visible symptom: blank screen + blinking cursor, no shell prompt.
+
+Fix: replace the `return` with `break`. The loop exits naturally, the `finally` still runs, then control falls through to the explicit `process.exit(0)` and the process terminates immediately — same UX as the `/exit` slash command users already had.
+
+### Mascot ASCII misaligned
+
+The handoff bundle's `ASCII_BIG` table was inconsistent — pincer rows 16 columns, stem rows 17, helmet rows 15 — because the design preview rendered each row as a free-floating `<pre>` and didn't care about absolute alignment. The CLI banner does care: every row gets concatenated under the same `' '`-prefix, so a 15-wide helmet drifts left of the 16-wide body.
+
+Fix: redrew `_MASCOT_BIG` on a strict 17-wide canvas. All four states (idle / working / done / error) verified at 12 rows × 17 chars (48 rows total, all width 17). Layout: pincers ◂▸ at cols 2-3 + 13-14, stems │ at cols 2 + 14, helmet box `╔═══...═══╗` spans cols 1-15, body box mirrored directly below, legs ┃ at cols 4 + 12 — symmetric on the central column (col 8).
+
+---
 ## [3.99.27] — 2026-05-12  🪜 lazyclaw launcher menu — full 30-subcommand coverage
 
 User: "여기에는 왜 오케스트라등 없는게 왤캐 많아?? lazyclaw <A> < 여기서 A는 모두 lazyclaw 한 다음 선택지에 있어야해."

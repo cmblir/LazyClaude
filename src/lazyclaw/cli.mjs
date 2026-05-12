@@ -1469,69 +1469,70 @@ function _attachGhostAutocomplete(rl) {
 // border off the box (which is exactly the bug v3.99.5 shipped:
 // two of the inner lines were 33 cols vs the others' 32, so the
 // ╮ rendered into the next line).
-// v3.99.26 — canonical Big ASCII mascot from the v0.1 Claude Design
-// handoff bundle. 12 rows. Claude's square body + lobster pincers (◂▸)
-// + helmet (╔═╗) + asterisk-star tail. Sleepy slit eyes (│ │) by
-// default — name says lazyclaw.
-//
-// State variants live in _renderMascot(state). Big variant = banner.
-// Inline 3-row Tiny variant lives in _renderMascotTiny(state).
+// v3.99.28 — Big ASCII mascot, rebuilt on a strict 17-wide canvas so
+// every row aligns (the v3.99.26 port copied the design handoff's
+// mixed 15/16/17 widths which made the helmet drift left of the
+// body in any monospace font). Layout: pincers ◂▸ at cols 2-3 and
+// 13-14, stems │ at cols 2 and 14, helmet box from col 1 to col 15
+// (13-wide interior), body box same width directly below, legs ┃ at
+// cols 4 and 12 — symmetric on the central axis (col 8).
+const _MASCOT_W = 17;
 const _MASCOT_BIG = {
   idle: [
-    '  ◂▸        ◂▸  ',
+    '  ◂▸         ◂▸  ',
     '  │           │  ',
     '  │           │  ',
-    '╔═════════════╗',
-    '║             ║',
-    '╚═════════════╝',
-    '┌─────────────┐',
-    '│  │     │  │',
-    '┤  │     │  ├',
-    '└─────────────┘',
-    '   ┃        ┃   ',
-    '   ┃        ┃   ',
+    ' ╔═════════════╗ ',
+    ' ║             ║ ',
+    ' ╚═════════════╝ ',
+    ' ┌─────────────┐ ',
+    ' │  │       │  │ ',
+    ' ┤  │       │  ├ ',
+    ' └─────────────┘ ',
+    '    ┃       ┃    ',
+    '    ┃       ┃    ',
   ],
   working: [
-    '  ◂▸        ◂▸  ',
+    '  ◂▸         ◂▸  ',
     '  │  ···      │  ',
     '  │           │  ',
-    '╔═════════════╗',
-    '║     *       ║',
-    '╚═════════════╝',
-    '┌─────────────┐',
-    '│  ·     ·  │',
-    '┤           ├',
-    '└─────────────┘',
-    '   ┃        ┃   ',
-    '   ┃        ┃   ',
+    ' ╔═════════════╗ ',
+    ' ║      *      ║ ',
+    ' ╚═════════════╝ ',
+    ' ┌─────────────┐ ',
+    ' │  ·       ·  │ ',
+    ' ┤             ├ ',
+    ' └─────────────┘ ',
+    '    ┃       ┃    ',
+    '    ┃       ┃    ',
   ],
   done: [
-    '✦ ◂▸        ◂▸ ✦',
+    '✦ ◂▸         ◂▸ ✦',
     '  │           │  ',
     '  │           │  ',
-    '╔═════════════╗',
-    '║             ║',
-    '╚═════════════╝',
-    '┌─────────────┐',
-    '│  ^     ^  │',
-    '┤    ‿‿‿    ├',
-    '└─────────────┘',
-    '   ┃        ┃   ',
-    '   ┃        ┃   ',
+    ' ╔═════════════╗ ',
+    ' ║             ║ ',
+    ' ╚═════════════╝ ',
+    ' ┌─────────────┐ ',
+    ' │  ^       ^  │ ',
+    ' ┤    ‿‿‿‿‿    ├ ',
+    ' └─────────────┘ ',
+    '    ┃       ┃    ',
+    '    ┃       ┃    ',
   ],
   error: [
-    '   ▾        ▾   ',
+    '   ▾         ▾   ',
     '  │           │  ',
     '  │           │  ',
-    '╔═════════════╗',
-    '║     ~       ║',
-    '╚═════════════╝',
-    '┌─────────────┐',
-    '│  ×     ×  │',
-    '┤    ⏜      ├',
-    '└─────────────┘',
-    '   ┃        ┃   ',
-    '   ┃        ┃   ',
+    ' ╔═════════════╗ ',
+    ' ║      ~      ║ ',
+    ' ╚═════════════╝ ',
+    ' ┌─────────────┐ ',
+    ' │  ×       ×  │ ',
+    ' ┤    ⏜⏜⏜⏜⏜    ├ ',
+    ' └─────────────┘ ',
+    '    ┃       ┃    ',
+    '    ┃       ┃    ',
   ],
 };
 const _MASCOT_TINY = {
@@ -4803,8 +4804,13 @@ async function cmdLauncher() {
     });
 
     if (!picked || picked.id === 'quit' || !picked.argv) {
-      // Plain return so main() can exit naturally.
-      return;
+      // v3.99.28 — break out of the while loop, fall through the
+      // finally (stdin cleanup), then hit the explicit process.exit(0)
+      // at the function tail. Previously this was `return`, which
+      // jumped over the explicit exit and left dangling timers /
+      // sockets (ollama probe, registry retry, etc.) keeping the
+      // event loop alive — visible to the user as "Quit didn't quit."
+      break;
     }
 
     // Two menu items need a follow-up question before they can run:
