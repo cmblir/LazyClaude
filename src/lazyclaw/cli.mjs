@@ -1468,40 +1468,111 @@ function _attachGhostAutocomplete(rl) {
 // border off the box (which is exactly the bug v3.99.5 shipped:
 // two of the inner lines were 33 cols vs the others' 32, so the
 // ╮ rendered into the next line).
-function _renderBanner(version) {
-  // Rebuilt from the Claude Design handoff bundle (v0.1 mascot sheet):
-  // Claude's asterisk star wearing a crab/crustacean helmet with two
-  // antenna-claws. 10-line "big ASCII" form — fits a terminal banner
-  // without zoom and reads at any monospace font that has the
-  // box-drawing + geometric-shape glyphs.
-  //
-  // Palette (CLAUDE ORIGINAL): helmet body #c33d2a, helmet shadow
-  // #7a1f15, star body #d97757, star shadow #a04f32, eyes ink
-  // #c7bca6 / muted slits. Truecolor ANSI; degrades gracefully on
-  // terminals that ignore it.
-  const helmet = (s) => `\x1b[38;2;195;61;42m${s}\x1b[0m`;   // #c33d2a
-  const star   = (s) => `\x1b[38;2;217;119;87m${s}\x1b[0m`;  // #d97757 — Claude orange
-  const ink    = (s) => `\x1b[38;2;241;234;217m${s}\x1b[0m`; // #f1ead9 paper-ink
-  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
-  const muted  = (s) => `\x1b[38;2;122;110;95m${s}\x1b[0m`;  // #7a6e5f
+// v3.99.26 — canonical Big ASCII mascot from the v0.1 Claude Design
+// handoff bundle. 12 rows. Claude's square body + lobster pincers (◂▸)
+// + helmet (╔═╗) + asterisk-star tail. Sleepy slit eyes (│ │) by
+// default — name says lazyclaw.
+//
+// State variants live in _renderMascot(state). Big variant = banner.
+// Inline 3-row Tiny variant lives in _renderMascotTiny(state).
+const _MASCOT_BIG = {
+  idle: [
+    '  ◂▸        ◂▸  ',
+    '  │           │  ',
+    '  │           │  ',
+    '╔═════════════╗',
+    '║             ║',
+    '╚═════════════╝',
+    '┌─────────────┐',
+    '│  │     │  │',
+    '┤  │     │  ├',
+    '└─────────────┘',
+    '   ┃        ┃   ',
+    '   ┃        ┃   ',
+  ],
+  working: [
+    '  ◂▸        ◂▸  ',
+    '  │  ···      │  ',
+    '  │           │  ',
+    '╔═════════════╗',
+    '║     *       ║',
+    '╚═════════════╝',
+    '┌─────────────┐',
+    '│  ·     ·  │',
+    '┤           ├',
+    '└─────────────┘',
+    '   ┃        ┃   ',
+    '   ┃        ┃   ',
+  ],
+  done: [
+    '✦ ◂▸        ◂▸ ✦',
+    '  │           │  ',
+    '  │           │  ',
+    '╔═════════════╗',
+    '║             ║',
+    '╚═════════════╝',
+    '┌─────────────┐',
+    '│  ^     ^  │',
+    '┤    ‿‿‿    ├',
+    '└─────────────┘',
+    '   ┃        ┃   ',
+    '   ┃        ┃   ',
+  ],
+  error: [
+    '   ▾        ▾   ',
+    '  │           │  ',
+    '  │           │  ',
+    '╔═════════════╗',
+    '║     ~       ║',
+    '╚═════════════╝',
+    '┌─────────────┐',
+    '│  ×     ×  │',
+    '┤    ⏜      ├',
+    '└─────────────┘',
+    '   ┃        ┃   ',
+    '   ┃        ┃   ',
+  ],
+};
+const _MASCOT_TINY = {
+  idle:    '◂▸  ◂▸\n[│  │]\n ┃  ┃ ',
+  working: '◂▸  ◂▸\n[·  ·] ···\n ┃  ┃ ',
+  done:    '◂▸  ◂▸\n[^  ^] ✓\n ┃  ┃ ',
+  error:   '▾   ▾ \n[×  ×] !\n ┃  ┃ ',
+};
 
+// Ink helpers. State picks a primary colour; the banner caller layers
+// a secondary "wordmark" right column.
+function _mascotInkers(state) {
+  const helmet = (s) => `\x1b[38;2;195;61;42m${s}\x1b[0m`;
+  const helmetDim = (s) => `\x1b[38;2;122;31;21m${s}\x1b[0m`;
+  const star = (s) => `\x1b[38;2;217;119;87m${s}\x1b[0m`;
+  const ok = (s) => `\x1b[38;2;111;185;143m${s}\x1b[0m`;
+  const err = (s) => `\x1b[38;2;230;57;70m${s}\x1b[0m`;
+  if (state === 'done') return (s) => ok(s);
+  if (state === 'error') return (s) => err(s);
+  if (state === 'working') return (s) => helmet(s);
+  return (s) => helmet(s);
+}
+
+function _renderMascot(state) {
+  const rows = _MASCOT_BIG[state] || _MASCOT_BIG.idle;
+  const ink = _mascotInkers(state);
+  return rows.map((r) => ink(r));
+}
+
+// Tiny inline mascot — picked up by chat/agent helpers when they want
+// to flash a one-line status without re-rendering the whole banner.
+// Returns a string; callers add their own newline.
+function _renderMascotTiny(state) {
+  const ink = _mascotInkers(state);
+  return ink((_MASCOT_TINY[state] || _MASCOT_TINY.idle));
+}
+
+function _renderBanner(version) {
+  const ink = (s) => `\x1b[38;2;241;234;217m${s}\x1b[0m`;
+  const dim = (s) => `\x1b[2m${s}\x1b[0m`;
   const v = String(version || '?.?.?');
-  // Left column — sprite. Right column — wordmark + tagline, aligned
-  // to the helmet's eye-row / brim. The trailing spaces preserve the
-  // grid so any caller padding the lines (or copying them) doesn't
-  // get ragged edges.
-  const left = [
-    `    ${helmet('▲')}      ${helmet('▲')}   `,
-    `    ${helmet('│')}      ${helmet('│')}   `,
-    `  ${helmet('╔══════════╗')} `,
-    `  ${helmet('║')}          ${helmet('║')} `,
-    `  ${helmet('║')}  ${muted('──')}  ${muted('──')}  ${helmet('║')} `,
-    `  ${helmet('║')}          ${helmet('║')} `,
-    `  ${helmet('╚══════════╝')} `,
-    `        ${star('✦')}       `,
-    `       ${star('╱|╲')}      `,
-    `      ${star('╱ | ╲')}     `,
-  ];
+  const left = _renderMascot('idle');
   const right = [
     '',
     '',
@@ -1509,6 +1580,8 @@ function _renderBanner(version) {
     `   ${ink('lazyclaw')}  ${dim('v' + v)}`,
     `   ${dim('a sleepy 8-bit')}`,
     `   ${dim('terminal assistant')}`,
+    '',
+    '',
     '',
     '',
     '',

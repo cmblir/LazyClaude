@@ -1339,86 +1339,14 @@ window._loadVendor = (() => {
 <div id="toast" class="fixed right-6 z-[60] space-y-2" style="bottom: 72px;"></div>
 <div id="modal-root"></div>
 
-<!-- Claude Mascot -->
-<div id="claudeMascot" style="position:fixed;z-index:1150;width:70px;height:63px;">
+<!-- Claude Mascot — lazyclaw 16x16 sprite (Claude Design handoff v0.1) -->
+<!-- The sprite is built at runtime by _mascotBuildSprite() in app.js using   -->
+<!-- the BASE rows + FACES overrides. Four states (idle/working/done/error)  -->
+<!-- share one rendered <svg>; _mascotSetState() swaps the active <g>.       -->
+<div id="claudeMascot" style="position:fixed;z-index:1150;width:72px;height:72px;">
   <div id="mascotBubble" class="mascot-bubble" style="display:none;"></div>
-  <!-- jumping (기본) -->
-  <div id="mascotJumping">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 90" width="70" height="63">
-      <style>
-        .mj-body{animation:mj-jump .5s ease-in-out infinite;transform-origin:center bottom}
-        .mj-shadow{animation:mj-sh .5s ease-in-out infinite}
-        .mj-la{animation:mj-wl .5s ease-in-out infinite;transform-origin:right center}
-        .mj-ra{animation:mj-wr .5s ease-in-out infinite;transform-origin:left center}
-        .mj-le{animation:mj-ear .5s ease-in-out infinite;transform-origin:center bottom}
-        .mj-re{animation:mj-ear .5s ease-in-out infinite .1s;transform-origin:center bottom}
-        @keyframes mj-jump{0%,100%{transform:translateY(0) scaleY(1) scaleX(1)}30%{transform:translateY(-16px) scaleY(1.1) scaleX(.95)}50%{transform:translateY(-18px) scaleY(1.05) scaleX(.98)}80%{transform:translateY(-5px) scaleY(.95) scaleX(1.05)}}
-        @keyframes mj-sh{0%,100%{transform:scaleX(1);opacity:.25}50%{transform:scaleX(.4);opacity:.08}}
-        @keyframes mj-wl{0%,100%{transform:rotate(0)}50%{transform:rotate(-25deg)}}
-        @keyframes mj-wr{0%,100%{transform:rotate(0)}50%{transform:rotate(25deg)}}
-        @keyframes mj-ear{0%,100%{transform:scaleY(1)}40%{transform:scaleY(1.2)}60%{transform:scaleY(.85)}}
-      </style>
-      <ellipse class="mj-shadow" cx="50" cy="82" rx="22" ry="5" fill="#000"/>
-      <g class="mj-body">
-        <rect class="mj-le" x="22" y="10" width="8" height="14" fill="#E07C4C"/>
-        <rect class="mj-re" x="70" y="10" width="8" height="14" fill="#E07C4C"/>
-        <rect x="18" y="24" width="64" height="4" fill="#E07C4C"/>
-        <rect x="14" y="28" width="72" height="32" fill="#E07C4C"/>
-        <rect x="30" y="34" width="8" height="10" fill="#000"/>
-        <rect x="62" y="34" width="8" height="10" fill="#000"/>
-        <rect class="mj-la" x="2" y="36" width="12" height="8" fill="#E07C4C"/>
-        <rect class="mj-ra" x="86" y="36" width="12" height="8" fill="#E07C4C"/>
-        <rect x="24" y="60" width="12" height="14" fill="#E07C4C"/>
-        <rect x="64" y="60" width="12" height="14" fill="#E07C4C"/>
-      </g>
-    </svg>
-  </div>
-  <!-- speaking (가끔) -->
-  <div id="mascotSpeaking" style="display:none;">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 90" width="85" height="55">
-      <style>
-        .ms-body{animation:ms-bob .8s ease-in-out infinite;transform-origin:center bottom}
-        .ms-shadow{animation:ms-sp .8s ease-in-out infinite}
-        .ms-mouth{animation:ms-talk .3s ease-in-out infinite;transform-origin:center center}
-        .ms-le{animation:ms-etl .8s ease-in-out infinite;transform-origin:center bottom}
-        .ms-re{animation:ms-etr .8s ease-in-out infinite;transform-origin:center bottom}
-        .ms-w1{animation:ms-wave .8s ease-out infinite;transform-origin:left center}
-        .ms-w2{animation:ms-wave .8s ease-out infinite .2s;transform-origin:left center}
-        .ms-w3{animation:ms-wave .8s ease-out infinite .4s;transform-origin:left center}
-        .ms-n1{animation:ms-fn1 1.5s ease-out infinite}
-        .ms-n2{animation:ms-fn2 1.5s ease-out infinite .3s}
-        .ms-n3{animation:ms-fn3 1.5s ease-out infinite .6s}
-        @keyframes ms-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-        @keyframes ms-sp{0%,100%{transform:scaleX(1);opacity:.25}50%{transform:scaleX(.9);opacity:.2}}
-        @keyframes ms-talk{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.5)}}
-        @keyframes ms-etl{0%,100%{transform:rotate(0)}50%{transform:rotate(-5deg)}}
-        @keyframes ms-etr{0%,100%{transform:rotate(0)}50%{transform:rotate(5deg)}}
-        @keyframes ms-wave{0%{opacity:.8;transform:scaleX(.3) scaleY(.8)}100%{opacity:0;transform:scaleX(1.2) scaleY(1)}}
-        @keyframes ms-fn1{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(15px,-25px) rotate(15deg)}}
-        @keyframes ms-fn2{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(20px,-30px) rotate(-10deg)}}
-        @keyframes ms-fn3{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(10px,-35px) rotate(20deg)}}
-      </style>
-      <ellipse class="ms-shadow" cx="50" cy="82" rx="22" ry="5" fill="#000"/>
-      <g class="ms-w1"><path d="M 92 44 Q 100 44, 100 52 Q 100 60, 92 60" fill="none" stroke="#E07C4C" stroke-width="3" stroke-linecap="round"/></g>
-      <g class="ms-w2"><path d="M 96 38 Q 108 38, 108 52 Q 108 66, 96 66" fill="none" stroke="#E07C4C" stroke-width="3" stroke-linecap="round"/></g>
-      <g class="ms-w3"><path d="M 100 32 Q 116 32, 116 52 Q 116 72, 100 72" fill="none" stroke="#E07C4C" stroke-width="3" stroke-linecap="round"/></g>
-      <g class="ms-n1"><ellipse cx="108" cy="28" rx="4" ry="3" fill="#E07C4C" transform="rotate(-20,108,28)"/><rect x="111" y="12" width="2" height="16" fill="#E07C4C"/><path d="M 113 12 Q 118 14, 118 18 Q 118 22, 113 20" fill="#E07C4C"/></g>
-      <g class="ms-n2"><ellipse cx="122" cy="22" rx="4" ry="3" fill="#E07C4C" transform="rotate(-20,122,22)"/><rect x="125" y="6" width="2" height="16" fill="#E07C4C"/></g>
-      <g class="ms-n3"><ellipse cx="115" cy="42" rx="3" ry="2.5" fill="#E07C4C" transform="rotate(-20,115,42)"/><ellipse cx="125" cy="40" rx="3" ry="2.5" fill="#E07C4C" transform="rotate(-20,125,40)"/><rect x="117" y="26" width="2" height="16" fill="#E07C4C"/><rect x="127" y="24" width="2" height="16" fill="#E07C4C"/><rect x="117" y="26" width="12" height="2" fill="#E07C4C"/></g>
-      <g class="ms-body">
-        <rect class="ms-le" x="22" y="10" width="8" height="14" fill="#E07C4C"/>
-        <rect class="ms-re" x="70" y="10" width="8" height="14" fill="#E07C4C"/>
-        <rect x="18" y="24" width="64" height="4" fill="#E07C4C"/>
-        <rect x="14" y="28" width="72" height="32" fill="#E07C4C"/>
-        <rect x="30" y="34" width="8" height="10" fill="#000"/>
-        <rect x="62" y="34" width="8" height="10" fill="#000"/>
-        <rect class="ms-mouth" x="44" y="50" width="12" height="6" fill="#000"/>
-        <rect x="2" y="40" width="12" height="8" fill="#E07C4C"/>
-        <rect x="86" y="40" width="12" height="8" fill="#E07C4C"/>
-        <rect x="24" y="60" width="12" height="14" fill="#E07C4C"/>
-        <rect x="64" y="60" width="12" height="14" fill="#E07C4C"/>
-      </g>
-    </svg>
+  <div id="mascotSprite" data-state="idle" style="width:100%;height:100%;">
+    <!-- populated on DOMContentLoaded -->
   </div>
 </div>
 <!-- Chatbot macOS floating window -->
@@ -1430,10 +1358,9 @@ window._loadVendor = (() => {
       <button class="feat-light feat-light-max" title="펼치기" onclick="_chatToggleMax()"></button>
     </div>
     <div class="feat-win-title-text" style="display:flex;align-items:center;gap:6px;">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 90" width="24" height="22" style="flex-shrink:0;">
-        <style>.cb2{animation:j2 .6s ease-in-out infinite;transform-origin:center bottom}.la2{animation:wl2 .6s ease-in-out infinite;transform-origin:right center}.ra2{animation:wr2 .6s ease-in-out infinite;transform-origin:left center}@keyframes j2{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}@keyframes wl2{0%,100%{transform:rotate(0)}50%{transform:rotate(-20deg)}}@keyframes wr2{0%,100%{transform:rotate(0)}50%{transform:rotate(20deg)}}</style>
-        <g class="cb2"><rect x="22" y="10" width="8" height="14" fill="#E07C4C"/><rect x="70" y="10" width="8" height="14" fill="#E07C4C"/><rect x="18" y="24" width="64" height="4" fill="#E07C4C"/><rect x="14" y="28" width="72" height="32" fill="#E07C4C"/><rect x="30" y="34" width="8" height="10" fill="#000"/><rect x="62" y="34" width="8" height="10" fill="#000"/><rect class="la2" x="2" y="36" width="12" height="8" fill="#E07C4C"/><rect class="ra2" x="86" y="36" width="12" height="8" fill="#E07C4C"/><rect x="24" y="60" width="12" height="14" fill="#E07C4C"/><rect x="64" y="60" width="12" height="14" fill="#E07C4C"/></g>
-      </svg>
+      <span id="chatTitleMascot" data-state="idle" style="display:inline-flex;width:24px;height:24px;flex-shrink:0;">
+        <!-- populated by _mascotPaintInline('#chatTitleMascot') -->
+      </span>
       대시보드 도우미
     </div>
   </div>

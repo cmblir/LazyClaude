@@ -10,6 +10,51 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.26] — 2026-05-12  🦞 lazyclaw CLI parity — 16 dashboard tabs + 4-state mascot
+
+User: "lazyclaw 대시보드에서 쓸 수 있어야해. 지금 lazyclaw에 있는 기능들은 모두."  + "lazyclaude랑 lazyclaw 마스코트 모두 변경해줘".
+
+Dashboard now mirrors every surface of the npm `lazyclaw` CLI as its own tab — 16 tabs grouped under a new `🦞 lazyclaw` NAV group. Mascot (both CLI banner and dashboard floating sprite) is rebuilt from the latest Claude Design handoff bundle as a true 16×16 pixel sprite with four states (`idle / working / done / error`).
+
+### Backend — `server/lazyclaw_proxy.py` (new module)
+
+Bridges the dashboard to the user's installed `lazyclaw` binary. Two execution paths, picked per command:
+
+  - **File-backed** commands (`config`, `rates`, `auth`, `pairing`, `nodes`, `message`, `cron`, `workspace`, `export`, `import`) operate directly on `~/.lazyclaw/config.json` plus the per-workspace markdown files. In-process JSON read/write through `_safe_write` (atomic). Avoids the subprocess round-trip for schemas that are small and stable.
+  - **Runtime** commands (`chat`, `agent`, `browse`, `doctor`, `status`, `daemon`, `setup`, `onboard`, workflow runner family `run / resume / inspect / clear / validate / graph`) shell out to the installed `lazyclaw` binary via `_run_cli(args, timeout, ...)` which returns a uniform `{ok, exitCode, stdout, stderr, parsed, durationMs, cmd}` envelope.
+
+49 new endpoints registered in `server/routes.py` under `/api/lc/*` (17 GET, 32 POST). Path safety: every user-supplied workflow path is resolved + checked under `$HOME` via `_under_home()` before any file op; workspace names go through an alphanumeric + `._-` filter; auth keys are masked before being returned over the wire (only the first 6 + last 4 chars survive).
+
+### Frontend — `dist/app.js` 16 new tabs
+
+A new `lazyclaw` NAV group is added to `GROUPS`. Tabs: `lcConfig`, `lcDoctor`, `lcSetup`, `lcDaemon`, `lcChat`, `lcRates`, `lcAuth`, `lcPairing`, `lcNodes`, `lcMessage`, `lcWorkspace`, `lcBrowse`, `lcCron`, `lcRunner`, `lcExportImport`, `lcAbout`. Each tab gates on `_lcAvailable()` — if the binary isn't installed, file-backed tabs degrade to read-only with a "CLI 미설치 — 읽기만 가능" chip, runtime tabs show a `npm i -g lazyclaw` install panel instead of an empty form.
+
+### Mascot — 16×16 sprite + 4 states
+
+The dashboard's old `#claudeMascot` was a draggable orange-square Claude (`mascotJumping` / `mascotSpeaking` modes). It is now rebuilt from the Claude Design handoff (`untitled/project/lazyclaw.html`) as a 16×16 pixel sprite with the Claude-Original palette:
+
+  - **idle**     — sleepy vertical-slit eyes. Default.
+  - **working**  — helmet glints + focused-dot eyes.
+  - **done**     — happy eyes + sparkles by the pincer tips. Auto-reverts after 2.4 s.
+  - **error**    — shaded helmet, claws drooping, dead × × eyes. Auto-reverts after 4.5 s.
+
+State machine: `_mascotSetState(state)` swaps the active SVG content. Every cell of the 16×16 grid is rendered as a 1×1 `<rect>` with crisp-edge rendering. Wired into `sendChat()` (working on submit, done on success, error on failure) and a global `_bindMascotErrorFeed()` that wraps `window.onerror` + `unhandledrejection`.
+
+CLI banner (`src/lazyclaw/cli.mjs::_renderBanner`) uses the canonical 12-row Big ASCII from the handoff (`◂▸` pincers, `╔═╗` helmet, `╱|╲` star tail). Three new helpers: `_renderMascot(state)` (Big ASCII, ANSI-coloured per state), `_renderMascotTiny(state)` (3-row inline ASCII), `_mascotInkers(state)` (state→colour picker).
+
+### Migration
+
+  - No DB or `~/.claude-dashboard-*.json` schema change.
+  - Existing `~/.lazyclaw/config.json` is read as-is; new sections are created lazily on first write.
+  - The old `_mascotSetMode('speaking')` callsite is kept as a back-compat shim mapping onto `_mascotSetState('done')` for ~1.8 s.
+
+### Limitations
+
+  - Interactive CLI wizards (`lazyclaw setup`, `lazyclaw onboard --pick`) cannot be driven from a web UI; the dashboard exposes the `--non-interactive` form equivalents.
+  - `lcCron sync` calls the CLI which writes launchd plists / crontab entries — the dashboard does NOT manage launchd directly.
+  - Long-running workflows beyond 600 s should use the daemon path (`lcDaemon` tab → start) or a custom `timeoutSec` override in the request body.
+
+---
 ## [3.99.25] — 2026-05-12  🎼 orchestrator-as-provider — dashboard side + sidebar chat toggle
 
 User: "프로바이더처럼 openclaw의 기능을 사용할 수 있게 해줘. 채팅으로 보내면 해당 메인 ai가 하위 에이전트들을 시켜야 업무를 자동으로 할 수 있게끔."
