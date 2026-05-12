@@ -10,6 +10,46 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.23] — 2026-05-12  🎨 mascot — rebuilt from Claude Design handoff (crab-helmet asterisk star)
+
+User: "터미널이랑 lazyclaw [Claude Design handoff URL] 로고 이거 참고해서 다시 만들어줘."
+
+The bunny mascot from v3.99.16 is retired. The Claude Design handoff bundle (`api.anthropic.com/v1/design/h/.../lazyclaw.html`) ships a proper "lazyclaw" mascot sheet — a 16×16 pixel character: **Claude's asterisk (`*`) star wearing a crustacean helmet with two antenna-claws**, four lifecycle states (idle / working / done / error), four colourway palettes (CLAUDE ORIGINAL / GAME BOY DMG / NES / CORAL CRUSTACEAN), and ASCII fallbacks in two sizes. v3.99.23 adopts the **CLAUDE ORIGINAL** palette + idle pose in both surfaces lazyclaw renders:
+
+### CLI banner (`_renderBanner` in `src/lazyclaw/cli.mjs`)
+
+Old: 5-line ASCII wordmark `LazyClaw |__/  3.99.X` + a 5-row bunny in block characters.
+
+New: the design bundle's 10-line "big ASCII" form — left column is the sprite, right column is `lazyclaw vX.Y.Z` + tagline:
+
+```
+    ▲      ▲
+    │      │
+  ╔══════════╗
+  ║          ║    lazyclaw  v3.99.23
+  ║  ──  ──  ║    a sleepy 8-bit
+  ║          ║    terminal assistant
+  ╚══════════╝
+        ✦
+       ╱|╲
+      ╱ | ╲
+```
+
+Colours via truecolor ANSI: helmet body `#c33d2a`, helmet shine `#ff8a6a`, antenna `#a02b1c`, star (Claude orange) `#d97757`, eye slits `#7a6e5f`. Degrades to visible glyphs on terminals that ignore truecolor.
+
+### Web dashboard logo (`src/lazyclaw/web/dashboard.html`)
+
+Old: animated jumping-bunny SVG (orange rectangles + hop / ear / arm keyframes).
+
+New: 16×16 pixel SVG — `viewBox="0 0 16 16"`, 25 `<rect>` runs, `shape-rendering="crispEdges"` so it stays pixelated at any size. Each sprite pixel maps to a 1×1 SVG rect; consecutive same-colour pixels in a row are merged for a smaller file. Idle pose; on `:hover` the helmet picks up a soft `drop-shadow(rgba(217,119,87,0.45))` warm-orange glow.
+
+The `lazyclaude` SPA dist still has the original Claude character mascot (a separate piece of artwork — different brand, different rabbit). That one isn't touched.
+
+### Migration
+
+None. Visual-only change.
+
+---
 ## [3.99.22] — 2026-05-11  🛠 orchestrator — setup wizard + `lazyclaw orchestrator` CLI
 
 User re-asserted the v3.99.21 goal: "프로바이더처럼 openclaw의 기능을 사용할 수 있게 해줘. 채팅으로 보내면 해당 메인 ai가 하위 에이전트들을 시켜야 업무를 자동으로 할 수 있게끔."

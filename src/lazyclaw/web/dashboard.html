@@ -42,24 +42,14 @@
       gap: 14px;
     }
     .logo { font-weight: 700; font-size: 16px; color: var(--accent); display: flex; align-items: center; gap: 10px; }
-    .logo .mascot { width: 36px; height: 32px; flex: none; }
+    .logo .mascot { width: 44px; height: 44px; flex: none; image-rendering: pixelated; image-rendering: crisp-edges; }
     .ver  { color: var(--dim); font-size: 11px; }
-    /* lazyclaude pixel-mascot — copied verbatim from dist/index.html so the
-       lazyclaw web dashboard wears the same character as the larger SPA. */
-    .mascot .mj-body   { animation: mj-jump 1s ease-in-out infinite; transform-origin: center bottom; }
-    .mascot .mj-shadow { animation: mj-sh   1s ease-in-out infinite; }
-    .mascot .mj-la     { animation: mj-wl   1s ease-in-out infinite; transform-origin: right center; }
-    .mascot .mj-ra     { animation: mj-wr   1s ease-in-out infinite; transform-origin: left center; }
-    .mascot .mj-le     { animation: mj-ear  1s ease-in-out infinite; transform-origin: center bottom; }
-    .mascot .mj-re     { animation: mj-ear  1s ease-in-out infinite .1s; transform-origin: center bottom; }
-    @keyframes mj-jump { 0%, 100% { transform: translateY(0) scaleY(1) scaleX(1); } 30% { transform: translateY(-10px) scaleY(1.1) scaleX(.95); } 50% { transform: translateY(-12px) scaleY(1.05) scaleX(.98); } 80% { transform: translateY(-3px) scaleY(.95) scaleX(1.05); } }
-    @keyframes mj-sh   { 0%, 100% { transform: scaleX(1); opacity: .25; } 50% { transform: scaleX(.4); opacity: .08; } }
-    @keyframes mj-wl   { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-25deg); } }
-    @keyframes mj-wr   { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(25deg); } }
-    @keyframes mj-ear  { 0%, 100% { transform: scaleY(1); } 40% { transform: scaleY(1.2); } 60% { transform: scaleY(.85); } }
-    @media (prefers-reduced-motion: reduce) {
-      .mascot .mj-body, .mascot .mj-shadow, .mascot .mj-la, .mascot .mj-ra, .mascot .mj-le, .mascot .mj-re { animation: none; }
-    }
+    /* lazyclaw 16x16 pixel mascot — Claude Design handoff (mascot sheet
+       v0.1, "claude original" palette). Claude's asterisk star (#d97757)
+       worn under a crustacean helmet (#c33d2a) with two antenna-claws.
+       Idle pose (sleepy slits). Hover gently brightens the helmet. */
+    .mascot { transition: filter 0.2s ease; }
+    .logo:hover .mascot { filter: drop-shadow(0 0 6px rgba(217, 119, 87, 0.45)); }
     nav.tabs {
       display: flex;
       gap: 2px;
@@ -286,22 +276,39 @@
 <body>
   <header>
     <div class="logo">
-      <svg class="mascot" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 90" aria-hidden="true">
-        <ellipse class="mj-shadow" cx="50" cy="82" rx="22" ry="5" fill="#000"/>
-        <g class="mj-body">
-          <rect class="mj-le" x="22" y="10" width="8" height="14" fill="#d97757"/>
-          <rect class="mj-re" x="70" y="10" width="8" height="14" fill="#d97757"/>
-          <rect x="18" y="24" width="64" height="4" fill="#d97757"/>
-          <rect x="14" y="28" width="72" height="32" fill="#d97757"/>
-          <rect x="30" y="34" width="8" height="10" fill="#000"/>
-          <rect x="62" y="34" width="8" height="10" fill="#000"/>
-          <rect class="mj-la" x="2"  y="36" width="12" height="8" fill="#d97757"/>
-          <rect class="mj-ra" x="86" y="36" width="12" height="8" fill="#d97757"/>
-          <rect x="24" y="60" width="12" height="14" fill="#d97757"/>
-          <rect x="64" y="60" width="12" height="14" fill="#d97757"/>
-        </g>
+      <svg class="mascot" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-label="lazyclaw mascot" role="img">
+        <!-- antennae / claws -->
+        <rect x="3"  y="1"  width="1"  height="1" fill="#a02b1c"/>
+        <rect x="12" y="1"  width="1"  height="1" fill="#a02b1c"/>
+        <rect x="3"  y="2"  width="1"  height="1" fill="#a02b1c"/>
+        <rect x="12" y="2"  width="1"  height="1" fill="#a02b1c"/>
+        <!-- helmet -->
+        <rect x="3"  y="3"  width="10" height="1" fill="#c33d2a"/>
+        <rect x="2"  y="4"  width="12" height="1" fill="#c33d2a"/>
+        <rect x="1"  y="5"  width="2"  height="1" fill="#c33d2a"/>
+        <rect x="3"  y="5"  width="1"  height="1" fill="#ff8a6a"/>
+        <rect x="4"  y="5"  width="8"  height="1" fill="#c33d2a"/>
+        <rect x="12" y="5"  width="1"  height="1" fill="#ff8a6a"/>
+        <rect x="13" y="5"  width="2"  height="1" fill="#c33d2a"/>
+        <rect x="1"  y="6"  width="14" height="1" fill="#c33d2a"/>
+        <rect x="2"  y="7"  width="12" height="1" fill="#c33d2a"/>
+        <!-- star body (Claude asterisk) — top edge below helmet brim -->
+        <rect x="3"  y="8"  width="10" height="1" fill="#d97757"/>
+        <!-- face row (idle: sleepy slit eyes) -->
+        <rect x="2"  y="9"  width="3"  height="1" fill="#d97757"/>
+        <rect x="5"  y="9"  width="2"  height="1" fill="#1a1410"/>
+        <rect x="7"  y="9"  width="2"  height="1" fill="#d97757"/>
+        <rect x="9"  y="9"  width="2"  height="1" fill="#1a1410"/>
+        <rect x="11" y="9"  width="3"  height="1" fill="#d97757"/>
+        <!-- star arms + tip -->
+        <rect x="1"  y="10" width="14" height="1" fill="#d97757"/>
+        <rect x="0"  y="11" width="16" height="1" fill="#d97757"/>
+        <rect x="1"  y="12" width="14" height="1" fill="#d97757"/>
+        <rect x="3"  y="13" width="10" height="1" fill="#d97757"/>
+        <rect x="5"  y="14" width="6"  height="1" fill="#d97757"/>
+        <rect x="7"  y="15" width="2"  height="1" fill="#d97757"/>
       </svg>
-      <span>LazyClaw</span>
+      <span>lazyclaw</span>
     </div>
     <div class="ver" id="version">…</div>
   </header>

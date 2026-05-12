@@ -1469,42 +1469,52 @@ function _attachGhostAutocomplete(rl) {
 // two of the inner lines were 33 cols vs the others' 32, so the
 // ╮ rendered into the next line).
 function _renderBanner(version) {
-  const W = 30;
-  const accent = (s) => `\x1b[38;5;208m${s}\x1b[0m`;
-  // 24-bit color so the mascot reads in the same warm orange as the
-  // dist/index.html SVG (#d97757). Falls back gracefully on terminals
-  // that ignore truecolor — the glyphs are visible regardless.
-  const orange = (s) => `\x1b[38;2;217;119;87m${s}\x1b[0m`;
-  // Inner content of each banner row — DO NOT pad here, the wrapper
-  // does it. Backslashes are JS-escaped so each `\\` renders as one
-  // literal `\` in the output.
-  const inner = [
-    '   _',
-    '  | |__ _ _____  _ _',
-    "  | / _` |_ / || | '_|",
-    '  |_\\__,_/__\\_, |_|',
-    '  LazyClaw  |__/  ' + String(version || '?.?.?').padEnd(10).slice(0, 10),
+  // Rebuilt from the Claude Design handoff bundle (v0.1 mascot sheet):
+  // Claude's asterisk star wearing a crab/crustacean helmet with two
+  // antenna-claws. 10-line "big ASCII" form — fits a terminal banner
+  // without zoom and reads at any monospace font that has the
+  // box-drawing + geometric-shape glyphs.
+  //
+  // Palette (CLAUDE ORIGINAL): helmet body #c33d2a, helmet shadow
+  // #7a1f15, star body #d97757, star shadow #a04f32, eyes ink
+  // #c7bca6 / muted slits. Truecolor ANSI; degrades gracefully on
+  // terminals that ignore it.
+  const helmet = (s) => `\x1b[38;2;195;61;42m${s}\x1b[0m`;   // #c33d2a
+  const star   = (s) => `\x1b[38;2;217;119;87m${s}\x1b[0m`;  // #d97757 — Claude orange
+  const ink    = (s) => `\x1b[38;2;241;234;217m${s}\x1b[0m`; // #f1ead9 paper-ink
+  const dim    = (s) => `\x1b[2m${s}\x1b[0m`;
+  const muted  = (s) => `\x1b[38;2;122;110;95m${s}\x1b[0m`;  // #7a6e5f
+
+  const v = String(version || '?.?.?');
+  // Left column — sprite. Right column — wordmark + tagline, aligned
+  // to the helmet's eye-row / brim. The trailing spaces preserve the
+  // grid so any caller padding the lines (or copying them) doesn't
+  // get ragged edges.
+  const left = [
+    `    ${helmet('▲')}      ${helmet('▲')}   `,
+    `    ${helmet('│')}      ${helmet('│')}   `,
+    `  ${helmet('╔══════════╗')} `,
+    `  ${helmet('║')}          ${helmet('║')} `,
+    `  ${helmet('║')}  ${muted('──')}  ${muted('──')}  ${helmet('║')} `,
+    `  ${helmet('║')}          ${helmet('║')} `,
+    `  ${helmet('╚══════════╝')} `,
+    `        ${star('✦')}       `,
+    `       ${star('╱|╲')}      `,
+    `      ${star('╱ | ╲')}     `,
   ];
-  // Pixel-art mascot mirrored from the lazyclaude SPA's #claudeMascot
-  // SVG (orange rectangles → block characters). Squashed to 5 rows so
-  // it lines up with `inner` in the banner. Eye sockets are left blank
-  // (the SVG fills them with #000); a hollow gap reads as eyes against
-  // the orange body in any monospace font.
-  const mascot = [
+  const right = [
     '',
-    orange('   ██      ██'),
-    orange('  ██████████████'),
-    orange('  ██  ') + '██' + orange('  ') + '██' + orange('  ██'),
-    orange('  ██████████████'),
-    orange('   ██      ██'),
+    '',
+    '',
+    `   ${ink('lazyclaw')}  ${dim('v' + v)}`,
+    `   ${dim('a sleepy 8-bit')}`,
+    `   ${dim('terminal assistant')}`,
+    '',
+    '',
+    '',
     '',
   ];
-  const banner = [
-    '╭' + '─'.repeat(W) + '╮',
-    ...inner.map((s) => '│' + s.padEnd(W).slice(0, W) + '│'),
-    '╰' + '─'.repeat(W) + '╯',
-  ];
-  return banner.map((l, i) => '  ' + accent(l) + (mascot[i] ? '  ' + mascot[i] : ''));
+  return left.map((l, i) => '  ' + l + (right[i] || ''));
 }
 
 function _printChatBanner(activeProvName, activeModel, version) {
