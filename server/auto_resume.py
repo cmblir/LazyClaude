@@ -408,10 +408,46 @@ def _read_jsonl_tail(jsonl: Path, byte_window: int = 16384) -> str:
 
 
 def _looks_rate_limited(jsonl: Path) -> bool:
-    tail = _read_jsonl_tail(jsonl).lower()
+    tail = _read_jsonl_tail(jsonl)
     if not tail:
         return False
-    return any(hint in tail for hint in RATE_LIMIT_HINTS)
+    tail_lower = tail.lower()
+    # Fast path: text-based hint matching (legacy rate-limit messages)
+    if any(hint in tail_lower for hint in RATE_LIMIT_HINTS):
+        return True
+    # Structured check: parse jsonl tail lines for api_error system entries
+    # with HTTP statuses that indicate rate limiting (429, 529, 503).
+    for line in reversed(tail.strip().split("\n")):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except Exception:
+            continue
+        if entry.get("type") != "system":
+            continue
+        subtype = entry.get("subtype") or ""
+        if subtype == "api_error":
+            err = entry.get("error") or {}
+            status = err.get("status")
+            if status in (429, 529, 503):
+                return True
+            # Check nested error object for rate-limit type
+            inner = err.get("error") if isinstance(err.get("error"), dict) else {}
+            inner_type = (inner.get("type") or "").lower()
+            if inner_type in ("rate_limit_error", "overloaded_error"):
+                return True
+            inner_msg = (inner.get("message") or "").lower()
+            if any(h in inner_msg for h in RATE_LIMIT_HINTS):
+                return True
+        # Claude Code may also write a system entry without subtype when
+        # the CLI itself hits the usage cap (Pro plan 5h limit).
+        if subtype in ("", "usage_limit", "rate_limit"):
+            msg = (entry.get("message") or entry.get("text") or "").lower()
+            if any(h in msg for h in RATE_LIMIT_HINTS):
+                return True
+    return False
 
 
 def _jsonl_idle_seconds(jsonl: Path) -> float:
@@ -1129,6 +1165,10 @@ def _process_one(session_id: str) -> None:
 
     # 2-signal gate: idle long AND last activity smells like cap
     if not _looks_rate_limited(jsonl):
+        log.debug(
+            "auto_resume: %s idle %.0fs but no rate-limit signal in jsonl tail, skipping",
+            session_id, idle,
+        )
         return
 
     with _LOCK:
@@ -1140,6 +1180,49 @@ def _process_one(session_id: str) -> None:
         store[session_id]["attempts"] = attempts + 1
         _dump_all(store)
         attempt_entry = dict(store[session_id])
+
+    # If the session is still live in a terminal, try TTY injection first.
+    # This handles the common case where the user's terminal is stuck at a
+    # "1) Yes  2) No" rate-limit selection prompt — keystrokes dismiss the
+    # prompt and submit the resume prompt directly into the live session.
+    if is_live:
+        live_rec = live_map.get(session_id) or {}
+        pid: Optional[int] = None
+        try:
+            pid = int(live_rec.get("pid")) if live_rec.get("pid") is not None else None
+        except Exception:
+            pid = None
+        if not pid:
+            try:
+                pid = int(attempt_entry.get("pid")) if attempt_entry.get("pid") is not None else None
+            except Exception:
+                pid = None
+        if pid:
+            try:
+                from .auto_resume_inject import inject_live as _inject
+                prompt = attempt_entry.get("prompt") or DEFAULT_PROMPT
+                result = _inject(pid, prompt, press_choice="1", allow_system_events=True)
+                if result.get("ok"):
+                    log.info(
+                        "auto_resume: %s inject_live succeeded via %s",
+                        session_id, result.get("mechanism"),
+                    )
+                    # Injection succeeded — revert to watching state and wait
+                    # for the session to produce new jsonl activity.
+                    with _LOCK:
+                        store = _load_all()
+                        if session_id in store:
+                            store[session_id]["state"] = STATE_WATCHING
+                            store[session_id]["lastError"] = ""
+                            _dump_all(store)
+                    return
+                else:
+                    log.info(
+                        "auto_resume: %s inject_live failed (%s), falling back to spawn",
+                        session_id, result.get("error", "?")[:200],
+                    )
+            except Exception as e:
+                log.warning("auto_resume: %s inject_live crashed: %s", session_id, e)
 
     exit_code, err_tail, out_tail = _spawn_resume(attempt_entry)
     jsonl_tail_for_class = _read_jsonl_tail(jsonl)
