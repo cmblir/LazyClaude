@@ -2,7 +2,7 @@
 
 # 💤 LazyClaude
 
-<img src="./docs/logo/mascot.svg" alt="LazyClaude mascot — pixel character napping with closed eyes" width="200" height="171" />
+<img src="./docs/screenshots/mascot-demo.gif" alt="LazyClaude mascots — random pixel pig characters" width="120" />
 
 **The lazy, elegant dashboard for everything Claude.**
 
@@ -44,7 +44,29 @@ CLAUDE_HOME=/path/to/.claude python3 server.py
 
 ---
 
-## 🔄 Auto-Resume with live TTY injection (v3.65.0+)
+## � Screenshots
+
+<table>
+<tr>
+<td align="center"><b>Dashboard</b><br/><img src="./docs/screenshots/dashboard.png" width="400" /></td>
+<td align="center"><b>Workflows</b><br/><img src="./docs/screenshots/workflows.png" width="400" /></td>
+</tr>
+<tr>
+<td align="center"><b>AI Providers / Playground</b><br/><img src="./docs/screenshots/playground.png" width="400" /></td>
+<td align="center"><b>Sessions</b><br/><img src="./docs/screenshots/sessions.png" width="400" /></td>
+</tr>
+<tr>
+<td align="center"><b>Cost Timeline</b><br/><img src="./docs/screenshots/costs.png" width="400" /></td>
+<td align="center"><b>MCP Servers</b><br/><img src="./docs/screenshots/mcp.png" width="400" /></td>
+</tr>
+<tr>
+<td align="center" colspan="2"><b>Auto-Resume</b><br/><img src="./docs/screenshots/auto-resume.png" width="400" /></td>
+</tr>
+</table>
+
+---
+
+## �🔄 Auto-Resume with live TTY injection (v3.65.0+)
 
 When a Claude session hits a rate-limit or selection prompt, Auto-Resume can now inject keystrokes into the **live terminal** — not just spawn a separate subprocess. macOS only:
 
