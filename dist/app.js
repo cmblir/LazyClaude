@@ -26336,10 +26336,10 @@ function _mascotWanderStep() {
 //   error   → 경고/놀람 (wide shocked eyes + alert marks)
 const _MASCOT_W = 16;
 // ═══════════════════════════════════════════════════════════════════
-// Mascot Sprite System v3 — uses actual PNG image files
-// Images served from /mascots/*.png (transparent background)
+// Mascot Sprite System v3 — uses actual GIF image files
+// Images served from /mascots/*.gif (transparent background)
 // ═══════════════════════════════════════════════════════════════════
-const _MASCOT_FRIENDS = ['idea', 'basic', 'bird', 'sparkle', 'worker', 'cool', 'pirate', 'headset'];
+const _MASCOT_FRIENDS = ['idea', 'basic', 'basic2', 'bird', 'sparkle', 'worker', 'cool', 'pirate', 'headset'];
 const _MASCOT_ALL = [..._MASCOT_FRIENDS, 'error'];
 let _mascotVariant = 'idea';
 let _mascotVariantTimer = null;
@@ -26355,7 +26355,7 @@ function _mascotPickRandomVariant(force, includeClassic) {
 }
 function _mascotGetImgSrc(state) {
   const variant = (state === 'error') ? 'error' : _mascotVariant;
-  return '/mascots/' + variant + '.png';
+  return '/mascots/' + variant + '.gif';
 }
 function _mascotBuildHtml(state, animate) {
   const src = _mascotGetImgSrc(state);
