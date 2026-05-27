@@ -26336,195 +26336,15 @@ function _mascotWanderStep() {
 //   error   → 경고/놀람 (wide shocked eyes + alert marks)
 const _MASCOT_W = 16;
 // ═══════════════════════════════════════════════════════════════════
-// Mascot Sprite System v2 — full independent sprites per variant
-// Each variant is a complete 16×16 pixel grid (no base + overlay).
+// Mascot Sprite System v3 — uses actual PNG image files
+// Images served from /mascots/*.png (transparent background)
 // ═══════════════════════════════════════════════════════════════════
-const _MASCOT_PALETTE = {
-  O: '#d4845a', o: '#b06540',
-  e: '#1a1410', W: '#ffffff',
-  B: '#78a9e3', b: '#2d5a8c',
-  Y: '#e8b84a', y: '#c49030',
-  T: '#b0b0b0', t: '#666666',
-  K: '#4a4540', k: '#3a3530',
-  P: '#6b5b9a', p: '#4a3a70',
-  X: '#e03030', x: '#a02020',
-  G: '#6a8a50', g: '#4a6a38',
-  H: '#8b7b40', h: '#6b5b30',
-  F: '#e8a878', f: '#c08060',
-  R: '#c94848', r: '#9c3030',
-  S: '#d4d4d4', s: '#999999',
-};
-// 9 mascot friends — each is a full 16×16 sprite
-const _MASCOT_SPRITES = {
-  idea: [
-    '......YYY.......',
-    '.....YyyyY......',
-    '.....YYYYY......',
-    '......TtT.......',
-    '................',
-    '..........OO....',
-    '........OOOOOO..',
-    '.......OOOOOOO..',
-    '...OO..OOOOOOO..',
-    '...OO.OeOOOeOO..',
-    '.......OOOOOOO..',
-    '.......OOOOOOO..',
-    '.......OOOOOOO..',
-    '......OO.OO.OO..',
-    '......OO.OO.OO..',
-    '................',
-  ],
-  basic: [
-    '................',
-    '................',
-    '................',
-    '................',
-    '....OOOOOOOO....',
-    '..OO.OOOOOO.OO..',
-    '....OOOOOOOO....',
-    '....OOOOOOOO....',
-    '....OeOOOOeO....',
-    '....OOOOOOOO....',
-    '....OOOOOOOO....',
-    '....OOOOOOOO....',
-    '....OO.OO.OO....',
-    '....WW.WW.WW....',
-    '....WW....WW....',
-    '................',
-  ],
-  bird: [
-    '................',
-    '.......BBB......',
-    '......BBBBB.....',
-    '......BeBBB.....',
-    '......BBBBB.....',
-    '.......bBb......',
-    '..........OO....',
-    '........OOOOOO..',
-    '.......OOOOOOO..',
-    '...OO..OOOOOOO..',
-    '...OO.OeOOOeOO..',
-    '.......OOOOOOO..',
-    '.......OOOOOOO..',
-    '......OO.OO.OO..',
-    '......OO.OO.OO..',
-    '................',
-  ],
-  sparkle: [
-    '......yS........',
-    '.....Sy.S.......',
-    '......Se........',
-    '......et........',
-    '......et........',
-    '..........RR....',
-    '........RRRRRR..',
-    '.......RRRRRRR..',
-    '...RR..RRRRRRR..',
-    '...RR.ReRRReRR..',
-    '.......RRRRRRR..',
-    '.......RRRRRRR..',
-    '.......RRRRRRR..',
-    '......RR.RR.RR..',
-    '......WW.WW.WW..',
-    '................',
-  ],
-  worker: [
-    '................',
-    '.....yYYYYy.....',
-    '....YYYYYYYY....',
-    '....YYYhYYYY....',
-    '....yyyyyyyy....',
-    '....OOOOOOOO....',
-    '..OO.OOOOOO.OO..',
-    '....OOOOOOOO....',
-    '....OeOOOOeO.tt.',
-    '....OOOOOOOO.tTt',
-    '....OOOOOOOO..t.',
-    '....OOOOOOOO....',
-    '....OO.OO.OO....',
-    '....OO.OO.OO....',
-    '................',
-    '................',
-  ],
-  cool: [
-    '................',
-    '................',
-    '..........OO....',
-    '........OOOOOO..',
-    '.......OOOOOOO..',
-    '.......OOOOOOO..',
-    '...OO..OOOOOOO..',
-    '...OO.OeOOOeOO..',
-    '.......OOOOOOO..',
-    '.......OOOOOOO..',
-    '.......OOOOOOPP.',
-    '.......OOOOOOpPW',
-    '.......OOOOOOO..',
-    '......OO.OO.OO..',
-    '......OO.OO.OO..',
-    '................',
-  ],
-  pirate: [
-    '...KKKKKKKk.....',
-    '..KKKKKKKKKk....',
-    '..KKkKKkKKKk....',
-    '..KKeKKeKKKK....',
-    '..KKKKKKKKKK....',
-    '...kKKKhKKk.....',
-    '....OOOOOOOO....',
-    '..OO.OOOOOO.OO..',
-    '....OOOOOOOO....',
-    '....OOOOOOOO.Pp.',
-    '....OOOOOOOO.pYy',
-    '....OOOOOOOO....',
-    '...OO.OO.OO.OO..',
-    '...OO.OO.OO.OO..',
-    '................',
-    '................',
-  ],
-  error: [
-    '................',
-    '................',
-    '........Tt......',
-    '................',
-    '....XXXX.XXXX...',
-    '....X..X.X..X...',
-    '....XXXX.XXXX...',
-    '................',
-    '..OOOOOOOOOOO...',
-    '..OeOeOOOeOeO.o',
-    '..OOOOOOOOOOO...',
-    '..eeeeeeeeeee...',
-    '................',
-    '................',
-    '................',
-    '................',
-  ],
-  headset: [
-    '................',
-    '....bbbbbbb.....',
-    '...bBBBBBBBb....',
-    '..bB.......Bb...',
-    '..bB.OOOOO.Bb...',
-    '..BB.OOOOO.BB...',
-    '..BB.OOOOO.BB...',
-    '..BBOOOOOOOOBB..',
-    '....OeOOOOeO....',
-    '....OeOOOOeO....',
-    '....OOOOOOOO....',
-    '..OO.OOOOOO.OO..',
-    '....OOOOOOOO....',
-    '....OO.OO.OO....',
-    '....OO.OO.OO....',
-    '................',
-  ],
-};
-const _MASCOT_VARIANT_IDS = Object.keys(_MASCOT_SPRITES);
-const _MASCOT_RANDOM_POOL = _MASCOT_VARIANT_IDS.filter((id) => id !== 'error');
+const _MASCOT_FRIENDS = ['idea', 'basic', 'bird', 'sparkle', 'worker', 'cool', 'pirate', 'headset'];
+const _MASCOT_ALL = [..._MASCOT_FRIENDS, 'error'];
 let _mascotVariant = 'idea';
 let _mascotVariantTimer = null;
 function _mascotPickRandomVariant(force, includeClassic) {
-  const pool = _MASCOT_RANDOM_POOL;
+  const pool = _MASCOT_FRIENDS;
   if (!pool.length) return;
   let next = pool[Math.floor(Math.random() * pool.length)];
   if (!force && pool.length > 1 && next === _mascotVariant) {
@@ -26533,30 +26353,18 @@ function _mascotPickRandomVariant(force, includeClassic) {
   _mascotVariant = next;
   if (typeof _mascotState === 'string') _mascotSetState(_mascotState);
 }
-function _mascotSpriteRows(state) {
-  // For error state, force error sprite
-  if (state === 'error') return _MASCOT_SPRITES.error;
-  return _MASCOT_SPRITES[_mascotVariant] || _MASCOT_SPRITES.basic;
+function _mascotGetImgSrc(state) {
+  const variant = (state === 'error') ? 'error' : _mascotVariant;
+  return '/mascots/' + variant + '.png';
 }
+function _mascotBuildHtml(state, animate) {
+  const src = _mascotGetImgSrc(state);
+  const animClass = animate ? 'lc-mb-anim' : '';
+  return `<img src="${src}" alt="mascot" class="${animClass}" style="width:100%;height:100%;image-rendering:pixelated;background:transparent;object-fit:contain;" />`;
+}
+// Keep old name for back-compat but now returns img tag
 function _mascotBuildSvg(state, animate) {
-  const rows = _mascotSpriteRows(state);
-  const cells = [];
-  for (let y = 0; y < rows.length; y++) {
-    const row = rows[y];
-    for (let x = 0; x < row.length; x++) {
-      const ch = row[x];
-      if (ch === '.') continue;
-      const fill = _MASCOT_PALETTE[ch] || '#d4845a';
-      cells.push(`<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${fill}"/>`);
-    }
-  }
-  const animStyle = animate ? `
-    <style>
-      .lc-mb{animation:lc-mb-bob .8s ease-in-out infinite;transform-origin:8px 16px}
-      @keyframes lc-mb-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-0.6px)}}
-    </style>` : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" style="width:100%;height:100%;image-rendering:pixelated;background:transparent;">
-    ${animStyle}<g class="${animate ? 'lc-mb' : ''}">${cells.join('')}</g></svg>`;
+  return _mascotBuildHtml(state, animate);
 }
 let _mascotState = 'idle';
 let _mascotDoneTimer = null;

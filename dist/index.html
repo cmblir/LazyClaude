@@ -1423,6 +1423,18 @@
       }
     }
 
+    /* Mascot PNG animation */
+    .lc-mb-anim {
+      animation: lc-mb-bob .8s ease-in-out infinite;
+    }
+    @keyframes lc-mb-bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    #claudeMascot, #mascotSprite, #mascotSprite img {
+      background: transparent !important;
+    }
+
     /* streaming cursor */
     .streaming-cursor::after {
       content: '▍';
