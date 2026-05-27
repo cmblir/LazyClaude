@@ -126,7 +126,7 @@
       "text": "Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가",
       "count": 1,
       "sample_lines": [
-        98
+        115
       ],
       "in_existing_en_dict": false
     },
@@ -212,7 +212,7 @@
       "text": "LazyClaude — 최적화 대시보드",
       "count": 1,
       "sample_lines": [
-        6
+        7
       ],
       "in_existing_en_dict": false
     },
@@ -496,7 +496,7 @@
       "text": "검색… ⌘K · /",
       "count": 1,
       "sample_lines": [
-        115
+        139
       ],
       "in_existing_en_dict": false
     },
@@ -546,7 +546,7 @@
       "text": "내리기",
       "count": 1,
       "sample_lines": [
-        188
+        233
       ],
       "in_existing_en_dict": false
     },
@@ -554,7 +554,7 @@
       "text": "네비게이션 도우미 ↔ 멀티 에이전트 오케스트레이터 전환",
       "count": 1,
       "sample_lines": [
-        207
+        253
       ],
       "in_existing_en_dict": false
     },
@@ -562,7 +562,7 @@
       "text": "다크",
       "count": 1,
       "sample_lines": [
-        136
+        170
       ],
       "in_existing_en_dict": false
     },
@@ -576,7 +576,7 @@
       "text": "닫기",
       "count": 1,
       "sample_lines": [
-        187
+        232
       ],
       "in_existing_en_dict": false
     },
@@ -584,7 +584,7 @@
       "text": "대시보드 도우미",
       "count": 1,
       "sample_lines": [
-        195
+        241
       ],
       "in_existing_en_dict": false
     },
@@ -592,7 +592,7 @@
       "text": "대시보드 모드 — 사이드바 탭 필터",
       "count": 1,
       "sample_lines": [
-        119
+        144
       ],
       "in_existing_en_dict": false
     },
@@ -600,7 +600,7 @@
       "text": "대시보드 모드 선택",
       "count": 1,
       "sample_lines": [
-        119
+        144
       ],
       "in_existing_en_dict": false
     },
@@ -626,7 +626,7 @@
       "text": "라이트",
       "count": 1,
       "sample_lines": [
-        139
+        174
       ],
       "in_existing_en_dict": false
     },
@@ -694,7 +694,7 @@
       "text": "모드별 사용량",
       "count": 1,
       "sample_lines": [
-        160
+        204
       ],
       "in_existing_en_dict": false
     },
@@ -714,7 +714,7 @@
       "text": "미드나잇",
       "count": 1,
       "sample_lines": [
-        142
+        178
       ],
       "in_existing_en_dict": false
     },
@@ -728,7 +728,7 @@
       "text": "버전 정보 / 변경 이력",
       "count": 1,
       "sample_lines": [
-        102
+        121
       ],
       "in_existing_en_dict": false
     },
@@ -772,7 +772,7 @@
       "text": "빠른 설정 — 모든 파라미터",
       "count": 1,
       "sample_lines": [
-        156
+        200
       ],
       "in_existing_en_dict": false
     },
@@ -792,7 +792,7 @@
       "text": "사이드바 열기/닫기",
       "count": 1,
       "sample_lines": [
-        110
+        132
       ],
       "in_existing_en_dict": false
     },
@@ -800,7 +800,7 @@
       "text": "사이드바 접기/펼치기",
       "count": 2,
       "sample_lines": [
-        88
+        102
       ],
       "in_existing_en_dict": false
     },
@@ -808,7 +808,7 @@
       "text": "사이드바 토글",
       "count": 1,
       "sample_lines": [
-        110
+        132
       ],
       "in_existing_en_dict": false
     },
@@ -822,7 +822,7 @@
       "text": "선셋",
       "count": 1,
       "sample_lines": [
-        148
+        186
       ],
       "in_existing_en_dict": false
     },
@@ -830,7 +830,7 @@
       "text": "설정",
       "count": 1,
       "sample_lines": [
-        127
+        152
       ],
       "in_existing_en_dict": false
     },
@@ -838,7 +838,7 @@
       "text": "설정 메뉴 열기",
       "count": 1,
       "sample_lines": [
-        127
+        152
       ],
       "in_existing_en_dict": false
     },
@@ -864,8 +864,8 @@
       "text": "세션 재인덱스",
       "count": 2,
       "sample_lines": [
-        95,
-        96
+        111,
+        112
       ],
       "in_existing_en_dict": false
     },
@@ -915,7 +915,7 @@
       "text": "안녕하세요! 대시보드 기능에 대해 무엇이든 물어보세요.",
       "count": 1,
       "sample_lines": [
-        201
+        247
       ],
       "in_existing_en_dict": false
     },
@@ -935,7 +935,7 @@
       "text": "언어",
       "count": 1,
       "sample_lines": [
-        150
+        191
       ],
       "in_existing_en_dict": false
     },
@@ -949,7 +949,7 @@
       "text": "연결됨",
       "count": 1,
       "sample_lines": [
-        125
+        150
       ],
       "in_existing_en_dict": false
     },
@@ -957,7 +957,7 @@
       "text": "예: MCP 어디서 설정해?",
       "count": 1,
       "sample_lines": [
-        219
+        264
       ],
       "in_existing_en_dict": false
     },
@@ -965,7 +965,7 @@
       "text": "오케스트레이터 프리셋",
       "count": 1,
       "sample_lines": [
-        212
+        257
       ],
       "in_existing_en_dict": false
     },
@@ -1009,7 +1009,7 @@
       "text": "자동 (OS)",
       "count": 1,
       "sample_lines": [
-        133
+        166
       ],
       "in_existing_en_dict": false
     },
@@ -1029,7 +1029,7 @@
       "text": "전송",
       "count": 1,
       "sample_lines": [
-        220
+        267
       ],
       "in_existing_en_dict": false
     },
@@ -1049,7 +1049,7 @@
       "text": "채팅 전송",
       "count": 1,
       "sample_lines": [
-        220
+        267
       ],
       "in_existing_en_dict": false
     },
@@ -1069,8 +1069,8 @@
       "text": "최신 정보 로딩",
       "count": 2,
       "sample_lines": [
-        98,
-        99
+        115,
+        116
       ],
       "in_existing_en_dict": false
     },
@@ -1090,7 +1090,7 @@
       "text": "키보드 단축키",
       "count": 1,
       "sample_lines": [
-        103
+        123
       ],
       "in_existing_en_dict": false
     },
@@ -1098,7 +1098,7 @@
       "text": "키보드 단축키 (?)",
       "count": 1,
       "sample_lines": [
-        103
+        122
       ],
       "in_existing_en_dict": false
     },
@@ -1112,7 +1112,7 @@
       "text": "테마",
       "count": 1,
       "sample_lines": [
-        131
+        164
       ],
       "in_existing_en_dict": false
     },
@@ -1150,7 +1150,7 @@
       "text": "펼치기",
       "count": 1,
       "sample_lines": [
-        189
+        235
       ],
       "in_existing_en_dict": false
     },
@@ -1158,7 +1158,7 @@
       "text": "포레스트",
       "count": 1,
       "sample_lines": [
-        145
+        182
       ],
       "in_existing_en_dict": false
     },
@@ -1238,7 +1238,7 @@
       "text": "한국어",
       "count": 1,
       "sample_lines": [
-        151
+        192
       ],
       "in_existing_en_dict": false
     },
@@ -1246,7 +1246,7 @@
       "text": "해당 탭으로 바로 안내해 드릴게요.",
       "count": 1,
       "sample_lines": [
-        201
+        247
       ],
       "in_existing_en_dict": false
     },
@@ -1290,7 +1290,7 @@
       "text": "💬 도우미 모드",
       "count": 1,
       "sample_lines": [
-        208
+        254
       ],
       "in_existing_en_dict": false
     },

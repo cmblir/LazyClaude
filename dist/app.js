@@ -1,11 +1,12 @@
 // ────────────────────────────────────────────────────────────────
 // STATE & HELPERS
 // ────────────────────────────────────────────────────────────────
-const state = { view: 'overview', data: {}, loading: {},
+const state = {
+  view: 'overview', data: {}, loading: {},
   // v2.59.0 — top-level mode filter for the sidebar.
   // 'all' shows everything; 'claude' / 'workflow' / 'providers' show
   // curated subsets defined in MODE_TABS.
-  mode: (() => { try { return localStorage.getItem('cc.mode') || 'all'; } catch(_) { return 'all'; } })(),
+  mode: (() => { try { return localStorage.getItem('cc.mode') || 'all'; } catch (_) { return 'all'; } })(),
 };
 
 const DOCS_BASE = 'https://docs.claude.com/en/docs/claude-code/';
@@ -14,189 +15,315 @@ const DOCS_BASE = 'https://docs.claude.com/en/docs/claude-code/';
 // 신규: learn/main/build/playground/config/observe (advanced 해체 — plans→main, 나머지→config)
 const NAV = [
   // learn — 신기능 · 온보딩 · 문서 · 가이드 (4)
-  { id: 'features', icon: '🆕', label: '신기능', group: 'learn',
-    desc: 'Anthropic 최신 발표 · 카드 클릭 → 창으로 열림 (여러 개 동시 가능)' },
-  { id: 'onboarding', icon: '🚀', label: '시작하기', group: 'learn',
-    desc: '처음 사용자를 위한 단계별 체크리스트 (현재 셋업 자동 감지)' },
-  { id: 'claudeDocs', icon: '📖', label: 'Claude Docs', group: 'learn',
+  {
+    id: 'features', icon: '🆕', label: '신기능', group: 'learn',
+    desc: 'Anthropic 최신 발표 · 카드 클릭 → 창으로 열림 (여러 개 동시 가능)'
+  },
+  {
+    id: 'onboarding', icon: '🚀', label: '시작하기', group: 'learn',
+    desc: '처음 사용자를 위한 단계별 체크리스트 (현재 셋업 자동 감지)'
+  },
+  {
+    id: 'claudeDocs', icon: '📖', label: 'Claude Docs', group: 'learn',
     desc: 'docs.anthropic.com 공식 문서 색인 + 검색',
-    docUrl: 'https://docs.anthropic.com/' },
-  { id: 'guideHub',   icon: '📚', label: '가이드 & 툴', group: 'learn',
-    desc: '외부 가이드 · 유용한 툴 · 베스트 프랙티스 · 치트시트' },
+    docUrl: 'https://docs.anthropic.com/'
+  },
+  {
+    id: 'guideHub', icon: '📚', label: '가이드 & 툴', group: 'learn',
+    desc: '외부 가이드 · 유용한 툴 · 베스트 프랙티스 · 치트시트'
+  },
 
   // main — 한눈에 보기 (6, plans 포함)
-  { id: 'overview',    icon: '✦',  label: '개요',            group: 'main', docUrl: DOCS_BASE+'overview' },
-  { id: 'projects',    icon: '📁', label: '프로젝트',          group: 'main', desc: '프로젝트별 Claude 세팅 + AI 추천', docUrl: DOCS_BASE+'memory' },
-  { id: 'plans',       icon: '🧭', label: '플랜 보관소',
-    group: 'main', desc: 'Plan Mode 로 만든 계획 문서들', docUrl: DOCS_BASE+'plan-mode' },
-  { id: 'analytics',   icon: '📊', label: '통계 & 스코어',      group: 'main', docUrl: DOCS_BASE+'costs' },
-  { id: 'aiEval',      icon: '🤖', label: 'AI 종합 평가',       group: 'main', desc: 'Claude 가 전체 셋업을 보고 우선순위 진단' },
-  { id: 'sessions',    icon: '🗂️', label: '세션 히스토리',      group: 'main', docUrl: DOCS_BASE+'interactive-mode' },
+  { id: 'overview', icon: '✦', label: '개요', group: 'main', docUrl: DOCS_BASE + 'overview' },
+  { id: 'projects', icon: '📁', label: '프로젝트', group: 'main', desc: '프로젝트별 Claude 세팅 + AI 추천', docUrl: DOCS_BASE + 'memory' },
+  {
+    id: 'plans', icon: '🧭', label: '플랜 보관소',
+    group: 'main', desc: 'Plan Mode 로 만든 계획 문서들', docUrl: DOCS_BASE + 'plan-mode'
+  },
+  { id: 'analytics', icon: '📊', label: '통계 & 스코어', group: 'main', docUrl: DOCS_BASE + 'costs' },
+  { id: 'aiEval', icon: '🤖', label: 'AI 종합 평가', group: 'main', desc: 'Claude 가 전체 셋업을 보고 우선순위 진단' },
+  { id: 'sessions', icon: '🗂️', label: '세션 히스토리', group: 'main', docUrl: DOCS_BASE + 'interactive-mode' },
 
   // build — 워크플로우/에이전트/프롬프트 (8)
-  { id: 'crewWizard',  icon: '🧑‍✈️', label: '크루 위저드', group: 'build',
+  {
+    id: 'crewWizard', icon: '🧑‍✈️', label: '크루 위저드', group: 'build',
     desc: '폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 자동 생성',
-    docUrl: null },
-  { id: 'runCenter',   icon: '🎯', label: '런 센터', group: 'build',
+    docUrl: null
+  },
+  {
+    id: 'runCenter', icon: '🎯', label: '런 센터', group: 'build',
     desc: 'ECC 스킬 181개 + 슬래시 명령 79개 + OMC 4모드 + OMX 명령을 검색·1클릭 실행',
-    docUrl: null },
-  { id: 'workflows',   icon: '🔀', label: '워크플로우', group: 'build',
-    desc: '세션 노드를 DAG 로 연결해 업무 흐름 설계' },
-  { id: 'promptLibrary', icon: '📝', label: '프롬프트 라이브러리', group: 'build',
+    docUrl: null
+  },
+  {
+    id: 'workflows', icon: '🔀', label: '워크플로우', group: 'build',
+    desc: '세션 노드를 DAG 로 연결해 업무 흐름 설계'
+  },
+  {
+    id: 'promptLibrary', icon: '📝', label: '프롬프트 라이브러리', group: 'build',
     desc: '자주 쓰는 프롬프트 저장 · 태그 검색 · 워크플로우로 복제',
-    docUrl: null },
-  { id: 'rtk', icon: '🦀', label: 'RTK Optimizer', group: 'build',
+    docUrl: null
+  },
+  {
+    id: 'rtk', icon: '🦀', label: 'RTK Optimizer', group: 'build',
     desc: 'rtk-ai/rtk Rust 프록시로 Claude 토큰 60-90% 절감 · 설치/훅 활성/통계 조회',
-    docUrl: 'https://www.rtk-ai.app/guide' },
-  { id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
-    desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE+'sub-agents' },
-  { id: 'agents',      icon: '🤝', label: '에이전트 & 그래프',  group: 'build', docUrl: DOCS_BASE+'sub-agents' },
-  { id: 'skills',      icon: '✨', label: '스킬',              group: 'build', docUrl: DOCS_BASE+'skills' },
-  { id: 'commands',    icon: '/',  label: '슬래시 명령어',      group: 'build', docUrl: DOCS_BASE+'slash-commands' },
-  { id: 'agentSdkScaffold', icon: '🧪', label: 'Agent SDK 스캐폴드', group: 'build',
+    docUrl: 'https://www.rtk-ai.app/guide'
+  },
+  {
+    id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
+    desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE + 'sub-agents'
+  },
+  { id: 'agents', icon: '🤝', label: '에이전트 & 그래프', group: 'build', docUrl: DOCS_BASE + 'sub-agents' },
+  { id: 'skills', icon: '✨', label: '스킬', group: 'build', docUrl: DOCS_BASE + 'skills' },
+  { id: 'commands', icon: '/', label: '슬래시 명령어', group: 'build', docUrl: DOCS_BASE + 'slash-commands' },
+  {
+    id: 'agentSdkScaffold', icon: '🧪', label: 'Agent SDK 스캐폴드', group: 'build',
     desc: 'claude-agent-sdk Python/TS 프로젝트 뼈대 생성',
-    docUrl: 'https://docs.anthropic.com/en/docs/claude-code/sdk/sdk-overview' },
+    docUrl: 'https://docs.anthropic.com/en/docs/claude-code/sdk/sdk-overview'
+  },
 
   // playground — Claude API 실험실 + AI 프로바이더 + 세션 리플레이 (12)
-  { id: 'aiProviders', icon: '🧠', label: 'AI 프로바이더',
-    group: 'playground', desc: 'Claude/GPT/Gemini/Ollama/Codex 멀티 AI — API 키 · CLI 감지 · 폴백 체인 · 연결 테스트' },
-  { id: 'promptCache', icon: '🧊', label: '프롬프트 캐시 실험실', group: 'playground',
+  {
+    id: 'aiProviders', icon: '🧠', label: 'AI 프로바이더',
+    group: 'playground', desc: 'Claude/GPT/Gemini/Ollama/Codex 멀티 AI — API 키 · CLI 감지 · 폴백 체인 · 연결 테스트'
+  },
+  {
+    id: 'promptCache', icon: '🧊', label: '프롬프트 캐시 실험실', group: 'playground',
     desc: 'Anthropic cache_control 실측 — cache_read / cache_creation 토큰 + 비용 절감',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching' },
-  { id: 'thinkingLab', icon: '🧠', label: 'Extended Thinking', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching'
+  },
+  {
+    id: 'thinkingLab', icon: '🧠', label: 'Extended Thinking', group: 'playground',
     desc: 'Opus/Sonnet thinking block 분리 시각화 — budget_tokens 슬라이더',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking' },
-  { id: 'toolUseLab',  icon: '🛠️', label: 'Tool Use 플레이그라운드', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking'
+  },
+  {
+    id: 'toolUseLab', icon: '🛠️', label: 'Tool Use 플레이그라운드', group: 'playground',
     desc: 'tool schema 정의 → tool_use 수신 → tool_result 피드 멀티 턴',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
-  { id: 'batchJobs',   icon: '📦', label: '배치 작업', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use'
+  },
+  {
+    id: 'batchJobs', icon: '📦', label: '배치 작업', group: 'playground',
     desc: 'Message Batches API — 대용량 프롬프트 병렬 제출 · JSONL 결과',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/message-batches' },
-  { id: 'apiFiles',    icon: '📎', label: 'Files API', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/message-batches'
+  },
+  {
+    id: 'apiFiles', icon: '📎', label: 'Files API', group: 'playground',
     desc: '파일 업로드 · 목록 · 삭제 + 메시지에 document reference',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/files' },
-  { id: 'visionLab',   icon: '👁️', label: 'Vision / PDF', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/files'
+  },
+  {
+    id: 'visionLab', icon: '👁️', label: 'Vision / PDF', group: 'playground',
     desc: '이미지/PDF → Opus·Sonnet·Haiku 3 모델 병렬 비교',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/vision' },
-  { id: 'modelBench',  icon: '🏁', label: '모델 벤치마크', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/vision'
+  },
+  {
+    id: 'modelBench', icon: '🏁', label: '모델 벤치마크', group: 'playground',
     desc: '프롬프트 셋 × 모델 교차 실행 → 평균 지연/토큰/비용 집계',
-    docUrl: 'https://docs.anthropic.com/en/docs/about-claude/models' },
-  { id: 'serverTools', icon: '🧰', label: '공식 내장 Tools', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/about-claude/models'
+  },
+  {
+    id: 'serverTools', icon: '🧰', label: '공식 내장 Tools', group: 'playground',
     desc: 'Anthropic hosted web_search / code_execution 실습',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use' },
-  { id: 'citationsLab', icon: '📑', label: 'Citations', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/tool-use'
+  },
+  {
+    id: 'citationsLab', icon: '📑', label: 'Citations', group: 'playground',
     desc: '문서 + citations.enabled → 인용 span 하이라이트',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/citations' },
-  { id: 'embeddingLab', icon: '🧬', label: 'Embedding 비교', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/citations'
+  },
+  {
+    id: 'embeddingLab', icon: '🧬', label: 'Embedding 비교', group: 'playground',
     desc: 'Voyage / OpenAI / Ollama 임베딩 cosine rank 매트릭스 비교',
-    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/embeddings' },
-  { id: 'sessionReplay', icon: '🎞️', label: 'Session Replay', group: 'playground',
+    docUrl: 'https://docs.anthropic.com/en/docs/build-with-claude/embeddings'
+  },
+  {
+    id: 'sessionReplay', icon: '🎞️', label: 'Session Replay', group: 'playground',
     desc: 'Claude Code JSONL 세션 로그 타임라인 재생 · 툴 호출 강조 · 누적 토큰 차트',
-    docUrl: null },
+    docUrl: null
+  },
   // v2.42.0 — four new Anthropic API features
-  { id: 'computerUseLab', icon: '🖱️', label: 'Computer Use', group: 'playground',
+  {
+    id: 'computerUseLab', icon: '🖱️', label: 'Computer Use', group: 'playground',
     desc: 'computer-use-2025-01-24 beta · screenshot+mouse+key 시연 (plan-only, 안전)',
-    docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool' },
-  { id: 'memoryLab', icon: '🧩', label: 'Memory Tool', group: 'playground',
+    docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool'
+  },
+  {
+    id: 'memoryLab', icon: '🧩', label: 'Memory Tool', group: 'playground',
     desc: 'memory-2025-08-18 beta · 서버측 memory blocks · 기억/회상/삭제 라운드트립',
-    docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool' },
-  { id: 'advisorLab', icon: '🧭', label: 'Advisor Tool', group: 'playground',
+    docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool'
+  },
+  {
+    id: 'advisorLab', icon: '🧭', label: 'Advisor Tool', group: 'playground',
     desc: 'Executor (Haiku) + Advisor (Opus) 페어링 · 토큰/비용/지연 델타 비교',
-    docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool' },
-  { id: 'routines', icon: '🔁', label: 'Routines', group: 'config',
+    docUrl: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool'
+  },
+  {
+    id: 'routines', icon: '🔁', label: 'Routines', group: 'config',
     desc: '~/.claude/scheduled-tasks/*.yaml CRUD + 즉시 실행 — Claude Code Routines',
-    docUrl: 'https://docs.claude.com/en/docs/claude-code/routines' },
-  { id: 'learner', icon: '🎓', label: 'Learner', group: 'build',
+    docUrl: 'https://docs.claude.com/en/docs/claude-code/routines'
+  },
+  {
+    id: 'learner', icon: '🎓', label: 'Learner', group: 'build',
     desc: '최근 세션 JSONL 에서 반복 tool 시퀀스/프롬프트 자동 추출 → Prompt Library / 워크플로우 제안',
-    docUrl: null },
-  { id: 'artifacts', icon: '🎨', label: 'Artifacts Viewer', group: 'build',
+    docUrl: null
+  },
+  {
+    id: 'artifacts', icon: '🎨', label: 'Artifacts Viewer', group: 'build',
     desc: '워크플로우 출력(HTML/SVG/Markdown/JSON)을 sandbox iframe + CSP + 정적 필터로 안전 미리보기',
-    docUrl: null },
-  { id: 'orchestrator', icon: '🎼', label: 'Orchestrator', group: 'build',
+    docUrl: null
+  },
+  {
+    id: 'orchestrator', icon: '🎼', label: 'Orchestrator', group: 'build',
     desc: 'Slack/Telegram/Discord 채널 멘션 → Claude 플래너 → 멀티 모델 병렬 분담 → 채널 회신. 채널별 fallback + 일일 예산 cap.',
-    docUrl: null },
-  { id: 'ralph', icon: '🦞', label: 'Ralph Loop', group: 'build',
+    docUrl: null
+  },
+  {
+    id: 'ralph', icon: '🦞', label: 'Ralph Loop', group: 'build',
     desc: 'Geoffrey Huntley Ralph Wiggum 패턴 — 같은 PROMPT.md를 4중 안전장치 안에서 반복. 프로젝트 추천기 + 라이브 SSE + CLI.',
-    docUrl: null },
+    docUrl: null
+  },
 
   // config — Claude Code 설정 전반 (13, advanced 흡수)
-  { id: 'hooks',       icon: '🪝', label: '훅',
-    group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE+'hooks' },
-  { id: 'eventForwarder', icon: '📤', label: 'Event Forwarder',
+  {
+    id: 'hooks', icon: '🪝', label: '훅',
+    group: 'config', desc: '이벤트(프롬프트 전/후, 도구 사용 등) 시 자동 실행되는 쉘 훅', docUrl: DOCS_BASE + 'hooks'
+  },
+  {
+    id: 'eventForwarder', icon: '📤', label: 'Event Forwarder',
     group: 'config', desc: 'Claude Code hook 이벤트를 외부 HTTP endpoint 로 포워딩 · 호스트 화이트리스트',
-    docUrl: DOCS_BASE+'hooks' },
-  { id: 'permissions', icon: '🔐', label: '권한',
-    group: 'config', desc: '허용/차단할 도구·명령 규칙. deny가 안전도를 높입니다', docUrl: DOCS_BASE+'iam' },
-  { id: 'mcp',         icon: '🔗', label: 'MCP 커넥터',
-    group: 'config', desc: '외부 시스템(DB·GitHub·브라우저 등)과 연결하는 MCP 서버', docUrl: DOCS_BASE+'mcp' },
-  { id: 'plugins',     icon: '🔌', label: '플러그인',
-    group: 'config', desc: '마켓플레이스에서 설치한 기능 팩(스킬+에이전트+명령어 묶음)', docUrl: DOCS_BASE+'plugins' },
-  { id: 'marketplaces',icon: '🏪', label: '마켓플레이스',
-    group: 'config', desc: '플러그인 마켓 추가/삭제 (git URL)', docUrl: DOCS_BASE+'plugins' },
-  { id: 'settings',    icon: '⚙️', label: 'Settings 편집',
-    group: 'config', desc: '~/.claude/settings.json 직접 편집 + 추천 프로파일 원클릭', docUrl: DOCS_BASE+'settings' },
-  { id: 'zclaude',     icon: '🛣️', label: 'zclaude (CCR)',
-    group: 'config', desc: 'Claude Code를 GLM/Z.AI/DeepSeek 등 다른 LLM으로 라우팅 + zclaude 별칭 안내' },
-  { id: 'claudemd',    icon: '📜', label: 'CLAUDE.md',
-    group: 'config', desc: '모든 세션 시작 시 로드되는 글로벌 지침(기억·규칙·취향)', docUrl: DOCS_BASE+'memory' },
-  { id: 'envConfig',   icon: '🌿', label: '환경 변수',
-    group: 'config', desc: 'ANTHROPIC_MODEL, CLAUDE_CONFIG_DIR, 프록시 등', docUrl: DOCS_BASE+'settings#environment-variables' },
-  { id: 'modelConfig', icon: '🧬', label: '모델 설정',
-    group: 'config', desc: 'settings.json 의 model / autoUpdates / cleanup 등', docUrl: DOCS_BASE+'settings' },
-  { id: 'outputStyles',icon: '🎨', label: '출력 스타일',
-    group: 'config', desc: '답변 톤/포맷을 바꾸는 output styles', docUrl: DOCS_BASE+'output-styles' },
-  { id: 'statusline',  icon: '📡', label: '상태라인 / 키바인딩',
-    group: 'config', desc: 'Claude Code 하단 상태라인, 키 바인딩', docUrl: DOCS_BASE+'statusline' },
-  { id: 'ideStatus',   icon: '💻', label: 'IDE 통합',
-    group: 'config', desc: 'VS Code/JetBrains 연결 상태, 감지된 터미널', docUrl: DOCS_BASE+'ide-integrations' },
-  { id: 'scheduled',   icon: '⏰', label: '예약된 작업',
-    group: 'config', desc: '~/.claude/scheduled-tasks/ 정의 스킬', docUrl: DOCS_BASE+'overview' },
+    docUrl: DOCS_BASE + 'hooks'
+  },
+  {
+    id: 'permissions', icon: '🔐', label: '권한',
+    group: 'config', desc: '허용/차단할 도구·명령 규칙. deny가 안전도를 높입니다', docUrl: DOCS_BASE + 'iam'
+  },
+  {
+    id: 'mcp', icon: '🔗', label: 'MCP 커넥터',
+    group: 'config', desc: '외부 시스템(DB·GitHub·브라우저 등)과 연결하는 MCP 서버', docUrl: DOCS_BASE + 'mcp'
+  },
+  {
+    id: 'plugins', icon: '🔌', label: '플러그인',
+    group: 'config', desc: '마켓플레이스에서 설치한 기능 팩(스킬+에이전트+명령어 묶음)', docUrl: DOCS_BASE + 'plugins'
+  },
+  {
+    id: 'marketplaces', icon: '🏪', label: '마켓플레이스',
+    group: 'config', desc: '플러그인 마켓 추가/삭제 (git URL)', docUrl: DOCS_BASE + 'plugins'
+  },
+  {
+    id: 'settings', icon: '⚙️', label: 'Settings 편집',
+    group: 'config', desc: '~/.claude/settings.json 직접 편집 + 추천 프로파일 원클릭', docUrl: DOCS_BASE + 'settings'
+  },
+  {
+    id: 'zclaude', icon: '🛣️', label: 'zclaude (CCR)',
+    group: 'config', desc: 'Claude Code를 GLM/Z.AI/DeepSeek 등 다른 LLM으로 라우팅 + zclaude 별칭 안내'
+  },
+  {
+    id: 'claudemd', icon: '📜', label: 'CLAUDE.md',
+    group: 'config', desc: '모든 세션 시작 시 로드되는 글로벌 지침(기억·규칙·취향)', docUrl: DOCS_BASE + 'memory'
+  },
+  {
+    id: 'envConfig', icon: '🌿', label: '환경 변수',
+    group: 'config', desc: 'ANTHROPIC_MODEL, CLAUDE_CONFIG_DIR, 프록시 등', docUrl: DOCS_BASE + 'settings#environment-variables'
+  },
+  {
+    id: 'modelConfig', icon: '🧬', label: '모델 설정',
+    group: 'config', desc: 'settings.json 의 model / autoUpdates / cleanup 등', docUrl: DOCS_BASE + 'settings'
+  },
+  {
+    id: 'outputStyles', icon: '🎨', label: '출력 스타일',
+    group: 'config', desc: '답변 톤/포맷을 바꾸는 output styles', docUrl: DOCS_BASE + 'output-styles'
+  },
+  {
+    id: 'statusline', icon: '📡', label: '상태라인 / 키바인딩',
+    group: 'config', desc: 'Claude Code 하단 상태라인, 키 바인딩', docUrl: DOCS_BASE + 'statusline'
+  },
+  {
+    id: 'ideStatus', icon: '💻', label: 'IDE 통합',
+    group: 'config', desc: 'VS Code/JetBrains 연결 상태, 감지된 터미널', docUrl: DOCS_BASE + 'ide-integrations'
+  },
+  {
+    id: 'scheduled', icon: '⏰', label: '예약된 작업',
+    group: 'config', desc: '~/.claude/scheduled-tasks/ 정의 스킬', docUrl: DOCS_BASE + 'overview'
+  },
 
   // observe — 비용/메트릭/세션 관측 (11)
-  { id: 'costsTimeline', icon: '💸', label: '비용 타임라인', group: 'observe',
-    desc: '모든 플레이그라운드/워크플로우 비용 통합 타임라인' },
-  { id: 'usage',       icon: '💳', label: '사용량 / 비용',
-    group: 'observe', desc: '최근 도구 호출 통계 + 일자별 그래프', docUrl: DOCS_BASE+'costs' },
-  { id: 'metrics',     icon: '📉', label: '토큰 메트릭',
-    group: 'observe', desc: 'metrics/costs.jsonl 토큰 사용량 시계열', docUrl: DOCS_BASE+'monitoring-usage' },
-  { id: 'memory',      icon: '🧠', label: '프로젝트 메모리',
-    group: 'observe', desc: '~/.claude/projects/*/memory 자동 기억', docUrl: DOCS_BASE+'memory' },
-  { id: 'tasks',       icon: '✅', label: '태스크 / TODO',
-    group: 'observe', desc: '세션별 TaskCreate 저장소', docUrl: DOCS_BASE+'overview' },
-  { id: 'backups',     icon: '💾', label: '백업 / 파일 히스토리',
-    group: 'observe', desc: 'backups/, file-history/, shell-snapshots/ 관측', docUrl: DOCS_BASE+'troubleshooting' },
-  { id: 'bashHistory', icon: '📜', label: '셸 명령 기록',
-    group: 'observe', desc: 'Bash 도구 실행 히스토리 (~/.claude/bash-commands.log)', docUrl: DOCS_BASE+'settings' },
-  { id: 'telemetry',   icon: '📡', label: '텔레메트리',
-    group: 'observe', desc: 'Claude Code 내부 이벤트 로그', docUrl: DOCS_BASE+'monitoring-usage' },
-  { id: 'homunculus',  icon: '🏠', label: 'Homunculus',
-    group: 'observe', desc: 'Claude Code 내부 프로젝트 추적기', docUrl: DOCS_BASE+'overview' },
-  { id: 'team',        icon: '👨‍👩‍👧', label: '팀 / 조직',
-    group: 'observe', desc: '워크스페이스 / 조직 정보 (claude.ai)', docUrl: 'https://claude.ai/settings/organization' },
-  { id: 'system',      icon: '🖥️', label: '시스템 상태',       group: 'observe', docUrl: DOCS_BASE+'troubleshooting' },
+  {
+    id: 'costsTimeline', icon: '💸', label: '비용 타임라인', group: 'observe',
+    desc: '모든 플레이그라운드/워크플로우 비용 통합 타임라인'
+  },
+  {
+    id: 'usage', icon: '💳', label: '사용량 / 비용',
+    group: 'observe', desc: '최근 도구 호출 통계 + 일자별 그래프', docUrl: DOCS_BASE + 'costs'
+  },
+  {
+    id: 'metrics', icon: '📉', label: '토큰 메트릭',
+    group: 'observe', desc: 'metrics/costs.jsonl 토큰 사용량 시계열', docUrl: DOCS_BASE + 'monitoring-usage'
+  },
+  {
+    id: 'memory', icon: '🧠', label: '프로젝트 메모리',
+    group: 'observe', desc: '~/.claude/projects/*/memory 자동 기억', docUrl: DOCS_BASE + 'memory'
+  },
+  {
+    id: 'tasks', icon: '✅', label: '태스크 / TODO',
+    group: 'observe', desc: '세션별 TaskCreate 저장소', docUrl: DOCS_BASE + 'overview'
+  },
+  {
+    id: 'backups', icon: '💾', label: '백업 / 파일 히스토리',
+    group: 'observe', desc: 'backups/, file-history/, shell-snapshots/ 관측', docUrl: DOCS_BASE + 'troubleshooting'
+  },
+  {
+    id: 'bashHistory', icon: '📜', label: '셸 명령 기록',
+    group: 'observe', desc: 'Bash 도구 실행 히스토리 (~/.claude/bash-commands.log)', docUrl: DOCS_BASE + 'settings'
+  },
+  {
+    id: 'telemetry', icon: '📡', label: '텔레메트리',
+    group: 'observe', desc: 'Claude Code 내부 이벤트 로그', docUrl: DOCS_BASE + 'monitoring-usage'
+  },
+  {
+    id: 'homunculus', icon: '🏠', label: 'Homunculus',
+    group: 'observe', desc: 'Claude Code 내부 프로젝트 추적기', docUrl: DOCS_BASE + 'overview'
+  },
+  {
+    id: 'team', icon: '👨‍👩‍👧', label: '팀 / 조직',
+    group: 'observe', desc: '워크스페이스 / 조직 정보 (claude.ai)', docUrl: 'https://claude.ai/settings/organization'
+  },
+  { id: 'system', icon: '🖥️', label: '시스템 상태', group: 'observe', docUrl: DOCS_BASE + 'troubleshooting' },
   // v2.44.0 — process / port / memory monitors
-  { id: 'openPorts',     icon: '🔌', label: '열린 포트 모니터',
-    group: 'observe', desc: 'TCP/UDP listening 소켓 + PID/Command/User · 한 번 클릭으로 프로세스 종료' },
-  { id: 'cliSessions',   icon: '🧑‍💻', label: '활성 CLI 세션',
-    group: 'observe', desc: 'Claude Code CLI 세션의 PID·RSS·CPU·idle 시간 + 터미널 포커스 / SIGTERM' },
-  { id: 'memoryManager', icon: '🧮', label: '메모리 관리',
-    group: 'observe', desc: 'vm_stat 기반 시스템 메모리 + 상위 30 프로세스 + idle Claude Code 일괄 종료' },
-  { id: 'autoResumeManager', icon: '🔄', label: 'Auto-Resume 관리',
-    group: 'reliability', desc: '활성 바인딩 리스트 + 일괄 취소' },
-  { id: 'backupRestore', icon: '💾', label: '백업 & 복원',
-    group: 'reliability', desc: '워크플로우/AR/AI 키/설정 스냅샷 + 복원' },
-  { id: 'securityScan', icon: '🛡️', label: 'Security Scan',
+  {
+    id: 'openPorts', icon: '🔌', label: '열린 포트 모니터',
+    group: 'observe', desc: 'TCP/UDP listening 소켓 + PID/Command/User · 한 번 클릭으로 프로세스 종료'
+  },
+  {
+    id: 'cliSessions', icon: '🧑‍💻', label: '활성 CLI 세션',
+    group: 'observe', desc: 'Claude Code CLI 세션의 PID·RSS·CPU·idle 시간 + 터미널 포커스 / SIGTERM'
+  },
+  {
+    id: 'memoryManager', icon: '🧮', label: '메모리 관리',
+    group: 'observe', desc: 'vm_stat 기반 시스템 메모리 + 상위 30 프로세스 + idle Claude Code 일괄 종료'
+  },
+  {
+    id: 'autoResumeManager', icon: '🔄', label: 'Auto-Resume 관리',
+    group: 'reliability', desc: '활성 바인딩 리스트 + 일괄 취소'
+  },
+  {
+    id: 'backupRestore', icon: '💾', label: '백업 & 복원',
+    group: 'reliability', desc: '워크플로우/AR/AI 키/설정 스냅샷 + 복원'
+  },
+  {
+    id: 'securityScan', icon: '🛡️', label: 'Security Scan',
     group: 'observe', desc: '~/.claude 정적 검사 — 시크릿 / 위험 훅 / 과도한 권한 / 신뢰 불가 MCP',
-    docUrl: DOCS_BASE+'security' },
+    docUrl: DOCS_BASE + 'security'
+  },
 ];
 const GROUPS = [
-  { id: 'learn',      icon: '🆕', label: '학습',         short: '학습',   desc: '신기능 · 온보딩 · 공식 문서 · 가이드' },
-  { id: 'main',       icon: '🏠', label: '메인',         short: '메인',   desc: '대시보드 · 프로젝트 · 플랜 · 세션' },
-  { id: 'build',      icon: '🔀', label: '빌드',         short: '빌드',   desc: '워크플로우 · 에이전트 · 프롬프트' },
+  { id: 'learn', icon: '🆕', label: '학습', short: '학습', desc: '신기능 · 온보딩 · 공식 문서 · 가이드' },
+  { id: 'main', icon: '🏠', label: '메인', short: '메인', desc: '대시보드 · 프로젝트 · 플랜 · 세션' },
+  { id: 'build', icon: '🔀', label: '빌드', short: '빌드', desc: '워크플로우 · 에이전트 · 프롬프트' },
   { id: 'playground', icon: '🧪', label: '플레이그라운드', short: '실험실', desc: 'Claude API 실험 12종 + 프로바이더' },
-  { id: 'config',     icon: '⚙️', label: '구성',         short: '구성',   desc: '훅 · 권한 · MCP · 플러그인 · 설정' },
-  { id: 'observe',    icon: '📊', label: '관측',         short: '관측',   desc: '비용 · 메트릭 · 시스템 관측' },
-  { id: 'reliability',icon: '🛟', label: '안정성',       short: '안정성', desc: 'Auto-Resume · 자동 복구 · 바인딩 관리' },
+  { id: 'config', icon: '⚙️', label: '구성', short: '구성', desc: '훅 · 권한 · MCP · 플러그인 · 설정' },
+  { id: 'observe', icon: '📊', label: '관측', short: '관측', desc: '비용 · 메트릭 · 시스템 관측' },
+  { id: 'reliability', icon: '🛟', label: '안정성', short: '안정성', desc: 'Auto-Resume · 자동 복구 · 바인딩 관리' },
 ];
 
 function viewHeader(title, subtitle, viewId) {
@@ -312,7 +439,7 @@ async function api(path, opts = {}) {
       try {
         const j = await r.json();
         msg = errMsg(j);
-      } catch {}
+      } catch { }
       throw new Error(msg);
     }
     return r.json();
@@ -337,7 +464,7 @@ function errMsg(r) {
   return (r.error_key && t(r.error_key) !== r.error_key) ? t(r.error_key) : (r.error || 'error');
 }
 
-function toast(msg, kind='info') {
+function toast(msg, kind = 'info') {
   const div = document.createElement('div');
   // V1 (v2.66.8) — toast styling unified. The kind-specific class adds
   // a left-border tint matching the .lc-* palette (purple/blue/amber/rose
@@ -361,7 +488,7 @@ function toast(msg, kind='info') {
   const copyBtn = isFailure
     ? `<button class="btn-ghost btn text-[11px] px-2 py-0.5 ml-2" data-toast-copy="${msgAttr}" title="${t('복사')}" aria-label="${t('복사')}">📋</button>`
     : '';
-  div.innerHTML = `<span>${({info:'ℹ️', ok:'✅', err:'❌', warn:'⚠️'})[kind]||'ℹ️'}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(msg)}</span>${copyBtn}`;
+  div.innerHTML = `<span>${({ info: 'ℹ️', ok: '✅', err: '❌', warn: '⚠️' })[kind] || 'ℹ️'}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(msg)}</span>${copyBtn}`;
   // QQ223 — bind copy handler imperatively. data-toast-copy holds
   // the JSON-encoded message; we parse it back at click time so
   // arbitrary quotes/backticks survive without poisoning HTML.
@@ -378,7 +505,7 @@ function toast(msg, kind='info') {
             navigator.clipboard.writeText(raw);
           }
           cb.textContent = '✓';
-          setTimeout(() => { try { cb.textContent = '📋'; } catch (_) {} }, 1200);
+          setTimeout(() => { try { cb.textContent = '📋'; } catch (_) { } }, 1200);
         } catch (_) { /* best-effort */ }
       });
     }
@@ -386,12 +513,12 @@ function toast(msg, kind='info') {
   _translateDOM(div);
   document.getElementById('toast').appendChild(div);
   const holdMs = isFailure ? 6000 : 2600;
-  setTimeout(() => div.style.opacity='0', holdMs);
+  setTimeout(() => div.style.opacity = '0', holdMs);
   setTimeout(() => div.remove(), holdMs + 600);
 }
 
 // v2.46.0 perf — hoist replacement map so it isn't reallocated per call.
-const _ESC_HTML_MAP = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+const _ESC_HTML_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => _ESC_HTML_MAP[ch]);
@@ -427,7 +554,7 @@ function _renderEmail(email) {
   if (email == null) return '';
   const s = String(email);
   let showFull = false;
-  try { showFull = localStorage.getItem('cc.showFullEmail') === '1'; } catch (_) {}
+  try { showFull = localStorage.getItem('cc.showFullEmail') === '1'; } catch (_) { }
   if (showFull) return escapeHtml(s);
   const at = s.indexOf('@');
   if (at <= 0) return escapeHtml(s);   // no local part to redact
@@ -460,11 +587,11 @@ function _errorState(msg) {
 
 function _toggleShowFullEmail() {
   let cur = false;
-  try { cur = localStorage.getItem('cc.showFullEmail') === '1'; } catch (_) {}
-  try { localStorage.setItem('cc.showFullEmail', cur ? '0' : '1'); } catch (_) {}
+  try { cur = localStorage.getItem('cc.showFullEmail') === '1'; } catch (_) { }
+  try { localStorage.setItem('cc.showFullEmail', cur ? '0' : '1'); } catch (_) { }
   if (typeof renderView === 'function') renderView();
   if (typeof _renderCliStatus === 'function') {
-    try { _renderCliStatus(); } catch (_) {}
+    try { _renderCliStatus(); } catch (_) { }
   }
 }
 // JSON 객체를 HTML 속성(작은/큰따옴표 모두 안전) 으로 인코딩
@@ -474,22 +601,22 @@ function jsonAttr(obj) {
 function fmtMs(ms) {
   if (!ms) return '—';
   const d = new Date(ms);
-  return d.toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+  return d.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 function fmtRel(ms) {
   if (!ms) return '—';
   const d = Math.max(0, Math.floor((Date.now() - ms) / 1000));
   if (d < 60) return `${d}초 전`;
-  if (d < 3600) return `${Math.floor(d/60)}분 전`;
-  if (d < 86400) return `${Math.floor(d/3600)}시간 전`;
-  return `${Math.floor(d/86400)}일 전`;
+  if (d < 3600) return `${Math.floor(d / 60)}분 전`;
+  if (d < 86400) return `${Math.floor(d / 3600)}시간 전`;
+  return `${Math.floor(d / 86400)}일 전`;
 }
 function fmtDur(ms) {
   if (!ms) return '—';
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s/60)}m ${s%60}s`;
-  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
 }
 function scoreColor(n) {
   n = Number(n) || 0;
@@ -513,29 +640,29 @@ function scoreColor(n) {
 // audit, easy to reorganise without touching the NAV array.
 const MODE_TABS = {
   claude: new Set([
-    'features','onboarding','guideHub','overview','projects','analytics',
-    'aiEval','sessions','agents','projectAgents','skills','commands',
-    'sessionReplay','rtk',
-    'hooks','permissions','mcp','plugins','marketplaces','settings',
-    'claudemd','envConfig','modelConfig','statusline',
-    'memory','memoryManager','tasks','plans','outputStyles','team',
-    'eventForwarder','autoResumeManager','backupRestore','backups',
-    'system','telemetry','metrics','costsTimeline',
-    'securityScan','claudeDocs','zclaude','homunculus','routines',
-    'usage','ideStatus','scheduled','bashHistory','cliSessions','openPorts',
+    'features', 'onboarding', 'guideHub', 'overview', 'projects', 'analytics',
+    'aiEval', 'sessions', 'agents', 'projectAgents', 'skills', 'commands',
+    'sessionReplay', 'rtk',
+    'hooks', 'permissions', 'mcp', 'plugins', 'marketplaces', 'settings',
+    'claudemd', 'envConfig', 'modelConfig', 'statusline',
+    'memory', 'memoryManager', 'tasks', 'plans', 'outputStyles', 'team',
+    'eventForwarder', 'autoResumeManager', 'backupRestore', 'backups',
+    'system', 'telemetry', 'metrics', 'costsTimeline',
+    'securityScan', 'claudeDocs', 'zclaude', 'homunculus', 'routines',
+    'usage', 'ideStatus', 'scheduled', 'bashHistory', 'cliSessions', 'openPorts',
   ]),
   workflow: new Set([
-    'workflows','runCenter','promptLibrary','agentSdkScaffold',
-    'learner','artifacts','crewWizard',
-    'agents','projectAgents','skills','commands',
+    'workflows', 'runCenter', 'promptLibrary', 'agentSdkScaffold',
+    'learner', 'artifacts', 'crewWizard',
+    'agents', 'projectAgents', 'skills', 'commands',
     'settings',
   ]),
   providers: new Set([
-    'aiProviders','modelConfig',
-    'promptCache','thinkingLab','toolUseLab','batchJobs','apiFiles',
-    'visionLab','modelBench','serverTools','citationsLab','embeddingLab',
-    'computerUseLab','memoryLab','advisorLab',
-    'costsTimeline','zclaude','envConfig','settings',
+    'aiProviders', 'modelConfig',
+    'promptCache', 'thinkingLab', 'toolUseLab', 'batchJobs', 'apiFiles',
+    'visionLab', 'modelBench', 'serverTools', 'citationsLab', 'embeddingLab',
+    'computerUseLab', 'memoryLab', 'advisorLab',
+    'costsTimeline', 'zclaude', 'envConfig', 'settings',
   ]),
 };
 
@@ -553,7 +680,7 @@ const MODE_TABS = {
     localStorage.removeItem('cc.mode.lazyclaw.counts');
     localStorage.removeItem('cc.mode.openclaw.lastTab');
     localStorage.removeItem('cc.mode.openclaw.counts');
-  } catch (_) {}
+  } catch (_) { }
 })();
 
 function _getMode() {
@@ -564,10 +691,10 @@ function _getMode() {
 // to whatever you last viewed in that mode. Defaults below seed the very
 // first switch.
 const MODE_DEFAULT_TAB = {
-  all:        'overview',
-  claude:     'overview',
-  workflow:   'workflows',
-  providers:  'aiProviders',
+  all: 'overview',
+  claude: 'overview',
+  workflow: 'workflows',
+  providers: 'aiProviders',
 };
 
 function _modeLastTab(m) {
@@ -576,21 +703,21 @@ function _modeLastTab(m) {
     if (stored && (m === 'all' || (MODE_TABS[m] && MODE_TABS[m].has(stored)))) {
       return stored;
     }
-  } catch (_) {}
+  } catch (_) { }
   return MODE_DEFAULT_TAB[m] || 'overview';
 }
 
 function _rememberLastTab(mode, tabId) {
   try { localStorage.setItem('cc.mode.' + mode + '.lastTab', tabId); }
-  catch (_) {}
+  catch (_) { }
 }
 
 function setMode(m) {
-  if (!['all','claude','workflow','providers'].includes(m)) m = 'all';
+  if (!['all', 'claude', 'workflow', 'providers'].includes(m)) m = 'all';
   // Remember the tab the user was on in the OLD mode before switching.
   const prev = state.mode || 'all';
   if (state.view) _rememberLastTab(prev, state.view);
-  try { localStorage.setItem('cc.mode', m); } catch (_) {}
+  try { localStorage.setItem('cc.mode', m); } catch (_) { }
   state.mode = m;
   // S1 (v2.66.5) — body data attribute drives the mode-aware accent stripe.
   if (document && document.body) document.body.dataset.mode = m;
@@ -717,7 +844,7 @@ function renderNav() {
       el.title = n.label + (n.desc ? ' — ' + n.desc : '');
       const descHtml = n.desc ? `<div class="nav-desc text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">${escapeHtml(t(n.desc))}</div>` : '';
       const isFav = _isFavoriteTab(n.id);
-      const favBtn = `<button class="nav-fav-btn" aria-label="${isFav?t('즐겨찾기 해제'):t('즐겨찾기 추가')}" title="${isFav?t('즐겨찾기 해제'):t('즐겨찾기 추가')}" style="${isFav?'':'opacity:0.4;'}">${isFav?'★':'☆'}</button>`;
+      const favBtn = `<button class="nav-fav-btn" aria-label="${isFav ? t('즐겨찾기 해제') : t('즐겨찾기 추가')}" title="${isFav ? t('즐겨찾기 해제') : t('즐겨찾기 추가')}" style="${isFav ? '' : 'opacity:0.4;'}">${isFav ? '★' : '☆'}</button>`;
       // I3 (v2.61.0) — 🔥 hot badge for the current mode's top-3 tabs.
       const _topInThisMode = _topTabsForMode(state.mode || 'all', 3);
       const isHot = _topInThisMode.includes(n.id);
@@ -729,9 +856,9 @@ function renderNav() {
       let modeBadges = '';
       if ((state.mode || 'all') === 'all') {
         const tags = [];
-        if (MODE_TABS.claude.has(n.id))    tags.push({ k:'C',  c:'#a78bfa', t:'Claude' });
-        if (MODE_TABS.workflow.has(n.id))  tags.push({ k:'W',  c:'#60a5fa', t:'Workflow' });
-        if (MODE_TABS.providers.has(n.id)) tags.push({ k:'P',  c:'#fbbf24', t:'Providers' });
+        if (MODE_TABS.claude.has(n.id)) tags.push({ k: 'C', c: '#a78bfa', t: 'Claude' });
+        if (MODE_TABS.workflow.has(n.id)) tags.push({ k: 'W', c: '#60a5fa', t: 'Workflow' });
+        if (MODE_TABS.providers.has(n.id)) tags.push({ k: 'P', c: '#fbbf24', t: 'Providers' });
         if (tags.length) {
           modeBadges = '<div class="nav-mode-badges" style="display:inline-flex;gap:2px;margin-left:4px;">'
             + tags.map(x => `<span title="${x.t}" style="font-size:8px;padding:1px 3px;border-radius:3px;background:${x.c}22;color:${x.c};font-weight:600;line-height:1;">${x.k}</span>`).join('')
@@ -877,9 +1004,9 @@ function go(id) {
   // this on tab-leave when registered, but not every view registers
   // one — defence in depth.
   if (id !== state.view) {
-    try { if (state.data._orchEs) { state.data._orchEs.close(); state.data._orchEs = null; } } catch (_) {}
-    try { if (state.data._ralphEs) { state.data._ralphEs.close(); state.data._ralphEs = null; } } catch (_) {}
-    try { if (state.data._ralphPollTimer) { clearInterval(state.data._ralphPollTimer); state.data._ralphPollTimer = null; } } catch (_) {}
+    try { if (state.data._orchEs) { state.data._orchEs.close(); state.data._orchEs = null; } } catch (_) { }
+    try { if (state.data._ralphEs) { state.data._ralphEs.close(); state.data._ralphEs = null; } } catch (_) { }
+    try { if (state.data._ralphPollTimer) { clearInterval(state.data._ralphPollTimer); state.data._ralphPollTimer = null; } } catch (_) { }
   }
   // 히스토리에 기록 — 알트 ±로 이동 중일 때는 append 안 함
   if (!_tabNavigating && id !== _tabHistory[_tabHistoryIdx]) {
@@ -889,13 +1016,13 @@ function go(id) {
     _tabHistoryIdx = _tabHistory.length - 1;
   }
   // v2.40.0 — recent-tabs MRU (localStorage). Capped at prefs.ui.recentTabsLimit.
-  try { _pushRecentTab(id); } catch {}
+  try { _pushRecentTab(id); } catch { }
   state.view = id;
   location.hash = '#/' + id;
   // H1 (v2.60.0) — per-mode last-tab memory.
-  try { _rememberLastTab(state.mode || 'all', id); } catch {}
+  try { _rememberLastTab(state.mode || 'all', id); } catch { }
   // I3 (v2.61.0) — per-mode visit counter for "most-used" 🔥 badge.
-  try { _bumpModeTabCounter(state.mode || 'all', id); } catch {}
+  try { _bumpModeTabCounter(state.mode || 'all', id); } catch { }
   renderNav();
   renderView();
 }
@@ -916,11 +1043,11 @@ function _bumpModeTabCounter(mode, tabId) {
   const counts = _modeTabCounts(mode);
   counts[tabId] = Math.min((counts[tabId] || 0) + 1, _COUNT_CAP);
   try { localStorage.setItem('cc.mode.' + mode + '.counts', JSON.stringify(counts)); }
-  catch (_) {}
+  catch (_) { }
 }
 
 function _openModeUsageModal() {
-  const modes = ['all','claude','workflow','providers'];
+  const modes = ['all', 'claude', 'workflow', 'providers'];
   const navById = {};
   NAV.forEach(n => { navById[n.id] = n; });
   const sections = modes.map(m => {
@@ -968,7 +1095,7 @@ function _openModeUsageModal() {
 
 function _resetModeCounts(mode) {
   if (!confirm(t('이 모드의 카운터를 리셋할까요?'))) return;
-  try { localStorage.removeItem('cc.mode.' + mode + '.counts'); } catch {}
+  try { localStorage.removeItem('cc.mode.' + mode + '.counts'); } catch { }
   _openModeUsageModal();   // re-render
   renderNav();             // 🔥 badges may change
 }
@@ -1005,7 +1132,7 @@ function _pushRecentTab(id) {
   cur.unshift(id);
   if (cur.length > limit) cur = cur.slice(0, limit);
   _recentTabsCache = cur;
-  try { localStorage.setItem(_RECENT_TABS_KEY, JSON.stringify(cur)); } catch {}
+  try { localStorage.setItem(_RECENT_TABS_KEY, JSON.stringify(cur)); } catch { }
 }
 function _isFavoriteTab(id) {
   const f = (window.CC_PREFS && window.CC_PREFS.ui && window.CC_PREFS.ui.favoriteTabs) || [];
@@ -1029,7 +1156,7 @@ function toggleFavoriteTab(id, ev) {
   if (idx >= 0) cur.splice(idx, 1);
   else cur.unshift(id);
   // setPref defined in v2.38 Quick Settings — debounces a POST to /api/prefs/set
-  if (typeof setPref === 'function') setPref('ui', 'favoriteTabs', cur, {skipApply: true});
+  if (typeof setPref === 'function') setPref('ui', 'favoriteTabs', cur, { skipApply: true });
   else if (window.CC_PREFS && window.CC_PREFS.ui) window.CC_PREFS.ui.favoriteTabs = cur;
   _scheduleRenderNav();
 }
@@ -1062,7 +1189,7 @@ window.addEventListener('beforeunload', (e) => {
       e.returnValue = '';
       return '';
     }
-  } catch (_) {}
+  } catch (_) { }
 });
 
 window.addEventListener('hashchange', () => {
@@ -1080,7 +1207,7 @@ window.addEventListener('hashchange', () => {
         if (typeof __wf !== 'undefined' && __wf.pollTimer) {
           clearInterval(__wf.pollTimer); __wf.pollTimer = null;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     state.view = h; renderNav(); renderView();
   }
@@ -1112,15 +1239,15 @@ async function _renderChart(canvasEl, cfg) {
   // Sweep entries whose canvas was removed from the DOM by a renderView swap
   _chartInstances.forEach((c, key) => {
     if (!document.getElementById(key)) {
-      try { c.destroy?.(); } catch (_) {}
+      try { c.destroy?.(); } catch (_) { }
       _chartInstances.delete(key);
     }
   });
   const existing = _chartInstances.get(id);
   if (existing && existing.config && existing.config.type === cfg.type
-      && existing.data && cfg.data
-      && Array.isArray(existing.data.datasets) && Array.isArray(cfg.data.datasets)
-      && existing.data.datasets.length === cfg.data.datasets.length) {
+    && existing.data && cfg.data
+    && Array.isArray(existing.data.datasets) && Array.isArray(cfg.data.datasets)
+    && existing.data.datasets.length === cfg.data.datasets.length) {
     try {
       existing.data.labels = cfg.data.labels;
       cfg.data.datasets.forEach((ds, i) => {
@@ -1134,11 +1261,11 @@ async function _renderChart(canvasEl, cfg) {
       return existing;
     } catch (_) {
       // Fall through to recreate on any update failure
-      try { existing.destroy(); } catch (_) {}
+      try { existing.destroy(); } catch (_) { }
       _chartInstances.delete(id);
     }
   }
-  if (existing) { try { existing.destroy(); } catch (_) {} }
+  if (existing) { try { existing.destroy(); } catch (_) { } }
   const fresh = new Chart(canvasEl, cfg);
   _chartInstances.set(id, fresh);
   return fresh;
@@ -1154,7 +1281,7 @@ document.addEventListener('keydown', (e) => {
 // Global Alt+ArrowLeft/Right — tab history nav
 _KEYDOWN_HANDLERS.push((e) => {
   if (!e.altKey || e.ctrlKey || e.metaKey) return;
-  const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
+  const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement || {}).tagName);
   if (inInput) return;
   if (e.key === 'ArrowLeft') { e.preventDefault(); _tabHistoryBack(); return true; }
   if (e.key === 'ArrowRight') { e.preventDefault(); _tabHistoryForward(); return true; }
@@ -1173,12 +1300,12 @@ const _SKELETONS = {
   aiProviders: () => `
     <div class="shimmer h-10 mb-4" style="width:40%"></div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-      ${Array.from({length:6}).map(()=>'<div class="shimmer h-44"></div>').join('')}
+      ${Array.from({ length: 6 }).map(() => '<div class="shimmer h-44"></div>').join('')}
     </div>`,
   commands: () => `
     <div class="shimmer h-10 mb-4" style="width:30%"></div>
     <div class="space-y-2">
-      ${Array.from({length:10}).map(()=>'<div class="shimmer h-14"></div>').join('')}
+      ${Array.from({ length: 10 }).map(() => '<div class="shimmer h-14"></div>').join('')}
     </div>`,
   workflows: () => `
     <div class="shimmer h-10 mb-4" style="width:40%"></div>
@@ -1190,22 +1317,22 @@ const _SKELETONS = {
   overview: () => `
     <div class="shimmer h-12 mb-4" style="width:50%"></div>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-      ${Array.from({length:4}).map(()=>'<div class="shimmer h-28"></div>').join('')}
+      ${Array.from({ length: 4 }).map(() => '<div class="shimmer h-28"></div>').join('')}
     </div>
     <div class="shimmer h-64"></div>`,
   sessions: () => `
     <div class="shimmer h-10 mb-4" style="width:35%"></div>
     <div class="shimmer h-8 mb-3" style="width:60%"></div>
-    ${Array.from({length:8}).map(()=>'<div class="shimmer h-12 mb-2"></div>').join('')}`,
+    ${Array.from({ length: 8 }).map(() => '<div class="shimmer h-12 mb-2"></div>').join('')}`,
   projects: () => `
     <div class="shimmer h-10 mb-4" style="width:35%"></div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-      ${Array.from({length:6}).map(()=>'<div class="shimmer h-40"></div>').join('')}
+      ${Array.from({ length: 6 }).map(() => '<div class="shimmer h-40"></div>').join('')}
     </div>`,
   analytics: () => `
     <div class="shimmer h-10 mb-4" style="width:40%"></div>
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-      ${Array.from({length:4}).map(()=>'<div class="shimmer h-24"></div>').join('')}
+      ${Array.from({ length: 4 }).map(() => '<div class="shimmer h-24"></div>').join('')}
     </div>
     <div class="shimmer h-80"></div>`,
 };
@@ -1215,7 +1342,7 @@ function _skeletonFor(tabId) {
   return `
     <div class="shimmer h-10 mb-4" style="width:35%"></div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-      ${Array.from({length:4}).map(()=>'<div class="shimmer h-28"></div>').join('')}
+      ${Array.from({ length: 4 }).map(() => '<div class="shimmer h-28"></div>').join('')}
     </div>
     <div class="shimmer h-48"></div>`;
 }
@@ -1315,7 +1442,7 @@ VIEWS.features = async () => {
         <div class="card p-4 hover-lift cursor-pointer" onclick="openFeatureWindow(JSON.parse(this.dataset.f))" data-f="${jsonAttr(f)}">
           <div class="flex items-start justify-between gap-2 mb-2">
             <div class="flex items-center gap-2 min-w-0">
-              <div class="text-2xl">${f.icon||'✨'}</div>
+              <div class="text-2xl">${f.icon || '✨'}</div>
               <div class="min-w-0">
                 <div class="font-semibold text-sm truncate">${escapeHtml(f.label)}</div>
                 ${f.released ? `<div class="text-[10px] text-[var(--text-dim)]">${escapeHtml(f.released)}</div>` : ''}
@@ -1323,7 +1450,7 @@ VIEWS.features = async () => {
             </div>
             ${f.isDynamic ? '<span class="chip text-[9px]" style="background:rgba(167,139,250,0.18);color:#c4b5fd;">AI</span>' : ''}
           </div>
-          <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(f.summary||'')}</div>
+          <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(f.summary || '')}</div>
         </div>`).join('') || '<div class="empty card" style="grid-column:1/-1;">데이터 없음</div>'}
     </div>
   `;
@@ -1333,12 +1460,12 @@ async function refreshFeatures() {
   showModalLoading('Claude 에게 최신 발표 조회 중 (~1분)…');
   try {
     const r = await api('/api/features/refresh', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
     });
     closeModal();
     if (r.error) { toast(errMsg(r), 'err'); return; }
-    const n = (r.features||[]).length;
-    toast(n ? `✨ 신기능 ${n}개 발견` : '새로운 기능 없음 (이미 최신)', n?'ok':'info');
+    const n = (r.features || []).length;
+    toast(n ? `✨ 신기능 ${n}개 발견` : '새로운 기능 없음 (이미 최신)', n ? 'ok' : 'info');
     renderView();
   } catch (e) { closeModal(); toast(e.message, 'err'); }
 }
@@ -1369,12 +1496,12 @@ function openFeatureWindow(feat) {
         <button class="feat-light feat-light-min" title="내리기" onclick="minimizeFeatureWindow('${winId}')"></button>
         <button class="feat-light feat-light-max" title="펼치기" onclick="maximizeFeatureWindow('${winId}')"></button>
       </div>
-      <div class="feat-win-title-text">${feat.icon||'✨'} ${escapeHtml(feat.label)}</div>
+      <div class="feat-win-title-text">${feat.icon || '✨'} ${escapeHtml(feat.label)}</div>
     </div>
     <div class="feat-win-body">
       <div class="mb-3">
-        <div class="text-[10px] uppercase tracking-widest text-[var(--text-dim)] mb-1">${feat.released?'출시일 '+escapeHtml(feat.released):''} ${feat.isDynamic?'· 🤖 AI 발견':''}</div>
-        <div class="text-sm">${escapeHtml(feat.summary||'')}</div>
+        <div class="text-[10px] uppercase tracking-widest text-[var(--text-dim)] mb-1">${feat.released ? '출시일 ' + escapeHtml(feat.released) : ''} ${feat.isDynamic ? '· 🤖 AI 발견' : ''}</div>
+        <div class="text-sm">${escapeHtml(feat.summary || '')}</div>
       </div>
       <div class="flex gap-2 mb-4 flex-wrap">
         ${feat.launchUrl ? `<a class="btn-primary btn text-xs" href="${escapeHtml(feat.launchUrl)}" target="_blank" rel="noopener noreferrer">🚀 사용하기</a>` : ''}
@@ -1513,7 +1640,7 @@ function _detachDragListeners(el) {
 // ────────────────────────────────────────────────────────────────
 VIEWS.onboarding = async () => {
   const r = await api('/api/guide/onboarding');
-  const p = r.progress || { done:0, total:0, percent:0 };
+  const p = r.progress || { done: 0, total: 0, percent: 0 };
   const steps = r.steps || [];
   const tips = r.tips || [];
   const ringColor = p.percent >= 80 ? '#4ade80' : (p.percent >= 50 ? '#a78bfa' : '#fbbf24');
@@ -1535,8 +1662,8 @@ VIEWS.onboarding = async () => {
         <div class="text-lg font-semibold mb-1">${t('셋업 진행률')}</div>
         <div class="text-sm text-[var(--text-mute)]">
           ${p.percent >= 100
-            ? t('완료 🎉 — 이제 AI 종합 평가 탭에서 품질 점수를 받아보세요.')
-            : t('남은 단계를 하나씩 체크하면 Claude Code 를 더 안전하고 생산적으로 쓸 수 있습니다.')}
+      ? t('완료 🎉 — 이제 AI 종합 평가 탭에서 품질 점수를 받아보세요.')
+      : t('남은 단계를 하나씩 체크하면 Claude Code 를 더 안전하고 생산적으로 쓸 수 있습니다.')}
         </div>
         ${tips.length ? `<ul class="mt-2 text-xs text-[var(--text-dim)] space-y-0.5">
           ${tips.map(x => `<li>• ${escapeHtml(x)}</li>`).join('')}
@@ -1554,18 +1681,18 @@ VIEWS.onboarding = async () => {
               <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
                           background:${s.done ? 'rgba(74,222,128,0.18)' : 'rgba(255,255,255,0.05)'};
                           color:${s.done ? '#4ade80' : 'var(--text-dim)'}; font-size:0.9rem; font-weight:600;">
-                ${s.done ? '✓' : (i+1)}
+                ${s.done ? '✓' : (i + 1)}
               </div>
               <div class="min-w-0">
                 <div class="font-semibold text-sm">${escapeHtml(s.title)}</div>
                 ${s.detail ? `<div class="text-[10px] text-[var(--text-dim)] mt-0.5">${escapeHtml(s.detail)}</div>` : ''}
               </div>
             </div>
-            <span class="chip text-[10px]" style="background:${s.done?'rgba(74,222,128,0.15)':'rgba(251,191,36,0.15)'};color:${s.done?'#4ade80':'#fbbf24'};">
+            <span class="chip text-[10px]" style="background:${s.done ? 'rgba(74,222,128,0.15)' : 'rgba(251,191,36,0.15)'};color:${s.done ? '#4ade80' : '#fbbf24'};">
               ${s.done ? t('완료') : t('필요')}
             </span>
           </div>
-          <div class="text-xs text-[var(--text-mute)] leading-relaxed mb-2">${escapeHtml(s.desc||'')}</div>
+          <div class="text-xs text-[var(--text-mute)] leading-relaxed mb-2">${escapeHtml(s.desc || '')}</div>
           ${s.hint ? `<div class="text-[11px] text-[var(--text-dim)] mb-2">💡 ${escapeHtml(s.hint)}</div>` : ''}
           <div class="flex gap-2 flex-wrap">
             ${s.navigate ? `<button class="btn text-[11px]" onclick="go('${s.navigate}')">→ ${t('해당 탭으로')}</button>` : ''}
@@ -1586,10 +1713,10 @@ VIEWS.guideHub = async () => {
   const sub = state.data.guideSub || 'toolkits';
 
   const subtabs = [
-    { id: 'toolkits',       label: '🧰 유용한 툴' },
+    { id: 'toolkits', label: '🧰 유용한 툴' },
     { id: 'externalGuides', label: '🔗 외부 가이드' },
-    { id: 'bestPractices',  label: '💡 베스트 프랙티스' },
-    { id: 'cheatsheet',     label: '⌨️ 치트시트' },
+    { id: 'bestPractices', label: '💡 베스트 프랙티스' },
+    { id: 'cheatsheet', label: '⌨️ 치트시트' },
   ];
 
   return `
@@ -1597,16 +1724,16 @@ VIEWS.guideHub = async () => {
 
     <div class="flex gap-2 flex-wrap mb-4">
       ${subtabs.map(s => `
-        <button class="btn text-xs ${sub===s.id?'btn-active':''}"
+        <button class="btn text-xs ${sub === s.id ? 'btn-active' : ''}"
                 onclick="state.data.guideSub='${s.id}'; renderView();">
           ${t(s.label)}
         </button>`).join('')}
     </div>
 
-    ${sub === 'toolkits'       ? _renderGuideToolkits(r.toolkits || []) : ''}
+    ${sub === 'toolkits' ? _renderGuideToolkits(r.toolkits || []) : ''}
     ${sub === 'externalGuides' ? _renderGuideExternal(r.toolkits || []) : ''}
-    ${sub === 'bestPractices'  ? _renderGuideBestPractices(r.bestPractices || []) : ''}
-    ${sub === 'cheatsheet'     ? _renderGuideCheatsheet(r.cheatsheet || {}) : ''}
+    ${sub === 'bestPractices' ? _renderGuideBestPractices(r.bestPractices || []) : ''}
+    ${sub === 'cheatsheet' ? _renderGuideCheatsheet(r.cheatsheet || {}) : ''}
   `;
 };
 AFTER.guideHub = () => {
@@ -1622,7 +1749,7 @@ async function _refreshToolkitManage() {
     if (!r || !r.ok) return;
     if (eccSlot) eccSlot.innerHTML = _renderEccManage(r);
     if (ccbSlot) ccbSlot.innerHTML = _renderCcbManage(r);
-  } catch {}
+  } catch { }
 }
 function _renderEccManage(r) {
   const e = r.ecc || {};
@@ -1641,12 +1768,12 @@ function _renderEccManage(r) {
     </div>
     <div class="flex items-center gap-2 flex-wrap">
       ${cloned
-        ? `<button class="btn text-[12px]" onclick="_eccInstall(this)" ${!r.gitAvailable?'disabled':''}>🔄 ${t('업데이트')}</button>
+      ? `<button class="btn text-[12px]" onclick="_eccInstall(this)" ${!r.gitAvailable ? 'disabled' : ''}>🔄 ${t('업데이트')}</button>
            ${nInstalled > 0
-             ? `<button class="btn-danger btn text-[12px]" onclick="_eccInstallPlugin(this, 'uninstall')">🗑 ${t('플러그인 제거')}</button>`
-             : `<button class="btn-primary btn text-[12px]" onclick="_eccInstallPlugin(this, 'install')">🔌 ${t('플러그인 설치')}</button>`}
+        ? `<button class="btn-danger btn text-[12px]" onclick="_eccInstallPlugin(this, 'uninstall')">🗑 ${t('플러그인 제거')}</button>`
+        : `<button class="btn-primary btn text-[12px]" onclick="_eccInstallPlugin(this, 'install')">🔌 ${t('플러그인 설치')}</button>`}
            <button class="btn-danger btn text-[12px]" onclick="_eccUninstall(this)">${t('마켓 제거')}</button>`
-        : `<button class="btn-primary btn text-[12px]" onclick="_eccInstall(this)" ${!r.gitAvailable?'disabled':''}>⬇︎ ${t('마켓플레이스 추가')}</button>`}
+      : `<button class="btn-primary btn text-[12px]" onclick="_eccInstall(this)" ${!r.gitAvailable ? 'disabled' : ''}>⬇︎ ${t('마켓플레이스 추가')}</button>`}
     </div>
     ${cloned ? `<div class="text-[11px] text-[var(--text-dim)] mt-1.5">📂 ${escapeHtml(e.installDir || '')}</div>` : ''}`;
 }
@@ -1663,10 +1790,10 @@ function _renderCcbManage(r) {
     </div>
     <div class="flex items-center gap-2 flex-wrap">
       ${cloned
-        ? `<button class="btn text-[12px]" onclick="_ccbInstall(this)" ${!r.gitAvailable?'disabled':''}>🔄 ${t('업데이트')}</button>
+      ? `<button class="btn text-[12px]" onclick="_ccbInstall(this)" ${!r.gitAvailable ? 'disabled' : ''}>🔄 ${t('업데이트')}</button>
            <button class="btn text-[12px]" onclick="_ccbOpen(this)">📂 ${t('폴더 열기')}</button>
            <button class="btn-danger btn text-[12px]" onclick="_ccbUninstall(this)">🗑 ${t('제거')}</button>`
-        : `<button class="btn-primary btn text-[12px]" onclick="_ccbInstall(this)" ${!r.gitAvailable?'disabled':''}>⬇︎ ${t('레포 내려받기')}</button>`}
+      : `<button class="btn-primary btn text-[12px]" onclick="_ccbInstall(this)" ${!r.gitAvailable ? 'disabled' : ''}>⬇︎ ${t('레포 내려받기')}</button>`}
     </div>
     <div class="text-[11px] text-[var(--text-dim)] mt-1.5">📂 ${escapeHtml(c.defaultDir || '')}</div>`;
 }
@@ -1747,8 +1874,8 @@ function _renderGuideToolkits(list) {
                 ${tk.stars ? `<span class="chip text-[10px]" style="background:rgba(250,204,21,0.15);color:#fbbf24;">⭐ ${escapeHtml(tk.stars)}</span>` : ''}
                 ${tk.license ? `<span class="chip text-[10px]">${escapeHtml(tk.license)}</span>` : ''}
               </div>
-              <div class="text-sm text-[var(--text-mute)] mb-1">${escapeHtml(tk.subtitle||'')}</div>
-              <div class="text-[11px] text-[var(--text-dim)]">${t('제작')}: ${escapeHtml(tk.author||'')}</div>
+              <div class="text-sm text-[var(--text-mute)] mb-1">${escapeHtml(tk.subtitle || '')}</div>
+              <div class="text-[11px] text-[var(--text-dim)]">${t('제작')}: ${escapeHtml(tk.author || '')}</div>
             </div>
             <a class="btn text-xs" href="${escapeHtml(tk.repo)}" target="_blank" rel="noopener noreferrer">↗ ${t('리포 열기')}</a>
           </div>
@@ -1773,7 +1900,7 @@ function _renderGuideToolkits(list) {
                     <div class="flex items-center gap-2">
                       <code class="code-terminal flex-1 min-w-0 px-2 py-1.5 rounded text-xs font-mono"
                             style="word-break:break-all;">${escapeHtml(inst.code)}</code>
-                      <button class="btn text-[11px]" onclick="_copyToClipboard(this, ${JSON.stringify(inst.code).replace(/"/g,'&quot;')})">📋 ${t('복사')}</button>
+                      <button class="btn text-[11px]" onclick="_copyToClipboard(this, ${JSON.stringify(inst.code).replace(/"/g, '&quot;')})">📋 ${t('복사')}</button>
                     </div>
                   </div>`).join('')}
               </div>
@@ -1785,7 +1912,7 @@ function _renderGuideToolkits(list) {
                 <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">
                   <div class="text-xs font-semibold mb-1.5">${escapeHtml(c.name)}</div>
                   <div class="flex flex-wrap gap-1">
-                    ${(c.items||[]).map(it => `<span class="chip chip-violet text-[10px]" style="background:rgba(167,139,250,0.12); color:#c4b5fd;">${escapeHtml(it)}</span>`).join('')}
+                    ${(c.items || []).map(it => `<span class="chip chip-violet text-[10px]" style="background:rgba(167,139,250,0.12); color:#c4b5fd;">${escapeHtml(it)}</span>`).join('')}
                   </div>
                 </div>`).join('')}
             </div>` : ''}
@@ -1800,9 +1927,9 @@ function _renderGuideExternal(list) {
       ${list.map(tk => `
         <a class="card p-4 hover-lift block no-underline" href="${escapeHtml(tk.repo)}" target="_blank" rel="noopener noreferrer"
            style="text-decoration:none; color:inherit;">
-          <div class="text-3xl mb-2">${tk.id==='wikidocs-claude-code-guide'?'📖':(tk.id==='claude-code-best-practice'?'🎯':'🧰')}</div>
+          <div class="text-3xl mb-2">${tk.id === 'wikidocs-claude-code-guide' ? '📖' : (tk.id === 'claude-code-best-practice' ? '🎯' : '🧰')}</div>
           <div class="font-semibold text-sm mb-1">${escapeHtml(tk.title)}</div>
-          <div class="text-xs text-[var(--text-mute)] mb-2 line-clamp-2">${escapeHtml(tk.subtitle||'')}</div>
+          <div class="text-xs text-[var(--text-mute)] mb-2 line-clamp-2">${escapeHtml(tk.subtitle || '')}</div>
           <div class="text-[11px] text-[var(--text-dim)]">${t('바로가기')} ↗</div>
         </a>`).join('')}
     </div>
@@ -1827,15 +1954,15 @@ function _renderGuideBestPractices(list) {
           <div class="flex items-start justify-between gap-3 mb-2">
             <div>
               <div class="text-lg font-semibold">${escapeHtml(bp.title)}</div>
-              <div class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(bp.desc||'')}</div>
+              <div class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(bp.desc || '')}</div>
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
-            ${(bp.steps||[]).map((st, i) => `
+            ${(bp.steps || []).map((st, i) => `
               <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">
                 <div class="flex items-center gap-2 mb-1">
                   <span style="width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
-                               background:rgba(167,139,250,0.18);color:#c4b5fd; font-size:0.7rem; font-weight:700;">${i+1}</span>
+                               background:rgba(167,139,250,0.18);color:#c4b5fd; font-size:0.7rem; font-weight:700;">${i + 1}</span>
                   <span class="text-sm font-semibold">${escapeHtml(st.label)}</span>
                 </div>
                 <div class="text-xs text-[var(--text-mute)] leading-relaxed">${escapeHtml(st.tip)}</div>
@@ -1862,7 +1989,7 @@ function _renderGuideCheatsheet(cs) {
               <code class="font-mono text-xs px-2 py-0.5 rounded flex-shrink-0"
                     style="background:rgba(167,139,250,0.12); color:#c4b5fd; min-width:130px;">${escapeHtml(c.cmd)}</code>
               <div class="text-xs text-[var(--text-mute)] flex-1">${escapeHtml(c.desc)}</div>
-              <button class="btn text-[10px] flex-shrink-0" onclick="_copyToClipboard(this, ${JSON.stringify(c.cmd).replace(/"/g,'&quot;')})">📋</button>
+              <button class="btn text-[10px] flex-shrink-0" onclick="_copyToClipboard(this, ${JSON.stringify(c.cmd).replace(/"/g, '&quot;')})">📋</button>
             </div>`).join('')}
         </div>
       </div>
@@ -1937,51 +2064,95 @@ const __wf = {
 };
 
 const WF_NODE_TYPES = [
-  { id: 'start',     icon: '🚀', label: '시작', portIn: false, portOut: true,
-    desc: 'DAG 의 진입점. 입력 없음 — 워크플로우의 시작점. 각 워크플로우에 1개만 두는 것이 일반적.' },
-  { id: 'session',   icon: '🗂️', label: '세션', portIn: true,  portOut: true,
-    desc: '가상 Claude 세션. subject(업무) · description(상세) · 모델 · cwd 를 설정하면 실행 시 claude -p 로 자동 실행되거나, 노드의 🖥️ 버튼으로 Terminal 새 창에서 대화형으로 열 수 있음.' },
-  { id: 'subagent',  icon: '🤝', label: '서브에이전트', portIn: true, portOut: true,
-    desc: '특정 역할(researcher · writer · reviewer 등)을 부여한 전문 세션. session 과 동일하지만 agentRole 필드로 페르소나를 명시해 전문성을 강화.' },
-  { id: 'aggregate', icon: '🧩', label: '취합', portIn: true, portOut: true,
-    desc: '여러 입력을 하나로 합치는 노드. concat(텍스트 이어붙이기) 또는 json(배열) 모드. 병렬로 수집한 결과를 하나로 모을 때 사용.' },
-  { id: 'branch',    icon: '🔀', label: '분기', portIn: true, portOut: true,
-    desc: '조건에 따라 Y / N 두 포트 중 하나만 활성화. 조건 문자열이 입력에 포함되면 Y, 아니면 N 으로 흐름이 분기.' },
-  { id: 'output',    icon: '📤', label: '결과', portIn: true,  portOut: false,
-    desc: '워크플로우의 종착지. 이전 노드의 출력을 최종 결과로 저장. exportTo 에 경로(~/ 하위) 지정 시 파일로 저장됨.' },
-  { id: 'http',      icon: '🌐', label: 'HTTP 요청', portIn: true, portOut: true,
-    desc: '외부 REST API 호출. GET/POST/PUT + 헤더 + 응답 JSON 경로 추출. {{input}} 플레이스홀더로 이전 노드 출력 주입.' },
-  { id: 'transform', icon: '🔄', label: '변환', portIn: true, portOut: true,
-    desc: '텍스트/JSON 변환. 템플릿 치환 · JSON 경로 추출 · regex 치환 · 결합. 코드 실행 없이 데이터 가공.' },
-  { id: 'variable',  icon: '📌', label: '변수', portIn: true, portOut: true,
-    desc: '입력 값을 변수 이름에 바인딩. 후속 노드에서 참조. 기본값 설정 가능.' },
-  { id: 'subworkflow', icon: '🔁', label: '서브 워크플로우', portIn: true, portOut: true,
-    desc: '다른 워크플로우를 호출하고 결과를 받는 노드. 워크플로우 재사용 가능.' },
-  { id: 'embedding', icon: '🧲', label: '임베딩', portIn: true, portOut: true,
-    desc: '텍스트를 벡터로 변환. Ollama bge-m3, OpenAI text-embedding-3 등 임베딩 모델 사용. RAG/검색 파이프라인 구축용.' },
-  { id: 'loop', icon: '🔄', label: '루프', portIn: true, portOut: true,
-    desc: '반복 처리 노드. for_each(리스트 순회) · count(횟수 반복) · while(조건 반복) 모드 지원. 입력을 분할하여 각 항목에 동일 흐름을 적용.' },
-  { id: 'retry', icon: '🔁', label: '재시도', portIn: true, portOut: true,
-    desc: '실패 시 자동 재시도. 최대 재시도 횟수 · 백오프 간격 · 배수를 설정하여 일시적 오류를 자동 복구.' },
-  { id: 'error_handler', icon: '🛡️', label: '에러 핸들러', portIn: true, portOut: true,
-    desc: '에러 처리 전략 노드. skip(무시) · default(기본값 반환) · route(다른 노드로 분기) 모드로 워크플로우 안정성 확보.' },
-  { id: 'merge', icon: '🔀', label: '합류', portIn: true, portOut: true,
-    desc: '여러 병렬 경로를 합류. all/any/count 모드' },
-  { id: 'delay', icon: '⏱️', label: '딜레이', portIn: true, portOut: true,
-    desc: '지정 시간 대기 후 통과. 고정/랜덤 딜레이' },
-  { id: 'slack_approval', icon: '🛂', label: 'Slack 어드민 게이트', portIn: true, portOut: true,
-    desc: 'Slack 채널에 메시지를 올리고 ✅/❌ 반응 또는 스레드 답장을 기다림. 타임아웃 시 자동 통과/거부/중단/기본값 중 선택. 자율모드에서 어드민 개입 지점.' },
-  { id: 'obsidian_log', icon: '📝', label: 'Obsidian 기록', portIn: true, portOut: true,
-    desc: 'Vault 의 Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 입력을 마크다운으로 append. 사이클 보고/감사 로그용.' },
-  { id: 'auto_resume', icon: '🔄', label: 'Auto-Resume 바인딩', portIn: true, portOut: true,
-    desc: '대상 Claude 세션 UUID(또는 입력 문자열에서 추출)에 Auto-Resume 워커를 바인딩/해제. 워크플로우는 즉시 다음 노드로 진행되고, 워커는 백그라운드에서 토큰/레이트 한도 발생 시 claude --resume 으로 자동 재시도.' },
-  { id: 'ralph', icon: '🦞', label: 'Ralph Loop', portIn: true, portOut: true,
-    desc: 'Same-prompt iteration (Ralph Wiggum) — max-iter / completion-promise / 예산 USD / cancel 4중 안전장치. 노드는 루프 종료까지 블로킹.' },
-  { id: 'docker_run', icon: '🐳', label: 'Docker Run', portIn: true, portOut: true,
-    desc: '격리된 docker 컨테이너에서 셸 명령 실행. --rm + --network=none + read-only mount + memory cap 기본. docker 미설치 시 호스트 실행 폴백 없이 명확한 에러.' },
+  {
+    id: 'start', icon: '🚀', label: '시작', portIn: false, portOut: true,
+    desc: 'DAG 의 진입점. 입력 없음 — 워크플로우의 시작점. 각 워크플로우에 1개만 두는 것이 일반적.'
+  },
+  {
+    id: 'session', icon: '🗂️', label: '세션', portIn: true, portOut: true,
+    desc: '가상 Claude 세션. subject(업무) · description(상세) · 모델 · cwd 를 설정하면 실행 시 claude -p 로 자동 실행되거나, 노드의 🖥️ 버튼으로 Terminal 새 창에서 대화형으로 열 수 있음.'
+  },
+  {
+    id: 'subagent', icon: '🤝', label: '서브에이전트', portIn: true, portOut: true,
+    desc: '특정 역할(researcher · writer · reviewer 등)을 부여한 전문 세션. session 과 동일하지만 agentRole 필드로 페르소나를 명시해 전문성을 강화.'
+  },
+  {
+    id: 'aggregate', icon: '🧩', label: '취합', portIn: true, portOut: true,
+    desc: '여러 입력을 하나로 합치는 노드. concat(텍스트 이어붙이기) 또는 json(배열) 모드. 병렬로 수집한 결과를 하나로 모을 때 사용.'
+  },
+  {
+    id: 'branch', icon: '🔀', label: '분기', portIn: true, portOut: true,
+    desc: '조건에 따라 Y / N 두 포트 중 하나만 활성화. 조건 문자열이 입력에 포함되면 Y, 아니면 N 으로 흐름이 분기.'
+  },
+  {
+    id: 'output', icon: '📤', label: '결과', portIn: true, portOut: false,
+    desc: '워크플로우의 종착지. 이전 노드의 출력을 최종 결과로 저장. exportTo 에 경로(~/ 하위) 지정 시 파일로 저장됨.'
+  },
+  {
+    id: 'http', icon: '🌐', label: 'HTTP 요청', portIn: true, portOut: true,
+    desc: '외부 REST API 호출. GET/POST/PUT + 헤더 + 응답 JSON 경로 추출. {{input}} 플레이스홀더로 이전 노드 출력 주입.'
+  },
+  {
+    id: 'transform', icon: '🔄', label: '변환', portIn: true, portOut: true,
+    desc: '텍스트/JSON 변환. 템플릿 치환 · JSON 경로 추출 · regex 치환 · 결합. 코드 실행 없이 데이터 가공.'
+  },
+  {
+    id: 'variable', icon: '📌', label: '변수', portIn: true, portOut: true,
+    desc: '입력 값을 변수 이름에 바인딩. 후속 노드에서 참조. 기본값 설정 가능.'
+  },
+  {
+    id: 'subworkflow', icon: '🔁', label: '서브 워크플로우', portIn: true, portOut: true,
+    desc: '다른 워크플로우를 호출하고 결과를 받는 노드. 워크플로우 재사용 가능.'
+  },
+  {
+    id: 'embedding', icon: '🧲', label: '임베딩', portIn: true, portOut: true,
+    desc: '텍스트를 벡터로 변환. Ollama bge-m3, OpenAI text-embedding-3 등 임베딩 모델 사용. RAG/검색 파이프라인 구축용.'
+  },
+  {
+    id: 'loop', icon: '🔄', label: '루프', portIn: true, portOut: true,
+    desc: '반복 처리 노드. for_each(리스트 순회) · count(횟수 반복) · while(조건 반복) 모드 지원. 입력을 분할하여 각 항목에 동일 흐름을 적용.'
+  },
+  {
+    id: 'retry', icon: '🔁', label: '재시도', portIn: true, portOut: true,
+    desc: '실패 시 자동 재시도. 최대 재시도 횟수 · 백오프 간격 · 배수를 설정하여 일시적 오류를 자동 복구.'
+  },
+  {
+    id: 'error_handler', icon: '🛡️', label: '에러 핸들러', portIn: true, portOut: true,
+    desc: '에러 처리 전략 노드. skip(무시) · default(기본값 반환) · route(다른 노드로 분기) 모드로 워크플로우 안정성 확보.'
+  },
+  {
+    id: 'merge', icon: '🔀', label: '합류', portIn: true, portOut: true,
+    desc: '여러 병렬 경로를 합류. all/any/count 모드'
+  },
+  {
+    id: 'delay', icon: '⏱️', label: '딜레이', portIn: true, portOut: true,
+    desc: '지정 시간 대기 후 통과. 고정/랜덤 딜레이'
+  },
+  {
+    id: 'slack_approval', icon: '🛂', label: 'Slack 어드민 게이트', portIn: true, portOut: true,
+    desc: 'Slack 채널에 메시지를 올리고 ✅/❌ 반응 또는 스레드 답장을 기다림. 타임아웃 시 자동 통과/거부/중단/기본값 중 선택. 자율모드에서 어드민 개입 지점.'
+  },
+  {
+    id: 'obsidian_log', icon: '📝', label: 'Obsidian 기록', portIn: true, portOut: true,
+    desc: 'Vault 의 Projects/<프로젝트>/logs/YYYY-MM-DD.md 에 입력을 마크다운으로 append. 사이클 보고/감사 로그용.'
+  },
+  {
+    id: 'auto_resume', icon: '🔄', label: 'Auto-Resume 바인딩', portIn: true, portOut: true,
+    desc: '대상 Claude 세션 UUID(또는 입력 문자열에서 추출)에 Auto-Resume 워커를 바인딩/해제. 워크플로우는 즉시 다음 노드로 진행되고, 워커는 백그라운드에서 토큰/레이트 한도 발생 시 claude --resume 으로 자동 재시도.'
+  },
+  {
+    id: 'ralph', icon: '🦞', label: 'Ralph Loop', portIn: true, portOut: true,
+    desc: 'Same-prompt iteration (Ralph Wiggum) — max-iter / completion-promise / 예산 USD / cancel 4중 안전장치. 노드는 루프 종료까지 블로킹.'
+  },
+  {
+    id: 'docker_run', icon: '🐳', label: 'Docker Run', portIn: true, portOut: true,
+    desc: '격리된 docker 컨테이너에서 셸 명령 실행. --rm + --network=none + read-only mount + memory cap 기본. docker 미설치 시 호스트 실행 폴백 없이 명확한 에러.'
+  },
   // QQ36 (v2.66.111) — sticky note. Free-floating annotation; no ports.
-  { id: 'sticky', icon: '🟨', label: '메모', portIn: false, portOut: false,
-    desc: '캔버스 주석용 스티키 노트. 마크다운 텍스트 + 색상 5종(노랑/파랑/초록/분홍/회색). 실행에 영향 없음 (n8n parity).' },
+  {
+    id: 'sticky', icon: '🟨', label: '메모', portIn: false, portOut: false,
+    desc: '캔버스 주석용 스티키 노트. 마크다운 텍스트 + 색상 5종(노랑/파랑/초록/분홍/회색). 실행에 영향 없음 (n8n parity).'
+  },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
@@ -1990,27 +2161,41 @@ const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 // blocks. The mapping is by-id; if a node type isn't listed here it falls into
 // "기타".
 const WF_NODE_CATEGORIES = [
-  { id: 'trigger',  icon: '🚀', label: '트리거',
+  {
+    id: 'trigger', icon: '🚀', label: '트리거',
     desc: 'DAG 진입점',
-    types: ['start'] },
-  { id: 'ai',       icon: '🤖', label: 'AI 작업',
+    types: ['start']
+  },
+  {
+    id: 'ai', icon: '🤖', label: 'AI 작업',
     desc: '세션 · 페르소나 · 임베딩',
-    types: ['session', 'subagent', 'embedding'] },
-  { id: 'flow',     icon: '🔁', label: '흐름 제어',
+    types: ['session', 'subagent', 'embedding']
+  },
+  {
+    id: 'flow', icon: '🔁', label: '흐름 제어',
     desc: '분기 · 루프 · 재시도 · 합류',
-    types: ['branch', 'loop', 'retry', 'error_handler', 'merge', 'delay', 'aggregate'] },
-  { id: 'data',     icon: '🔧', label: '데이터 / HTTP',
+    types: ['branch', 'loop', 'retry', 'error_handler', 'merge', 'delay', 'aggregate']
+  },
+  {
+    id: 'data', icon: '🔧', label: '데이터 / HTTP',
     desc: '변환 · 변수 · 외부 호출 · 서브워크플로우',
-    types: ['http', 'transform', 'variable', 'subworkflow'] },
-  { id: 'integ',    icon: '🔗', label: '연동',
+    types: ['http', 'transform', 'variable', 'subworkflow']
+  },
+  {
+    id: 'integ', icon: '🔗', label: '연동',
     desc: 'Slack 어드민 · Obsidian 기록 · Auto-Resume · Ralph 루프 · Docker',
-    types: ['slack_approval', 'obsidian_log', 'auto_resume', 'ralph', 'docker_run'] },
-  { id: 'output',   icon: '📤', label: '출력',
+    types: ['slack_approval', 'obsidian_log', 'auto_resume', 'ralph', 'docker_run']
+  },
+  {
+    id: 'output', icon: '📤', label: '출력',
     desc: '워크플로우 종착',
-    types: ['output'] },
-  { id: 'annot',    icon: '🟨', label: '주석',
+    types: ['output']
+  },
+  {
+    id: 'annot', icon: '🟨', label: '주석',
     desc: '실행에 영향 없는 캔버스 메모',
-    types: ['sticky'] },
+    types: ['sticky']
+  },
 ];
 
 // Reverse-lookup: type id → category id (for highlighting current selection).
@@ -2024,20 +2209,20 @@ const WF_TYPE_TO_CAT = (() => {
 let __wfProviders = null; // {providers:[{id,name,icon,type,available,models:[]}]}
 async function _wfLoadProviders() {
   if (__wfProviders) return __wfProviders;
-  try { __wfProviders = await cachedApi('/api/ai-providers/list'); } catch(e) { __wfProviders = {providers:[]}; }
+  try { __wfProviders = await cachedApi('/api/ai-providers/list'); } catch (e) { __wfProviders = { providers: [] }; }
   return __wfProviders;
 }
 function _wfAssigneeOptions(selectedValue) {
-  const p = __wfProviders || {providers:[]};
+  const p = __wfProviders || { providers: [] };
   const groups = {};
   for (const prov of p.providers) {
     if (!prov.available || !prov.models?.length) continue;
     const gLabel = prov.icon + ' ' + prov.name;
-    groups[gLabel] = (groups[gLabel]||[]);
+    groups[gLabel] = (groups[gLabel] || []);
     for (const m of prov.models) {
       const val = prov.id === 'claude-cli'
-        ? (m.id.replace('claude-','').replace('-4-7','4.7').replace('-4-6','4.6').replace('-4-5','4.5').replace('opus','opus-').replace('sonnet','sonnet-').replace('haiku','haiku-').replace('--','-'))
-        : (prov.id.replace('-cli','').replace('-api','') + ':' + m.id);
+        ? (m.id.replace('claude-', '').replace('-4-7', '4.7').replace('-4-6', '4.6').replace('-4-5', '4.5').replace('opus', 'opus-').replace('sonnet', 'sonnet-').replace('haiku', 'haiku-').replace('--', '-'))
+        : (prov.id.replace('-cli', '').replace('-api', '') + ':' + m.id);
       // Claude CLI alias 정리
       const displayVal = prov.id === 'claude-cli' ? m.id : val;
       groups[gLabel].push({ value: val, label: m.label || m.id, note: m.note || '' });
@@ -2045,8 +2230,8 @@ function _wfAssigneeOptions(selectedValue) {
   }
   // Claude 기본 3개는 항상 포함 (프로바이더 로드 전 fallback)
   if (!Object.keys(groups).length) {
-    return ['opus-4.7','sonnet-4.6','haiku-4.5'].map(m =>
-      `<option value="${m}" ${selectedValue===m?'selected':''}>${m}</option>`
+    return ['opus-4.7', 'sonnet-4.6', 'haiku-4.5'].map(m =>
+      `<option value="${m}" ${selectedValue === m ? 'selected' : ''}>${m}</option>`
     ).join('');
   }
   let html = '';
@@ -2055,7 +2240,7 @@ function _wfAssigneeOptions(selectedValue) {
     html += `<optgroup label="${escapeHtml(gLabel)}">`;
     for (const o of opts) {
       const sel = o.value === selectedValue ? 'selected' : '';
-      html += `<option value="${escapeHtml(o.value)}" ${sel}>${escapeHtml(o.label)}${o.note?' — '+escapeHtml(t(o.note)):''}</option>`;
+      html += `<option value="${escapeHtml(o.value)}" ${sel}>${escapeHtml(o.label)}${o.note ? ' — ' + escapeHtml(t(o.note)) : ''}</option>`;
     }
     html += '</optgroup>';
   }
@@ -2240,9 +2425,9 @@ AFTER.workflows = async () => {
   _wfBindCanvas();
   // 위저드 → 신규 워크플로우 자동 오픈 (one-shot)
   let pendingOpenId = '';
-  try { pendingOpenId = localStorage.getItem('__wf_open_id') || ''; } catch(_){}
+  try { pendingOpenId = localStorage.getItem('__wf_open_id') || ''; } catch (_) { }
   if (pendingOpenId && __wf.workflows.find(w => w.id === pendingOpenId)) {
-    try { localStorage.removeItem('__wf_open_id'); } catch(_){}
+    try { localStorage.removeItem('__wf_open_id'); } catch (_) { }
     await _wfOpen(pendingOpenId);
   } else if (!__wf.current && __wf.workflows.length) {
     await _wfOpen(__wf.workflows[0].id);
@@ -2265,24 +2450,24 @@ AFTER.workflows = async () => {
 const __cw = {
   step: 1,
   form: {
-    project:  '',
-    goal:     '',
+    project: '',
+    goal: '',
     plannerModel: 'claude:opus',
     personas: [
       { role: 'Researcher', model: 'claude:sonnet', focus: '' },
-      { role: 'Builder',    model: 'gemini:gemini-2.5-pro', focus: '' },
-      { role: 'Reviewer',   model: 'ollama:llama3.1', focus: '' },
+      { role: 'Builder', model: 'gemini:gemini-2.5-pro', focus: '' },
+      { role: 'Reviewer', model: 'ollama:llama3.1', focus: '' },
     ],
-    autonomy:            'admin_gate',
-    slackChannel:        '',
+    autonomy: 'admin_gate',
+    slackChannel: '',
     slackTimeoutSeconds: 300,
-    vaultPath:           '~/ObsidianVault',
-    maxIterations:       3,
-    feedbackNote:        '',
-    cwd:                 '',
+    vaultPath: '~/ObsidianVault',
+    maxIterations: 3,
+    feedbackNote: '',
+    cwd: '',
   },
   slackStatus: null,
-  lastResult:  null,
+  lastResult: null,
 };
 
 // Thin wrapper so the wizard can call POST endpoints with a plain JSON body.
@@ -2298,7 +2483,7 @@ async function _cwApi(path, body) {
 VIEWS.crewWizard = async () => {
   await _wfLoadProviders();
   let slack = { configured: false };
-  try { slack = await api('/api/slack/config'); } catch(e) {}
+  try { slack = await api('/api/slack/config'); } catch (e) { }
   __cw.slackStatus = slack;
   // QQ233 — replace hardcoded persona/planner defaults with the first
   // *actually available* provider:model so the wizard doesn't preselect
@@ -2329,11 +2514,11 @@ VIEWS.crewWizard = async () => {
   })();
   // First-visit auto-guide — shown once, then user can re-open via button.
   let firstVisit = false;
-  try { firstVisit = !localStorage.getItem('cwGuideSeen'); } catch(_){}
-  if (firstVisit) setTimeout(() => { _cwShowGuide(); try{localStorage.setItem('cwGuideSeen','1');}catch(_){} }, 250);
+  try { firstVisit = !localStorage.getItem('cwGuideSeen'); } catch (_) { }
+  if (firstVisit) setTimeout(() => { _cwShowGuide(); try { localStorage.setItem('cwGuideSeen', '1'); } catch (_) { } }, 250);
   return `
     ${viewHeader('🧑‍✈️ 크루 위저드',
-       '폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 자동 생성. 워크플로우 탭에서 그대로 캔버스 편집 가능.', 'crewWizard')}
+    '폼만 채우면 기획자 + 페르소나 N명 + Slack 어드민 게이트 + Obsidian 기록까지 자동 생성. 워크플로우 탭에서 그대로 캔버스 편집 가능.', 'crewWizard')}
     <div class="flex items-center gap-2 mb-3 text-[11px]" style="color:var(--text-dim);">
       <button class="btn text-xs" onclick="_cwShowGuide()" title="${t('사용법')}">📖 ${t('사용법 보기')}</button>
       <span style="opacity:.6;">·</span>
@@ -2342,11 +2527,11 @@ VIEWS.crewWizard = async () => {
     <div id="cwRoot" style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start;">
       <div class="card" style="padding:18px;min-width:0;">
         <div id="cwSteps" class="flex items-center gap-2 text-xs mb-4" style="flex-wrap:wrap;">
-          ${[1,2,3,4].map(s => `
+          ${[1, 2, 3, 4].map(s => `
             <div class="cw-step" data-step="${s}" style="display:flex;align-items:center;gap:6px;">
               <span class="cw-bullet" style="width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--bg-soft);">${s}</span>
-              <span class="cw-label">${['프로젝트','페르소나','Slack & Obsidian','자율성'][s-1]}</span>
-              ${s<4?'<span style="opacity:.4;">›</span>':''}
+              <span class="cw-label">${['프로젝트', '페르소나', 'Slack & Obsidian', '자율성'][s - 1]}</span>
+              ${s < 4 ? '<span style="opacity:.4;">›</span>' : ''}
             </div>
           `).join('')}
         </div>
@@ -2408,10 +2593,10 @@ function _cwUpdateStepBadges() {
 function _cwRenderBody() {
   const host = document.getElementById('cwBody');
   if (!host) return;
-  if (__cw.step === 1)      host.innerHTML = _cwStep1();
+  if (__cw.step === 1) host.innerHTML = _cwStep1();
   else if (__cw.step === 2) host.innerHTML = _cwStep2();
   else if (__cw.step === 3) host.innerHTML = _cwStep3();
-  else                       host.innerHTML = _cwStep4();
+  else host.innerHTML = _cwStep4();
   _cwBindStepInputs();
 }
 
@@ -2447,7 +2632,7 @@ function _cwStep2() {
     <div class="cw-persona" data-idx="${i}" style="border:1px solid var(--border);border-radius:8px;padding:10px;display:grid;grid-template-columns:140px 1fr 1fr 28px;gap:8px;align-items:end;">
       <label class="block">
         <div class="text-[11px] font-semibold mb-1">${t('역할')}</div>
-        <input class="input w-full cw_p_role" placeholder="Researcher" value="${escapeHtml(p.role||'')}">
+        <input class="input w-full cw_p_role" placeholder="Researcher" value="${escapeHtml(p.role || '')}">
       </label>
       <label class="block">
         <div class="text-[11px] font-semibold mb-1">${t('모델')}</div>
@@ -2455,7 +2640,7 @@ function _cwStep2() {
       </label>
       <label class="block">
         <div class="text-[11px] font-semibold mb-1">${t('중점 영역 (선택)')}</div>
-        <input class="input w-full cw_p_focus" placeholder="시장조사" value="${escapeHtml(p.focus||'')}">
+        <input class="input w-full cw_p_focus" placeholder="시장조사" value="${escapeHtml(p.focus || '')}">
       </label>
       <button class="btn text-sm cw_p_del" title="${t('제거')}" style="height:30px;">✕</button>
     </div>
@@ -2477,8 +2662,8 @@ function _cwStep3() {
       <div style="border:1px solid var(--border);border-radius:8px;padding:12px;">
         <div class="flex items-center justify-between gap-2 mb-2">
           <div class="text-xs font-semibold">🛂 Slack ${t('어드민 게이트')}</div>
-          <div class="text-[11px]" style="color:${slack.configured?'#22c55e':'#ef4444'};">
-            ${slack.configured ? `${t('연결됨')} · ${escapeHtml(slack.tokenHint||'')}` : t('미설정')}
+          <div class="text-[11px]" style="color:${slack.configured ? '#22c55e' : '#ef4444'};">
+            ${slack.configured ? `${t('연결됨')} · ${escapeHtml(slack.tokenHint || '')}` : t('미설정')}
           </div>
         </div>
         ${slack.configured ? '' : `
@@ -2491,7 +2676,7 @@ function _cwStep3() {
         `}
         <div class="grid gap-2" style="grid-template-columns:1fr auto;">
           <input id="cw_slack_channel" class="input" placeholder="${t('이 워크플로우에서 사용할 채널 ID (선택, 비우면 기본 채널 사용)')}" value="${escapeHtml(f.slackChannel)}">
-          <button id="cw_slack_test" class="btn" ${slack.configured?'':'disabled'}>${t('테스트 메시지')}</button>
+          <button id="cw_slack_test" class="btn" ${slack.configured ? '' : 'disabled'}>${t('테스트 메시지')}</button>
         </div>
       </div>
 
@@ -2515,12 +2700,12 @@ function _cwStep4() {
         <div class="text-xs font-semibold mb-2">${t('자율성 모드')}</div>
         <div class="grid gap-2">
           ${[
-            ['admin_gate', '🛂 어드민 게이트', '매 사이클마다 Slack 으로 보고하고 어드민이 승인할 때까지 대기. 타임아웃 시 흐름 중단.'],
-            ['autonomous', '🤖 자율 모드', 'Slack 으로 상태 알림은 보내지만 짧은 타임아웃 후 스스로 판단해 다음 사이클 진행. 어드민이 끼어들고 싶을 때만 답장하면 됨.'],
-            ['no_slack',   '🔕 Slack 없음', 'Slack 노드를 빼고 페르소나 → Aggregate → Obsidian → 다음 사이클로 바로 흐름.']
-          ].map(([v, label, desc]) => `
-            <label class="cw-radio" style="display:flex;gap:10px;align-items:flex-start;border:1px solid ${f.autonomy===v?'var(--cyan)':'var(--border)'};border-radius:8px;padding:10px;cursor:pointer;">
-              <input type="radio" name="cw_autonomy" value="${v}" ${f.autonomy===v?'checked':''}>
+      ['admin_gate', '🛂 어드민 게이트', '매 사이클마다 Slack 으로 보고하고 어드민이 승인할 때까지 대기. 타임아웃 시 흐름 중단.'],
+      ['autonomous', '🤖 자율 모드', 'Slack 으로 상태 알림은 보내지만 짧은 타임아웃 후 스스로 판단해 다음 사이클 진행. 어드민이 끼어들고 싶을 때만 답장하면 됨.'],
+      ['no_slack', '🔕 Slack 없음', 'Slack 노드를 빼고 페르소나 → Aggregate → Obsidian → 다음 사이클로 바로 흐름.']
+    ].map(([v, label, desc]) => `
+            <label class="cw-radio" style="display:flex;gap:10px;align-items:flex-start;border:1px solid ${f.autonomy === v ? 'var(--cyan)' : 'var(--border)'};border-radius:8px;padding:10px;cursor:pointer;">
+              <input type="radio" name="cw_autonomy" value="${v}" ${f.autonomy === v ? 'checked' : ''}>
               <div>
                 <div class="text-sm font-semibold">${label}</div>
                 <div class="text-[11px]" style="color:var(--text-dim);">${desc}</div>
@@ -2544,7 +2729,7 @@ function _cwStep4() {
 
       <label class="block">
         <div class="text-xs font-semibold mb-1">${t('루프 피드백 노트 (선택)')}</div>
-        <textarea id="cw_feedback" class="input w-full" rows="3" placeholder="${t('비워두면 기본값 사용: \"이전 사이클 보고를 검토하고 미해결 항목을 우선 처리…\"')}">${escapeHtml(f.feedbackNote||'')}</textarea>
+        <textarea id="cw_feedback" class="input w-full" rows="3" placeholder="${t('비워두면 기본값 사용: \"이전 사이클 보고를 검토하고 미해결 항목을 우선 처리…\"')}">${escapeHtml(f.feedbackNote || '')}</textarea>
       </label>
     </div>
   `;
@@ -2555,20 +2740,20 @@ function _cwBindStepInputs() {
   const get = id => document.getElementById(id);
 
   if (__cw.step === 1) {
-    if (get('cw_project')) get('cw_project').oninput  = e => f.project = e.target.value;
-    if (get('cw_goal'))    get('cw_goal').oninput     = e => f.goal = e.target.value;
+    if (get('cw_project')) get('cw_project').oninput = e => f.project = e.target.value;
+    if (get('cw_goal')) get('cw_goal').oninput = e => f.goal = e.target.value;
     if (get('cw_planner')) get('cw_planner').onchange = e => f.plannerModel = e.target.value;
-    if (get('cw_cwd'))     get('cw_cwd').oninput      = e => f.cwd = e.target.value;
+    if (get('cw_cwd')) get('cw_cwd').oninput = e => f.cwd = e.target.value;
   }
   if (__cw.step === 2) {
     document.querySelectorAll('.cw-persona').forEach(row => {
       const i = +row.dataset.idx;
       const r = row.querySelector('.cw_p_role');
       const m = row.querySelector('.cw_p_model');
-      const fc= row.querySelector('.cw_p_focus');
-      const dl= row.querySelector('.cw_p_del');
-      if (r)  r.oninput  = e => f.personas[i].role = e.target.value;
-      if (m)  m.onchange = e => f.personas[i].model = e.target.value;
+      const fc = row.querySelector('.cw_p_focus');
+      const dl = row.querySelector('.cw_p_del');
+      if (r) r.oninput = e => f.personas[i].role = e.target.value;
+      if (m) m.onchange = e => f.personas[i].model = e.target.value;
       if (fc) fc.oninput = e => f.personas[i].focus = e.target.value;
       if (dl) dl.onclick = () => {
         if (f.personas.length <= 1) { toast(t('최소 1명은 필요합니다'), 'warn'); return; }
@@ -2595,18 +2780,18 @@ function _cwBindStepInputs() {
   if (__cw.step === 3) {
     if (get('cw_slack_channel')) get('cw_slack_channel').oninput = e => f.slackChannel = e.target.value.trim();
     if (get('cw_slack_default')) get('cw_slack_default').oninput = e => f.slackChannel = e.target.value.trim();
-    if (get('cw_vault'))         get('cw_vault').oninput         = e => f.vaultPath = e.target.value.trim();
+    if (get('cw_vault')) get('cw_vault').oninput = e => f.vaultPath = e.target.value.trim();
 
     const saveBtn = get('cw_slack_save');
     if (saveBtn) saveBtn.onclick = async () => {
-      const tok = (get('cw_slack_token')||{}).value || '';
-      const ch  = (get('cw_slack_default')||{}).value || '';
+      const tok = (get('cw_slack_token') || {}).value || '';
+      const ch = (get('cw_slack_default') || {}).value || '';
       saveBtn.disabled = true; saveBtn.textContent = '...';
       try {
         const r = await _cwApi('/api/slack/config/save', { token: tok.trim(), defaultChannel: ch.trim() });
         if (r.ok) {
           toast(t('Slack 토큰 저장 + 검증 성공'), 'ok');
-          __cw.slackStatus = { configured: true, tokenHint: tok.slice(0,6)+'...' };
+          __cw.slackStatus = { configured: true, tokenHint: tok.slice(0, 6) + '...' };
           _cwRenderBody();
         } else {
           toast(t('실패: ') + (r.error || ''), 'error');
@@ -2615,22 +2800,22 @@ function _cwBindStepInputs() {
     };
     const testBtn = get('cw_slack_test');
     if (testBtn) testBtn.onclick = async () => {
-      const ch = (get('cw_slack_channel')||{}).value || f.slackChannel;
+      const ch = (get('cw_slack_channel') || {}).value || f.slackChannel;
       testBtn.disabled = true;
       try {
         const r = await _cwApi('/api/slack/test', { channel: ch, text: 'LazyClaude · Crew Wizard 연결 테스트' });
-        if (r.ok) toast(t('Slack 인증 OK') + (r.postedTo?` · ${t('메시지 전송')}: ${r.postedTo}`:''), 'ok');
-        else      toast(t('Slack 실패: ') + (r.error||''), 'error');
+        if (r.ok) toast(t('Slack 인증 OK') + (r.postedTo ? ` · ${t('메시지 전송')}: ${r.postedTo}` : ''), 'ok');
+        else toast(t('Slack 실패: ') + (r.error || ''), 'error');
       } finally { testBtn.disabled = false; }
     };
     const vTest = get('cw_vault_test');
     if (vTest) vTest.onclick = async () => {
-      const v = (get('cw_vault')||{}).value || f.vaultPath;
+      const v = (get('cw_vault') || {}).value || f.vaultPath;
       vTest.disabled = true;
       try {
         const r = await _cwApi('/api/obsidian/test', { vaultPath: v.trim(), project: 'lazyclaude-wizard-probe' });
         if (r.ok) toast(t('Obsidian 쓰기 성공: ') + r.path, 'ok');
-        else      toast(t('Obsidian 실패: ') + (r.error||''), 'error');
+        else toast(t('Obsidian 실패: ') + (r.error || ''), 'error');
       } finally { vTest.disabled = false; }
     };
   }
@@ -2638,7 +2823,7 @@ function _cwBindStepInputs() {
     document.querySelectorAll('input[name="cw_autonomy"]').forEach(el => {
       el.onchange = e => { f.autonomy = e.target.value; _cwRenderBody(); };
     });
-    if (get('cw_iter'))     get('cw_iter').oninput     = e => f.maxIterations = Math.max(1, Math.min(20, +e.target.value || 1));
+    if (get('cw_iter')) get('cw_iter').oninput = e => f.maxIterations = Math.max(1, Math.min(20, +e.target.value || 1));
     if (get('cw_slack_to')) get('cw_slack_to').oninput = e => f.slackTimeoutSeconds = Math.max(5, Math.min(14400, +e.target.value || 60));
     if (get('cw_feedback')) get('cw_feedback').oninput = e => f.feedbackNote = e.target.value;
   }
@@ -2651,7 +2836,7 @@ async function _cwPreview() {
   try {
     const r = await _cwApi('/api/wizard/crew/preview', f);
     if (!r.ok) {
-      if (host) host.innerHTML = `<div class="text-[12px]" style="color:#ef4444;">${escapeHtml(r.error||'')}</div>`;
+      if (host) host.innerHTML = `<div class="text-[12px]" style="color:#ef4444;">${escapeHtml(r.error || '')}</div>`;
       return;
     }
     const p = r.preview;
@@ -2662,12 +2847,12 @@ async function _cwPreview() {
           ${p.nodes.length} ${t('노드')} · ${p.edges.length} ${t('연결')} · ${p.repeat.maxIterations} ${t('사이클')}
         </div>
         <ol class="mt-3 text-[11px]" style="padding-left:18px;line-height:1.7;">
-          ${p.nodes.map(n => `<li><code>${escapeHtml(n.type)}</code> — ${escapeHtml(n.title||'')}</li>`).join('')}
+          ${p.nodes.map(n => `<li><code>${escapeHtml(n.type)}</code> — ${escapeHtml(n.title || '')}</li>`).join('')}
         </ol>
       `;
     }
-  } catch(e) {
-    if (host) host.innerHTML = `<div style="color:#ef4444;">${escapeHtml(e.message||String(e))}</div>`;
+  } catch (e) {
+    if (host) host.innerHTML = `<div style="color:#ef4444;">${escapeHtml(e.message || String(e))}</div>`;
   }
 }
 
@@ -2678,18 +2863,18 @@ async function _cwSubmit() {
   try {
     const r = await _cwApi('/api/wizard/crew/create', f);
     if (!r.ok) {
-      toast(t('생성 실패: ') + (r.error||''), 'error');
+      toast(t('생성 실패: ') + (r.error || ''), 'error');
       return;
     }
     __cw.lastResult = r;
     toast(`${t('생성 완료')} — ${r.name}`, 'ok');
     // Hand off to the workflow canvas so the user can edit immediately.
     setTimeout(() => {
-      try { localStorage.setItem('__wf_open_id', r.id); } catch(_){}
-      try { go('workflows'); } catch(_) { location.hash = '#workflows'; }
+      try { localStorage.setItem('__wf_open_id', r.id); } catch (_) { }
+      try { go('workflows'); } catch (_) { location.hash = '#workflows'; }
     }, 400);
-  } catch(e) {
-    toast(t('오류: ') + (e.message||String(e)), 'error');
+  } catch (e) {
+    toast(t('오류: ') + (e.message || String(e)), 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🚀 ' + t('워크플로우 생성'); }
   }
@@ -2811,15 +2996,15 @@ function _cwShowGuide() {
 // ──────────────────────────────────────────────────────────────────
 
 const __rc = {
-  catalog:    [],
-  filtered:   [],
-  source:     '',          // '' | 'ecc' | 'omc' | 'omx' | 'fav'
-  kind:       '',          // '' | 'skill' | 'command' | 'mode' | 'diagnostic' | 'knowledge'
-  category:   '',          // '' | 'frontend' | 'backend' | ...
-  query:      '',
-  loaded:     false,
+  catalog: [],
+  filtered: [],
+  source: '',          // '' | 'ecc' | 'omc' | 'omx' | 'fav'
+  kind: '',          // '' | 'skill' | 'command' | 'mode' | 'diagnostic' | 'knowledge'
+  category: '',          // '' | 'frontend' | 'backend' | ...
+  query: '',
+  loaded: false,
   eccInstalled: false,
-  history:    [],
+  history: [],
   selectedItem: null,
   lastResult: null,
 };
@@ -2836,8 +3021,8 @@ async function _rcApi(path, body) {
 VIEWS.runCenter = async () => {
   return `
     ${viewHeader('🎯 ' + t('런 센터'),
-       t('ECC 181 스킬 + 79 슬래시 명령 + OMC 4 모드 + OMX 명령을 한 화면에서 검색·1클릭 실행. 결과는 자동 저장되며 워크플로우로도 변환 가능.'),
-       'runCenter')}
+    t('ECC 181 스킬 + 79 슬래시 명령 + OMC 4 모드 + OMX 명령을 한 화면에서 검색·1클릭 실행. 결과는 자동 저장되며 워크플로우로도 변환 가능.'),
+    'runCenter')}
     <div id="rcRoot" style="display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px;align-items:start;">
       <aside class="card" id="rcSidebar" style="padding:12px;position:sticky;top:8px;">
         <div class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--text-dim);">${t('소스')}</div>
@@ -2916,10 +3101,10 @@ async function _rcLoadCatalog(force) {
   const ecc = document.getElementById('rcEccStatus');
   if (ecc) {
     const dbg = __rc.debug || {};
-    const totalEcc = (dbg.ecc_skill_total||0) + (dbg.ecc_cmd_total||0);
+    const totalEcc = (dbg.ecc_skill_total || 0) + (dbg.ecc_cmd_total || 0);
     if (__rc.eccInstalled && totalEcc > 0) {
       ecc.innerHTML = `<span style="color:#22c55e;">✓ ECC ${t('설치됨')}</span>
-        <span style="color:var(--text-dim);"> · ${dbg.ecc_skill_total||0} ${t('스킬')} + ${dbg.ecc_cmd_total||0} ${t('명령')}</span>`;
+        <span style="color:var(--text-dim);"> · ${dbg.ecc_skill_total || 0} ${t('스킬')} + ${dbg.ecc_cmd_total || 0} ${t('명령')}</span>`;
     } else if (__rc.eccInstalled) {
       // ECC root found but 0 items parsed — likely permission/parse error.
       ecc.innerHTML = `<span style="color:#fbbf24;">⚠ ECC ${t('경로는 발견됐지만 항목 0개')}</span>
@@ -2945,7 +3130,7 @@ async function _rcReload() {
 
 function _rcRenderFilters() {
   const sources = [
-    { id: '',    label: t('전체') },
+    { id: '', label: t('전체') },
     { id: 'ecc', label: 'ECC' },
     { id: 'omc', label: 'OMC' },
     { id: 'omx', label: 'OMX' },
@@ -2959,25 +3144,25 @@ function _rcRenderFilters() {
   });
   const host = document.getElementById('rcSourceFilters');
   if (host) host.innerHTML = sources.map(s => {
-    const cnt = s.id === ''  ? __rc.catalog.length
-              : s.id === 'fav' ? favCount
-              : (sCounts[s.id] || 0);
-    return `<button class="rc-filter ${__rc.source===s.id?'rc-filter-on':''}" onclick="__rc.source='${s.id}';_rcRenderFilters();_rcApplyFilters();">
+    const cnt = s.id === '' ? __rc.catalog.length
+      : s.id === 'fav' ? favCount
+        : (sCounts[s.id] || 0);
+    return `<button class="rc-filter ${__rc.source === s.id ? 'rc-filter-on' : ''}" onclick="__rc.source='${s.id}';_rcRenderFilters();_rcApplyFilters();">
       <span>${escapeHtml(s.label)}</span><span class="rc-count">${cnt}</span>
     </button>`;
   }).join('');
 
   const kinds = [
-    { id: '',           label: t('전체') },
-    { id: 'skill',      label: t('스킬') },
-    { id: 'command',    label: t('슬래시 명령') },
-    { id: 'mode',       label: t('모드') },
+    { id: '', label: t('전체') },
+    { id: 'skill', label: t('스킬') },
+    { id: 'command', label: t('슬래시 명령') },
+    { id: 'mode', label: t('모드') },
     { id: 'diagnostic', label: t('진단') },
-    { id: 'knowledge',  label: t('지식') },
+    { id: 'knowledge', label: t('지식') },
   ];
   const khost = document.getElementById('rcKindFilters');
   if (khost) khost.innerHTML = kinds.map(k =>
-    `<button class="rc-filter ${__rc.kind===k.id?'rc-filter-on':''}" onclick="__rc.kind='${k.id}';_rcRenderFilters();_rcApplyFilters();">
+    `<button class="rc-filter ${__rc.kind === k.id ? 'rc-filter-on' : ''}" onclick="__rc.kind='${k.id}';_rcRenderFilters();_rcApplyFilters();">
       ${escapeHtml(k.label)}
     </button>`
   ).join('');
@@ -2988,7 +3173,7 @@ function _rcRenderFilters() {
   const catList = ['', ...Array.from(cats).sort()];
   const chost = document.getElementById('rcCatFilters');
   if (chost) chost.innerHTML = catList.map(c =>
-    `<button class="rc-cat ${__rc.category===c?'rc-cat-on':''}" onclick="__rc.category='${c}';_rcRenderFilters();_rcApplyFilters();">
+    `<button class="rc-cat ${__rc.category === c ? 'rc-cat-on' : ''}" onclick="__rc.category='${c}';_rcRenderFilters();_rcApplyFilters();">
       ${escapeHtml(c || t('전체'))}
     </button>`
   ).join('');
@@ -3001,14 +3186,14 @@ function _rcApplyFilters() {
   } else if (__rc.source) {
     items = items.filter(it => it.source === __rc.source);
   }
-  if (__rc.kind)     items = items.filter(it => it.kind === __rc.kind);
+  if (__rc.kind) items = items.filter(it => it.kind === __rc.kind);
   if (__rc.category) items = items.filter(it => it.category === __rc.category);
   if (__rc.query) {
     const q = __rc.query;
     items = items.filter(it => {
-      return (it.name||'').toLowerCase().includes(q)
-          || (it.description||'').toLowerCase().includes(q)
-          || (it.category||'').toLowerCase().includes(q);
+      return (it.name || '').toLowerCase().includes(q)
+        || (it.description || '').toLowerCase().includes(q)
+        || (it.category || '').toLowerCase().includes(q);
     });
   }
   __rc.filtered = items;
@@ -3051,7 +3236,7 @@ function _rcRenderCard(it) {
         <button class="rc-fav" onclick="event.stopPropagation();_rcToggleFavorite('${escapeHtml(it.id)}')" title="${t('즐겨찾기')}">${star}</button>
       </div>
       <div class="rc-name">${escapeHtml(it.name || '')}</div>
-      <div class="rc-desc">${escapeHtml((it.description || '').slice(0, 140))}${(it.description||'').length>140?'…':''}</div>
+      <div class="rc-desc">${escapeHtml((it.description || '').slice(0, 140))}${(it.description || '').length > 140 ? '…' : ''}</div>
       <div class="rc-card-foot">
         <span class="rc-cat-tag">${escapeHtml(it.category || 'general')}</span>
         <span class="rc-kind-tag">${escapeHtml(it.kind || '')}</span>
@@ -3066,7 +3251,7 @@ function _rcRenderCardCompact(it) {
         <span class="rc-name" style="font-size:12px;">${escapeHtml(it.name || '')}</span>
         <span class="rc-source" style="color:${_rcSourceColor(it.source)};font-size:10px;">${escapeHtml(it.source.toUpperCase())}</span>
       </div>
-      <div class="rc-desc" style="font-size:11px;-webkit-line-clamp:1;">${escapeHtml((it.description || '').slice(0, 80))}${(it.description||'').length>80?'…':''}</div>
+      <div class="rc-desc" style="font-size:11px;-webkit-line-clamp:1;">${escapeHtml((it.description || '').slice(0, 80))}${(it.description || '').length > 80 ? '…' : ''}</div>
     </div>`;
 }
 
@@ -3106,7 +3291,7 @@ function _rcOpenItem(itemId) {
     <div class="p-5 border-b border-[var(--border)] flex items-start justify-between gap-3">
       <div style="min-width:0;">
         <div class="text-[11px] uppercase tracking-widest" style="color:var(--text-dim);">
-          ${escapeHtml(it.source.toUpperCase())} · ${escapeHtml(it.kind)} · ${escapeHtml(it.category||'')}
+          ${escapeHtml(it.source.toUpperCase())} · ${escapeHtml(it.kind)} · ${escapeHtml(it.category || '')}
         </div>
         <h2 class="text-lg font-bold truncate">${escapeHtml(it.name || '')}</h2>
         <p class="text-[12px] mt-1" style="color:var(--text-mute);">${escapeHtml(it.description || '')}</p>
@@ -3151,11 +3336,11 @@ function _rcOpenItem(itemId) {
     </div>
   `;
   showModal(html, { wide: true });
-  setTimeout(() => { try { document.getElementById('rcGoal')?.focus(); } catch(e){} }, 50);
+  setTimeout(() => { try { document.getElementById('rcGoal')?.focus(); } catch (e) { } }, 50);
 }
 
 async function _rcExecute(itemId) {
-  const goal     = (document.getElementById('rcGoal')?.value || '').trim();
+  const goal = (document.getElementById('rcGoal')?.value || '').trim();
   // QQ234 — fall back through cached providers if the dropdown has no
   // value (which happens when 'claude:sonnet' wasn't in its options
   // because the user lacks claude-cli). Prefer first-available real
@@ -3168,14 +3353,14 @@ async function _rcExecute(itemId) {
     return `${p0.id.replace('-cli', '').replace('-api', '')}:${m0.id || m0.name}`;
   };
   const assignee = document.getElementById('rcAssignee')?.value || _firstRealAssignee();
-  const timeout  = +(document.getElementById('rcTimeout')?.value || 180);
+  const timeout = +(document.getElementById('rcTimeout')?.value || 180);
   if (!goal) { toast(t('목표를 입력하세요'), 'warn'); return; }
 
   const btn = document.getElementById('rcRunBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + t('실행 중…'); }
   const panel = document.getElementById('rcResultPanel');
-  const body  = document.getElementById('rcResultBody');
-  const meta  = document.getElementById('rcResultMeta');
+  const body = document.getElementById('rcResultBody');
+  const meta = document.getElementById('rcResultMeta');
   if (panel) panel.style.display = '';
   if (body) body.textContent = t('실행 중…');
   if (meta) meta.textContent = '';
@@ -3185,15 +3370,15 @@ async function _rcExecute(itemId) {
     __rc.lastResult = r;
     if (body) body.textContent = r.output || r.error || t('(빈 응답)');
     if (meta) {
-      const sec = ((r.durationMs||0)/1000).toFixed(1);
-      meta.textContent = `${r.provider||''} · ${r.model||''} · ${sec}s · ${r.tokensIn||0}↑ ${r.tokensOut||0}↓ · $${(r.costUsd||0).toFixed(4)}`;
+      const sec = ((r.durationMs || 0) / 1000).toFixed(1);
+      meta.textContent = `${r.provider || ''} · ${r.model || ''} · ${sec}s · ${r.tokensIn || 0}↑ ${r.tokensOut || 0}↓ · $${(r.costUsd || 0).toFixed(4)}`;
     }
     const acts = document.getElementById('rcResultActions');
     if (acts) acts.innerHTML = `
       <button class="btn text-xs" onclick="_rcCopyResult()">📋 ${t('결과 복사')}</button>
       <button class="btn text-xs" onclick="_rcSaveAsPrompt()">📝 ${t('프롬프트로 저장')}</button>
     `;
-    toast(r.ok ? t('실행 성공') : t('실행 실패: ') + (r.error||''), r.ok ? 'ok' : 'err');
+    toast(r.ok ? t('실행 성공') : t('실행 실패: ') + (r.error || ''), r.ok ? 'ok' : 'err');
   } catch (e) {
     if (body) body.textContent = e.message || String(e);
     toast(t('실행 오류'), 'err');
@@ -3215,21 +3400,21 @@ async function _rcSaveAsPrompt() {
   const it = __rc.selectedItem;
   try {
     const r = await api('/api/prompt-library/save', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: `Run: ${it.name}`,
-        body:  __rc.lastResult.output,
-        tags:  [it.source, it.category || ''],
+        body: __rc.lastResult.output,
+        tags: [it.source, it.category || ''],
       }),
     });
     toast(r.ok ? t('프롬프트 라이브러리에 저장됨') : t('저장 실패'), r.ok ? 'ok' : 'err');
-  } catch(e) { toast(t('저장 오류'), 'err'); }
+  } catch (e) { toast(t('저장 오류'), 'err'); }
 }
 
 async function _rcConvertToWorkflow(itemId) {
   try {
     const r = await _rcApi('/api/run/to-workflow', { itemId });
-    if (!r.ok) { toast(t('변환 실패: ') + (r.error||''), 'err'); return; }
+    if (!r.ok) { toast(t('변환 실패: ') + (r.error || ''), 'err'); return; }
     if (r.kind === 'template') {
       toast(t('빌트인 템플릿: ') + r.templateId + ' — ' + t('템플릿에서 직접 사용하세요'), 'ok');
       closeModal();
@@ -3238,18 +3423,18 @@ async function _rcConvertToWorkflow(itemId) {
     }
     // draft → save then open
     const saved = await api('/api/workflows/save', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(r.draft),
     });
     if (saved.ok) {
-      try { localStorage.setItem('__wf_open_id', saved.id); } catch(_){}
+      try { localStorage.setItem('__wf_open_id', saved.id); } catch (_) { }
       toast(t('워크플로우 생성 완료 — 워크플로우 탭으로 이동'), 'ok');
       closeModal();
       go('workflows');
     } else {
       toast(t('워크플로우 저장 실패'), 'err');
     }
-  } catch(e) { toast(t('오류: ') + (e.message||String(e)), 'err'); }
+  } catch (e) { toast(t('오류: ') + (e.message || String(e)), 'err'); }
 }
 
 // QQ38 (v2.66.113) — workflow tag filter chips.
@@ -3265,9 +3450,9 @@ function _wfRenderTagFilter() {
   if (all.size === 0) { host.style.display = 'none'; host.innerHTML = ''; return; }
   host.style.display = '';
   const cur = (__wf.tagFilter || '');
-  host.innerHTML = `<button class="chip text-[10px]" onclick="_wfSetTagFilter('')" style="${!cur?'background:var(--accent);color:#fff;':''}">${t('전체')}</button>`
+  host.innerHTML = `<button class="chip text-[10px]" onclick="_wfSetTagFilter('')" style="${!cur ? 'background:var(--accent);color:#fff;' : ''}">${t('전체')}</button>`
     + Array.from(all).sort().map(tg =>
-      `<button class="chip text-[10px]" onclick="_wfSetTagFilter('${tg.replace(/'/g, "\\'")}')" style="${cur===tg?'background:var(--accent);color:#fff;':''}">#${escapeHtml(tg)}</button>`
+      `<button class="chip text-[10px]" onclick="_wfSetTagFilter('${tg.replace(/'/g, "\\'")}')" style="${cur === tg ? 'background:var(--accent);color:#fff;' : ''}">#${escapeHtml(tg)}</button>`
     ).join('');
 }
 
@@ -3300,7 +3485,7 @@ function _wfRenderList() {
     const runningCount = w.runningCount || 0;
     const totalRuns = w.totalRuns || 0;
     const recentChips = lastRuns.length
-      ? lastRuns.map(r => `<span title="${escapeHtml(r.status)} ${r.error?'· '+escapeHtml(r.error):''} ${r.durationMs?'· '+(r.durationMs/1000).toFixed(1)+'s':''}" style="color:${_runColor(r.status)};font-size:11px;">${_runIcon(r.status)}</span>`).join('')
+      ? lastRuns.map(r => `<span title="${escapeHtml(r.status)} ${r.error ? '· ' + escapeHtml(r.error) : ''} ${r.durationMs ? '· ' + (r.durationMs / 1000).toFixed(1) + 's' : ''}" style="color:${_runColor(r.status)};font-size:11px;">${_runIcon(r.status)}</span>`).join('')
       : `<span style="color:var(--text-dim);font-size:10px;">${escapeHtml(t('실행 기록 없음'))}</span>`;
     // QQ78 (v2.67.15) — small success-rate badge from the lastRuns
     // sample (good enough as a recency-weighted health signal).
@@ -3323,7 +3508,7 @@ function _wfRenderList() {
         <div class="min-w-0 flex-1">
           <div class="text-sm font-medium truncate">${escapeHtml(w.name || 'Untitled')}</div>
           <div class="text-[10px] text-[var(--text-dim)] mt-0.5">
-            ${w.nodeCount} ${t('노드')}${w.stickyCount?` + ${w.stickyCount} 🟨`:''} · ${w.edgeCount} ${t('연결')} · ${fmtRel(w.updatedAt)}
+            ${w.nodeCount} ${t('노드')}${w.stickyCount ? ` + ${w.stickyCount} 🟨` : ''} · ${w.edgeCount} ${t('연결')} · ${fmtRel(w.updatedAt)}
           </div>
           ${tagChips ? `<div class="flex flex-wrap gap-1 mt-1">${tagChips}</div>` : ''}
           <div class="flex items-center gap-1.5 mt-1">
@@ -3344,14 +3529,22 @@ function _wfRenderList() {
 // template, injects the user's goal into the planner node's description, saves
 // as a new workflow, navigates to it. Optionally auto-runs.
 const _WF_QUICK_TPL = {
-  'autopilot':       { id: 'bt-autopilot',     title: '🚀 Autopilot',
-    desc: '요구사항을 받아 계획 → 실행 → 검증을 단일 흐름으로 끝까지 자율 실행' },
-  'ralph':           { id: 'bt-ralph',          title: '🔁 Ralph',
-    desc: 'verify 통과까지 fix 루프를 자동 반복 (최대 5회)' },
-  'ultrawork':       { id: 'bt-ultrawork',      title: '🤝 Ultrawork',
-    desc: '5명의 병렬 에이전트(Sonnet×2 + Haiku×3)가 동시 작업 후 결과 합류' },
-  'deep-interview':  { id: 'bt-deep-interview', title: '🧐 Deep Interview',
-    desc: '요구사항을 소크라테스식 질문으로 명확히한 후 설계 문서 산출' },
+  'autopilot': {
+    id: 'bt-autopilot', title: '🚀 Autopilot',
+    desc: '요구사항을 받아 계획 → 실행 → 검증을 단일 흐름으로 끝까지 자율 실행'
+  },
+  'ralph': {
+    id: 'bt-ralph', title: '🔁 Ralph',
+    desc: 'verify 통과까지 fix 루프를 자동 반복 (최대 5회)'
+  },
+  'ultrawork': {
+    id: 'bt-ultrawork', title: '🤝 Ultrawork',
+    desc: '5명의 병렬 에이전트(Sonnet×2 + Haiku×3)가 동시 작업 후 결과 합류'
+  },
+  'deep-interview': {
+    id: 'bt-deep-interview', title: '🧐 Deep Interview',
+    desc: '요구사항을 소크라테스식 질문으로 명확히한 후 설계 문서 산출'
+  },
 };
 
 // QQ238 — replace any session/subagent assignee whose `provider:model`
@@ -3429,9 +3622,9 @@ async function _wfQuickAction(modeKey) {
     try {
       const fr = await api('/api/workflows/templates/' + encodeURIComponent(meta.id));
       tpl = fr.template || ref;
-    } catch(_) { tpl = ref; }
-  } catch(e) {
-    toast(t('템플릿 조회 실패: ') + (e.message||String(e)), 'err'); return;
+    } catch (_) { tpl = ref; }
+  } catch (e) {
+    toast(t('템플릿 조회 실패: ') + (e.message || String(e)), 'err'); return;
   }
 
   if (!tpl.nodes || !tpl.nodes.length) {
@@ -3443,7 +3636,7 @@ async function _wfQuickAction(modeKey) {
   const cloneNodes = JSON.parse(JSON.stringify(tpl.nodes));
   const cloneEdges = JSON.parse(JSON.stringify(tpl.edges || []));
   const planner = cloneNodes.find(n => n.id === 'n-plan')
-                || cloneNodes.find(n => n.type === 'session' || n.type === 'subagent');
+    || cloneNodes.find(n => n.type === 'session' || n.type === 'subagent');
   if (planner) {
     planner.data = planner.data || {};
     const orig = (planner.data.description || planner.data.subject || '').trim();
@@ -3460,9 +3653,9 @@ async function _wfQuickAction(modeKey) {
     description: `Quick Action (${modeKey}) — ${goal.slice(0, 200)}`,
     nodes: cloneNodes, edges: cloneEdges,
     viewport: tpl.viewport || { panX: 0, panY: 0, zoom: 1 },
-    repeat:   tpl.repeat   || { enabled: false, maxIterations: 1, intervalSeconds: 0 },
-    notify:   { slack: '', discord: '' },
-    policy:   { tokenBudgetTotal: 0, onBudgetExceeded: 'stop', fallbackProvider: '' },
+    repeat: tpl.repeat || { enabled: false, maxIterations: 1, intervalSeconds: 0 },
+    notify: { slack: '', discord: '' },
+    policy: { tokenBudgetTotal: 0, onBudgetExceeded: 'stop', fallbackProvider: '' },
   };
 
   const r = await api('/api/workflows/save', {
@@ -3582,8 +3775,8 @@ async function _wfOpen(wfId) {
   _wfRenderCanvas();
   _wfRenderInspector();
   _wfUpdateToolbar();
-  const v = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
-  const isDefault = (Math.abs(v.panX) < 1 && Math.abs(v.panY) < 1 && Math.abs((v.zoom||1) - 1) < 0.01);
+  const v = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
+  const isDefault = (Math.abs(v.panX) < 1 && Math.abs(v.panY) < 1 && Math.abs((v.zoom || 1) - 1) < 0.01);
   if (isDefault && (__wf.current.nodes || []).length) {
     requestAnimationFrame(() => _wfFitView());
   }
@@ -3650,7 +3843,7 @@ function _wfToggleInspector() {
   const el = document.getElementById('wfInspector');
   if (!el) return;
   const collapsed = el.classList.toggle('wf-collapsed');
-  try { localStorage.setItem('wfInspectorCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem('wfInspectorCollapsed', collapsed ? '1' : '0'); } catch (e) { }
   // 토글 버튼 라벨 업데이트
   const tog = document.getElementById('wfInspectorToggle');
   if (tog) tog.innerHTML = collapsed ? `📋 ${t('메타')}` : `📋 ${t('메타')}`;
@@ -3660,7 +3853,7 @@ function _wfApplyInspectorState() {
   const el = document.getElementById('wfInspector');
   if (!el) return;
   let collapsed = false;
-  try { collapsed = localStorage.getItem('wfInspectorCollapsed') === '1'; } catch (e) {}
+  try { collapsed = localStorage.getItem('wfInspectorCollapsed') === '1'; } catch (e) { }
   el.classList.toggle('wf-collapsed', collapsed);
 }
 
@@ -3684,7 +3877,7 @@ window._wfToggleGrid = function () {
   if (!host) return;
   const next = !host.classList.contains('wf-grid-on');
   host.classList.toggle('wf-grid-on', next);
-  try { localStorage.setItem('cc.wfGrid', next ? '1' : '0'); } catch (_) {}
+  try { localStorage.setItem('cc.wfGrid', next ? '1' : '0'); } catch (_) { }
 };
 function _wfRestoreGrid() {
   try {
@@ -3692,7 +3885,7 @@ function _wfRestoreGrid() {
       const host = document.getElementById('wfCanvasHost');
       if (host) host.classList.add('wf-grid-on');
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 // QQ8 (v2.66.83) — sync the floating description tag with the
@@ -3794,7 +3987,7 @@ function _wfRenderCanvas() {
     _wfRenderMinimap(); return;
   }
   const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
-  vp.setAttribute('transform', `translate(${view.panX},${view.panY}) scale(${view.zoom||1})`);
+  vp.setAttribute('transform', `translate(${view.panX},${view.panY}) scale(${view.zoom || 1})`);
 
   const nodes = __wf.current.nodes || [];
   const edges = __wf.current.edges || [];
@@ -3862,7 +4055,7 @@ function _wfRenderCanvas() {
     const fpos = f ? `${f.x},${f.y}` : '?';
     const tpos = to ? `${to.x},${to.y}` : '?';
     const sel = __wf.selectedEdgeId === e.id ? '1' : '0';
-    return `${e.from}/${e.fromPort||'out'}@${fpos}|${e.to}/${e.toPort||'in'}@${tpos}|${sel}`;
+    return `${e.from}/${e.fromPort || 'out'}@${fpos}|${e.to}/${e.toPort || 'in'}@${tpos}|${sel}`;
   };
   if (__wf._forceFullCanvasRebuild) {
     edgesG.innerHTML = edges.map(e => _wfRenderEdge(e, _nodeMap)).join('');
@@ -3942,7 +4135,7 @@ function _wfNodeSnapKey(n) {
     // Sticky text changes should also trigger re-render of the node
     // (text/color/dim affect SVG content directly).
     sk: n.type === 'sticky'
-      ? `${(d.text||'').length}|${d.color||''}|${d.width||0}|${d.height||0}`
+      ? `${(d.text || '').length}|${d.color || ''}|${d.width || 0}|${d.height || 0}`
       : '',
   });
 }
@@ -4047,10 +4240,10 @@ async function _wfLoadTelemetry() {
   const summary = `
     <div class="grid gap-3 mb-3" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
       <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--accent);">${g.totalRuns}</div><div class="text-[10px] text-[var(--text-dim)]">${t('전체 실행')}</div></div>
-      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:${successColor};">${(g.successRate||0).toFixed(1)}%</div><div class="text-[10px] text-[var(--text-dim)]">${t('전체 성공률')}</div></div>
-      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--cyan);">${(g.p50_sec||0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('p50 (초)')}</div></div>
-      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--cyan);">${(g.p95_sec||0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('p95 (초)')}</div></div>
-      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--cyan);">${(g.p99_sec||0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('p99 (초)')}</div></div>
+      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:${successColor};">${(g.successRate || 0).toFixed(1)}%</div><div class="text-[10px] text-[var(--text-dim)]">${t('전체 성공률')}</div></div>
+      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--cyan);">${(g.p50_sec || 0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('p50 (초)')}</div></div>
+      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--cyan);">${(g.p95_sec || 0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('p95 (초)')}</div></div>
+      <div class="card p-3 text-center"><div class="text-lg font-bold" style="color:var(--cyan);">${(g.p99_sec || 0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('p99 (초)')}</div></div>
     </div>`;
   let table = '';
   if (rows.length === 0) {
@@ -4071,22 +4264,22 @@ async function _wfLoadTelemetry() {
     const trs = rows.map(w => {
       const isOthers = w.workflowId === '__others__';
       const label = isOthers ? t('기타 (집계)') : escapeHtml(w.name || w.workflowId || '?');
-      const sr = (w.successRate||0).toFixed(1);
+      const sr = (w.successRate || 0).toFixed(1);
       const srColor = w.successRate >= 90 ? 'var(--ok)' : (w.successRate >= 70 ? 'var(--warn)' : 'var(--err, #f87171)');
       // Y3 (v2.66.11) — clickable row → run-history modal for that wf
       const clickAttrs = isOthers ? '' :
         `style="cursor:pointer;" onclick="_wfOpenRunHistoryFor('${escapeHtml(w.workflowId)}')" title="${t('실행 이력 + 노드별 상세 보기')}"`;
       return `<tr ${clickAttrs} style="border-top:1px solid var(--border);font-size:11px;">
-        <td style="padding:4px 6px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}${isOthers?'':' <span class="text-[9px]" style="color:var(--text-dim)">↗</span>'}</td>
+        <td style="padding:4px 6px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}${isOthers ? '' : ' <span class="text-[9px]" style="color:var(--text-dim)">↗</span>'}</td>
         <td style="padding:4px 6px;">${w.totalRuns}</td>
         <td style="padding:4px 6px;color:var(--ok);">${w.successCount}</td>
         <td style="padding:4px 6px;color:var(--err, #f87171);">${w.failedCount}</td>
         <td style="padding:4px 6px;color:var(--text-dim);">${w.cancelledCount}</td>
         <td style="padding:4px 6px;color:${srColor};">${sr}%</td>
-        <td style="padding:4px 6px;">${(w.p50_sec||0).toFixed(2)}</td>
-        <td style="padding:4px 6px;">${(w.p95_sec||0).toFixed(2)}</td>
-        <td style="padding:4px 6px;">${(w.p99_sec||0).toFixed(2)}</td>
-        <td style="padding:4px 6px;">$${(w.totalCost||0).toFixed(4)}</td>
+        <td style="padding:4px 6px;">${(w.p50_sec || 0).toFixed(2)}</td>
+        <td style="padding:4px 6px;">${(w.p95_sec || 0).toFixed(2)}</td>
+        <td style="padding:4px 6px;">${(w.p99_sec || 0).toFixed(2)}</td>
+        <td style="padding:4px 6px;">$${(w.totalCost || 0).toFixed(4)}</td>
       </tr>`;
     }).join('');
     table = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead>${head}</thead><tbody>${trs}</tbody></table></div>`;
@@ -4124,7 +4317,7 @@ async function _wfLoadStats() {
     const activeSchedules = s.scheduleCount ?? 0;
     const byProvider = s.byProvider || [];
     const providerChips = byProvider.length
-      ? byProvider.map(p => `<span class="chip text-[10px]">${escapeHtml(p.provider||'?')}: ${p.count}</span>`).join(' ')
+      ? byProvider.map(p => `<span class="chip text-[10px]">${escapeHtml(p.provider || '?')}: ${p.count}</span>`).join(' ')
       : `<span class="text-[10px]" style="color:var(--text-dim)">${t('데이터 없음')}</span>`;
     host.innerHTML = `
       <div class="grid grid-cols-4 gap-3 mb-3">
@@ -4137,7 +4330,7 @@ async function _wfLoadStats() {
           <div class="text-[10px] text-[var(--text-dim)]">${t('성공률')}</div>
         </div>
         <div class="card p-3 text-center">
-          <div class="text-lg font-bold" style="color:var(--cyan);">${(avgDuration/1000).toFixed(1)}s</div>
+          <div class="text-lg font-bold" style="color:var(--cyan);">${(avgDuration / 1000).toFixed(1)}s</div>
           <div class="text-[10px] text-[var(--text-dim)]">${t('평균 소요시간')}</div>
         </div>
         <div class="card p-3 text-center">
@@ -4267,10 +4460,10 @@ function _wfRenderMinimap() {
 
 function _wfPortPos(node, port) {
   // port = 'in' | 'out' | 'out_y' | 'out_n'
-  if (port === 'in') return { x: node.x, y: node.y + WF_NODE_H/2 };
-  if (port === 'out' || port === 'out_y') return { x: node.x + WF_NODE_W, y: node.y + WF_NODE_H/2 };
+  if (port === 'in') return { x: node.x, y: node.y + WF_NODE_H / 2 };
+  if (port === 'out' || port === 'out_y') return { x: node.x + WF_NODE_W, y: node.y + WF_NODE_H / 2 };
   if (port === 'out_n') return { x: node.x + WF_NODE_W, y: node.y + WF_NODE_H - 10 };
-  return { x: node.x + WF_NODE_W, y: node.y + WF_NODE_H/2 };
+  return { x: node.x + WF_NODE_W, y: node.y + WF_NODE_H / 2 };
 }
 
 function _wfRenderNode(n) {
@@ -4284,10 +4477,10 @@ function _wfRenderNode(n) {
     const h = Math.max(80, Math.min(800, d.height || 140));
     const palette = {
       yellow: { bg: '#fef3c7', border: '#f59e0b', text: '#78350f' },
-      blue:   { bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a' },
-      green:  { bg: '#dcfce7', border: '#22c55e', text: '#14532d' },
-      pink:   { bg: '#fce7f3', border: '#ec4899', text: '#831843' },
-      gray:   { bg: '#e5e7eb', border: '#6b7280', text: '#1f2937' },
+      blue: { bg: '#dbeafe', border: '#3b82f6', text: '#1e3a8a' },
+      green: { bg: '#dcfce7', border: '#22c55e', text: '#14532d' },
+      pink: { bg: '#fce7f3', border: '#ec4899', text: '#831843' },
+      gray: { bg: '#e5e7eb', border: '#6b7280', text: '#1f2937' },
     };
     const c = palette[d.color] || palette.yellow;
     const md = d.text || '';
@@ -4296,9 +4489,9 @@ function _wfRenderNode(n) {
     catch (_) { html = escapeHtml(md); }
     return `
       <g class="wf-node${sel} wf-sticky" data-node="${n.id}" data-type="sticky" transform="translate(${n.x},${n.y})">
-        <rect class="wf-node-ring" x="-4" y="-4" width="${w+8}" height="${h+8}" rx="10" ry="10"></rect>
+        <rect class="wf-node-ring" x="-4" y="-4" width="${w + 8}" height="${h + 8}" rx="10" ry="10"></rect>
         <rect width="${w}" height="${h}" rx="6" ry="6" fill="${c.bg}" stroke="${c.border}" stroke-width="1.5"/>
-        <foreignObject x="8" y="6" width="${w-16}" height="${h-12}">
+        <foreignObject x="8" y="6" width="${w - 16}" height="${h - 12}">
           <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:11px;line-height:1.4;color:${c.text};font-family:inherit;overflow:hidden;height:100%;">
             ${html || `<span style="opacity:0.5;font-style:italic;">${t('메모 입력...')}</span>`}
           </div>
@@ -4306,20 +4499,20 @@ function _wfRenderNode(n) {
       </g>`;
   }
   const sub = n.type === 'session' || n.type === 'subagent'
-    ? `<text class="wf-node-sub" x="40" y="48">@${escapeHtml((n.data||{}).assignee || 'auto')}</text>`
+    ? `<text class="wf-node-sub" x="40" y="48">@${escapeHtml((n.data || {}).assignee || 'auto')}</text>`
     : `<text class="wf-node-sub" x="40" y="48">${escapeHtml(meta.label)}</text>`;
   const portIn = meta.portIn
-    ? `<circle class="wf-port wf-port-in" cx="0" cy="${WF_NODE_H/2}" r="6" data-port="in" data-node="${n.id}"></circle>` : '';
+    ? `<circle class="wf-port wf-port-in" cx="0" cy="${WF_NODE_H / 2}" r="6" data-port="in" data-node="${n.id}"></circle>` : '';
   let portsOut = '';
   if (n.type === 'branch') {
     portsOut = `
       <circle class="wf-port" cx="${WF_NODE_W}" cy="18" r="6" data-port="out_y" data-node="${n.id}"></circle>
-      <text x="${WF_NODE_W-12}" y="22" class="wf-node-sub" text-anchor="end" style="fill:#4ade80;">Y</text>
-      <circle class="wf-port" cx="${WF_NODE_W}" cy="${WF_NODE_H-18}" r="6" data-port="out_n" data-node="${n.id}"></circle>
-      <text x="${WF_NODE_W-12}" y="${WF_NODE_H-14}" class="wf-node-sub" text-anchor="end" style="fill:#f87171;">N</text>
+      <text x="${WF_NODE_W - 12}" y="22" class="wf-node-sub" text-anchor="end" style="fill:#4ade80;">Y</text>
+      <circle class="wf-port" cx="${WF_NODE_W}" cy="${WF_NODE_H - 18}" r="6" data-port="out_n" data-node="${n.id}"></circle>
+      <text x="${WF_NODE_W - 12}" y="${WF_NODE_H - 14}" class="wf-node-sub" text-anchor="end" style="fill:#f87171;">N</text>
     `;
   } else if (meta.portOut) {
-    portsOut = `<circle class="wf-port" cx="${WF_NODE_W}" cy="${WF_NODE_H/2}" r="6" data-port="out" data-node="${n.id}"></circle>`;
+    portsOut = `<circle class="wf-port" cx="${WF_NODE_W}" cy="${WF_NODE_H / 2}" r="6" data-port="out" data-node="${n.id}"></circle>`;
   }
   // 세션/서브에이전트 노드에는 우상단에 터미널 spawn 아이콘 표시
   const spawnBtn = (n.type === 'session' || n.type === 'subagent')
@@ -4330,16 +4523,16 @@ function _wfRenderNode(n) {
         <text x="10" y="15" text-anchor="middle" font-size="12" pointer-events="none">🖥️</text>
       </g>` : '';
   return `
-    <g class="wf-node${sel}${(n.data&&n.data.disabled)?' wf-disabled':''}" data-node="${n.id}" data-type="${n.type}" transform="translate(${n.x},${n.y})">
+    <g class="wf-node${sel}${(n.data && n.data.disabled) ? ' wf-disabled' : ''}" data-node="${n.id}" data-type="${n.type}" transform="translate(${n.x},${n.y})">
       <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
-      <rect class="wf-node-ring" x="-4" y="-4" width="${WF_NODE_W+8}" height="${WF_NODE_H+8}" rx="14" ry="14"></rect>
+      <rect class="wf-node-ring" x="-4" y="-4" width="${WF_NODE_W + 8}" height="${WF_NODE_H + 8}" rx="14" ry="14"></rect>
       <!-- QQ5 — disabled badge (only shown when .wf-disabled class present) -->
       <g class="wf-node-disabled-badge" transform="translate(${WF_NODE_W - 24}, 6)">
         <rect width="18" height="18" rx="9" ry="9" fill="rgba(120,120,120,0.85)" stroke="rgba(255,255,255,0.45)"/>
         <text x="9" y="13" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">⏸</text>
       </g>
       <!-- QQ20 — pin badge (n8n parity); shown only for pinned nodes -->
-      ${(n.data && n.data.pinned && (n.data.pinnedOutput||'').trim()) ? `
+      ${(n.data && n.data.pinned && (n.data.pinnedOutput || '').trim()) ? `
         <g class="wf-node-pin-badge" transform="translate(${WF_NODE_W - 46}, 6)">
           <rect width="18" height="18" rx="9" ry="9" fill="rgba(245,158,11,0.9)" stroke="rgba(255,255,255,0.55)"/>
           <text x="9" y="13" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">📌</text>
@@ -4347,7 +4540,7 @@ function _wfRenderNode(n) {
         </g>` : ''}
       <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
       <text class="wf-node-title" x="40" y="28">${escapeHtml(n.title || meta.label)}</text>
-      <text class="wf-node-elapsed" x="${WF_NODE_W-12}" y="${WF_NODE_H-8}" text-anchor="end"></text>
+      <text class="wf-node-elapsed" x="${WF_NODE_W - 12}" y="${WF_NODE_H - 8}" text-anchor="end"></text>
       ${sub}
       ${spawnBtn}
       ${portIn}${portsOut}
@@ -4361,7 +4554,7 @@ function _wfRenderNode(n) {
 function _wfRenderEdge(e, nodeMap) {
   if (!__wf.current) return '';
   const fromN = nodeMap ? nodeMap.get(e.from) : __wf.current.nodes.find(x => x.id === e.from);
-  const toN   = nodeMap ? nodeMap.get(e.to)   : __wf.current.nodes.find(x => x.id === e.to);
+  const toN = nodeMap ? nodeMap.get(e.to) : __wf.current.nodes.find(x => x.id === e.to);
   if (!fromN || !toN) return '';
   const p1 = _wfPortPos(fromN, e.fromPort || 'out');
   const p2 = _wfPortPos(toN, e.toPort || 'in');
@@ -4374,7 +4567,7 @@ function _wfBezier(x1, y1, x2, y2) {
   if (diffX >= 0) {
     // 정방향(또는 동일 x): 기존처럼 수평 베지어
     const dx = Math.max(20, diffX * 0.45);
-    return `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
   }
   // 역류: 출발이 도착보다 오른쪽. 제어점을 수직 방향(y2 쪽)으로 크게
   // 꺼내 부드러운 S-curve 로 우회. 루프·교차 방지.
@@ -4398,7 +4591,7 @@ function _wfBeautifyLayout() {
   const incoming = {}, outgoing = {};
   nodes.forEach(n => { incoming[n.id] = []; outgoing[n.id] = []; });
   edges.forEach(e => {
-    if (incoming[e.to])   incoming[e.to].push(e.from);
+    if (incoming[e.to]) incoming[e.to].push(e.from);
     if (outgoing[e.from]) outgoing[e.from].push(e.to);
   });
 
@@ -4546,7 +4739,7 @@ function _wfUpdateNodeTransform(nid) {
   const drag = __wf.drag;
   let nodeMap, adj;
   if (drag && drag._nodeMap && drag._nodesRef === __wf.current.nodes
-      && drag._edgesRef === __wf.current.edges) {
+    && drag._edgesRef === __wf.current.edges) {
     nodeMap = drag._nodeMap;
     adj = drag._adj;
   } else {
@@ -4573,14 +4766,14 @@ function _wfUpdateNodeTransform(nid) {
   // v2.46.0 perf — use cached `__wf._nodeEls` map populated by the keyed-diff
   // canvas renderer instead of querying the DOM on every drag mousemove frame.
   const g = (__wf._nodeEls && __wf._nodeEls.get(nid)) ||
-            document.querySelector('#wfNodes g.wf-node[data-node="' + nid + '"]');
+    document.querySelector('#wfNodes g.wf-node[data-node="' + nid + '"]');
   if (g) g.setAttribute('transform', `translate(${n.x},${n.y})`);
   const touched = adj.get(nid) || [];
   for (const e of touched) {
     const path = document.querySelector('#wfEdges path.wf-edge[data-edge="' + e.id + '"]');
     if (!path) continue;
     const fromN = nodeMap.get(e.from);
-    const toN   = nodeMap.get(e.to);
+    const toN = nodeMap.get(e.to);
     if (!fromN || !toN) continue;
     const p1 = _wfPortPos(fromN, e.fromPort || 'out');
     const p2 = _wfPortPos(toN, e.toPort || 'in');
@@ -4618,7 +4811,7 @@ window._wfDuplicateNodes = function (ids) {
       newEdges.push(Object.assign({}, ed, {
         id: 'e-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         from: idMap[ed.from],
-        to:   idMap[ed.to],
+        to: idMap[ed.to],
       }));
     }
   }
@@ -4803,7 +4996,7 @@ function _wfAddEdge(fromId, fromPort, toId, toPort) {
   if (fromId === toId) { toast(t('같은 노드에 연결할 수 없습니다'), 'warn'); return false; }
   _wfPushUndo();
   // 중복 방지
-  if (__wf.current.edges.some(e => e.from===fromId && e.to===toId && e.fromPort===fromPort)) {
+  if (__wf.current.edges.some(e => e.from === fromId && e.to === toId && e.fromPort === fromPort)) {
     toast(t('이미 연결되어 있습니다'), 'warn'); return false;
   }
   // 사이클 검사 — 이 edge 추가 후 to→from 경로가 있으면 cycle
@@ -4830,7 +5023,7 @@ function _wfBindCanvas() {
       const cvs = document.getElementById('wfMinimap');
       if (cvs) cvs.style.display = 'none';
     }
-  } catch (_) {}
+  } catch (_) { }
   // LL18 (v2.66.47) — sync zoom-cluster label with the actual viewport
   // on first canvas mount. Without this, the label reads "100%" even
   // when the workflow opens at a fit-to-screen zoom of, say, 0.78.
@@ -4845,7 +5038,7 @@ function _wfBindCanvas() {
       const el = document.getElementById('wfInspector');
       if (el) el.style.width = w + 'px';
     }
-  } catch (_) {}
+  } catch (_) { }
   const ihandle = document.getElementById('wfInspectorResize');
   if (ihandle && !ihandle.__wfBound) {
     ihandle.__wfBound = true;
@@ -4874,7 +5067,7 @@ function _wfBindCanvas() {
       const ins = document.getElementById('wfInspector');
       if (!ins) return;
       const w = Math.round(ins.getBoundingClientRect().width);
-      try { localStorage.setItem('cc.wfInspectorWidth', String(w)); } catch (_) {}
+      try { localStorage.setItem('cc.wfInspectorWidth', String(w)); } catch (_) { }
     });
   }
 
@@ -4937,10 +5130,10 @@ function _wfBindCanvas() {
   // 좌표 변환 — 스크린 좌표를 SVG 뷰포트 좌표(팬/줌 적용 후)로
   function svgPt(evt) {
     const rect = svg.getBoundingClientRect();
-    const view = (__wf.current && __wf.current.viewport) || { panX:0, panY:0, zoom:1 };
+    const view = (__wf.current && __wf.current.viewport) || { panX: 0, panY: 0, zoom: 1 };
     return {
-      x: (evt.clientX - rect.left - (view.panX||0)) / (view.zoom||1),
-      y: (evt.clientY - rect.top  - (view.panY||0)) / (view.zoom||1),
+      x: (evt.clientX - rect.left - (view.panX || 0)) / (view.zoom || 1),
+      y: (evt.clientY - rect.top - (view.panY || 0)) / (view.zoom || 1),
     };
   }
 
@@ -4952,7 +5145,7 @@ function _wfBindCanvas() {
     const spawnG = target.closest && target.closest('.wf-node-spawn');
     if (spawnG) {
       const nid = spawnG.getAttribute('data-spawn');
-      if (touch) { try{e.preventDefault();}catch(_){} }
+      if (touch) { try { e.preventDefault(); } catch (_) { } }
       _wfSpawnSession(nid);
       return;
     }
@@ -4964,7 +5157,7 @@ function _wfBindCanvas() {
         __wf.drag = { kind: 'edge', fromId: nodeId, fromPort: port };
         __wf.edgeDraft = { x1: pt.x, y1: pt.y, x2: pt.x, y2: pt.y };
         _wfDraftRender();
-        if (touch) { try{e.preventDefault();}catch(_){} }
+        if (touch) { try { e.preventDefault(); } catch (_) { } }
         return;
       }
       // in-port 에서 시작하는 드래그는 무시
@@ -4979,7 +5172,7 @@ function _wfBindCanvas() {
       // Task 9: Shift+클릭 → 다중 선택
       if (e.shiftKey || (touch && __wfMultiSelected.size > 0)) {
         _wfToggleMultiSelect(nid);
-        if (touch) { try{e.preventDefault();}catch(_){} }
+        if (touch) { try { e.preventDefault(); } catch (_) { } }
         return;
       }
       // QQ28 (v2.66.103) — if the clicked node is part of an active
@@ -4997,7 +5190,7 @@ function _wfBindCanvas() {
         __wf.drag = { kind: 'multi', leadId: nid, items: origs, startX: pt.x, startY: pt.y };
         _wfSyncSelectionClasses();
         _wfRenderInspector();
-        if (touch) { try{e.preventDefault();}catch(_){} }
+        if (touch) { try { e.preventDefault(); } catch (_) { } }
         return;
       }
       if (__wfMultiSelected.size > 0) { __wfMultiSelected.clear(); _wfSyncMultiSelectClasses(); }
@@ -5008,7 +5201,7 @@ function _wfBindCanvas() {
       // 전체 re-render 대신 selected 클래스만 토글 (깜빡임 방지)
       _wfSyncSelectionClasses();
       _wfRenderInspector();
-      if (touch) { try{e.preventDefault();}catch(_){} }
+      if (touch) { try { e.preventDefault(); } catch (_) { } }
       return;
     }
     // 엣지 클릭
@@ -5038,15 +5231,15 @@ function _wfBindCanvas() {
       rectEl.setAttribute('x', pt.x); rectEl.setAttribute('y', pt.y);
       rectEl.setAttribute('width', 0); rectEl.setAttribute('height', 0);
       rectEl.style.display = '';
-      try { e.preventDefault(); } catch(_) {}
+      try { e.preventDefault(); } catch (_) { }
       return;
     }
     __wf.selectedNodeId = null; __wf.selectedEdgeId = null;
-    const view = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
-    __wf.drag = { kind: 'pan', startX: e.clientX, startY: e.clientY, origPanX: view.panX||0, origPanY: view.panY||0 };
+    const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
+    __wf.drag = { kind: 'pan', startX: e.clientX, startY: e.clientY, origPanX: view.panX || 0, origPanY: view.panY || 0 };
     _wfSyncSelectionClasses();
     _wfRenderInspector();
-    if (touch) { try{e.preventDefault();}catch(_){} }
+    if (touch) { try { e.preventDefault(); } catch (_) { } }
   }
 
   function onMove(e, touch) {
@@ -5074,23 +5267,23 @@ function _wfBindCanvas() {
       if (!__wf.dirty) { __wf.dirty = true; _wfUpdateToolbar(); }
       _wfSchedulePatch();
       _wfScheduleMinimap();  // v2.43.1: rAF-coalesced (was sync, ~100/s)
-      if (touch) { try{e.preventDefault();}catch(_){} }
+      if (touch) { try { e.preventDefault(); } catch (_) { } }
     } else if (__wf.drag.kind === 'pan') {
       const dx = e.clientX - __wf.drag.startX;
       const dy = e.clientY - __wf.drag.startY;
-      __wf.current.viewport = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
+      __wf.current.viewport = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
       __wf.current.viewport.panX = __wf.drag.origPanX + dx;
       __wf.current.viewport.panY = __wf.drag.origPanY + dy;
       // v2.46.0 perf — use cached viewport <g> ref (set in _wfBindCanvas).
       const vp = __wf._viewportEl || (__wf._viewportEl = document.getElementById('wfViewport'));
       if (vp) vp.setAttribute('transform',
-        `translate(${__wf.current.viewport.panX},${__wf.current.viewport.panY}) scale(${__wf.current.viewport.zoom||1})`);
+        `translate(${__wf.current.viewport.panX},${__wf.current.viewport.panY}) scale(${__wf.current.viewport.zoom || 1})`);
       _wfSchedulePatch();
       _wfScheduleMinimap();  // v2.43.1: rAF-coalesced
     } else if (__wf.drag.kind === 'edge') {
       __wf.edgeDraft.x2 = pt.x; __wf.edgeDraft.y2 = pt.y;
       _wfDraftRender();
-      if (touch) { try{e.preventDefault();}catch(_){} }
+      if (touch) { try { e.preventDefault(); } catch (_) { } }
     } else if (__wf.drag.kind === 'multi') {
       const SNAP = 10;
       const rawDx = pt.x - __wf.drag.startX;
@@ -5118,7 +5311,7 @@ function _wfBindCanvas() {
       if (!__wf.dirty) { __wf.dirty = true; _wfUpdateToolbar(); }
       _wfSchedulePatch();
       _wfScheduleMinimap();
-      if (touch) { try{e.preventDefault();}catch(_){} }
+      if (touch) { try { e.preventDefault(); } catch (_) { } }
     } else if (__wf.drag.kind === 'rubber') {
       __wf.drag.curX = pt.x; __wf.drag.curY = pt.y;
       const rectEl = document.getElementById('wfRubberRect');
@@ -5225,225 +5418,231 @@ function _wfBindCanvas() {
     _wfShowEmptyCanvasContextMenu(e.clientX, e.clientY);
   });
 
-window._wfShowNodeContextMenu = _wfShowNodeContextMenu;
-function _wfShowNodeContextMenu(nid, x, y) {
-  // Remove any existing menu first.
-  const old = document.getElementById('wfNodeCtxMenu');
-  if (old) old.remove();
-  const menu = document.createElement('div');
-  menu.id = 'wfNodeCtxMenu';
-  menu.style.cssText = 'position:fixed;z-index:10000;min-width:160px;'
-    + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);'
-    + 'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);'
-    + 'padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
-  const items = [
-    { icon: '✏️', label: t('편집'),   shortcut: '⏎',  fn: () => _wfOpenNodeEditor(nid) },
-    { icon: '📑', label: t('복제'),   shortcut: '⌘D', fn: () => {
-        // QQ128 — multi-select aware. If the right-clicked node is part
-        // of a multi-selection, duplicate the whole set (matching the
-        // QQ127 Cmd/Ctrl+D path); otherwise duplicate just this node.
-        if (typeof _wfDuplicateNodes === 'function') {
-          const ids = (__wfMultiSelected && __wfMultiSelected.has(nid) && __wfMultiSelected.size > 1)
-            ? Array.from(__wfMultiSelected) : [nid];
-          _wfDuplicateNodes(ids);
+  window._wfShowNodeContextMenu = _wfShowNodeContextMenu;
+  function _wfShowNodeContextMenu(nid, x, y) {
+    // Remove any existing menu first.
+    const old = document.getElementById('wfNodeCtxMenu');
+    if (old) old.remove();
+    const menu = document.createElement('div');
+    menu.id = 'wfNodeCtxMenu';
+    menu.style.cssText = 'position:fixed;z-index:10000;min-width:160px;'
+      + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);'
+      + 'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);'
+      + 'padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
+    const items = [
+      { icon: '✏️', label: t('편집'), shortcut: '⏎', fn: () => _wfOpenNodeEditor(nid) },
+      {
+        icon: '📑', label: t('복제'), shortcut: '⌘D', fn: () => {
+          // QQ128 — multi-select aware. If the right-clicked node is part
+          // of a multi-selection, duplicate the whole set (matching the
+          // QQ127 Cmd/Ctrl+D path); otherwise duplicate just this node.
+          if (typeof _wfDuplicateNodes === 'function') {
+            const ids = (__wfMultiSelected && __wfMultiSelected.has(nid) && __wfMultiSelected.size > 1)
+              ? Array.from(__wfMultiSelected) : [nid];
+            _wfDuplicateNodes(ids);
+          }
         }
-      } },
-    // PP2 (v2.66.72) — toggle node enabled / disabled
-    { icon: '⏸', label: t('비활성화 토글'), shortcut: 'D', fn: () => _wfToggleNodeDisabled(nid) },
-    // QQ19 (v2.66.94) — single-node execution from context menu (n8n parity)
-    ...((() => {
-      const sn = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
-      const t2 = sn && sn.type;
-      if (t2 !== 'session' && t2 !== 'subagent') return [];
-      return [{ icon: '▶', label: t('단독 실행'), shortcut: '', fn: () => _wfRunSingleNode(nid) }];
-    })()),
-    // QQ19 — copy last output (only if there is one)
-    ...((() => {
-      const r = (__wf.lastRunResults || {})[nid];
-      const out = r && (r.output || r.error);
-      if (!out) return [];
-      return [{ icon: '📋', label: t('출력 복사'), shortcut: '', fn: () => {
-        navigator.clipboard.writeText(String(out)).then(
-          () => toast(t('출력 복사됨'), 'ok'),
-          () => toast(t('복사 실패'), 'err'),
-        );
-      } }];
-    })()),
-    // QQ20 (v2.66.95) — pin/unpin data (n8n parity)
-    ...((() => {
-      const sn = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
-      if (!sn || (sn.type !== 'session' && sn.type !== 'subagent')) return [];
-      const isPinned = !!(sn.data && sn.data.pinned && (sn.data.pinnedOutput || '').trim());
-      if (isPinned) {
-        return [{ icon: '📌', label: t('핀 해제'), shortcut: '', fn: () => _wfTogglePin(nid, false) }];
+      },
+      // PP2 (v2.66.72) — toggle node enabled / disabled
+      { icon: '⏸', label: t('비활성화 토글'), shortcut: 'D', fn: () => _wfToggleNodeDisabled(nid) },
+      // QQ19 (v2.66.94) — single-node execution from context menu (n8n parity)
+      ...((() => {
+        const sn = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
+        const t2 = sn && sn.type;
+        if (t2 !== 'session' && t2 !== 'subagent') return [];
+        return [{ icon: '▶', label: t('단독 실행'), shortcut: '', fn: () => _wfRunSingleNode(nid) }];
+      })()),
+      // QQ19 — copy last output (only if there is one)
+      ...((() => {
+        const r = (__wf.lastRunResults || {})[nid];
+        const out = r && (r.output || r.error);
+        if (!out) return [];
+        return [{
+          icon: '📋', label: t('출력 복사'), shortcut: '', fn: () => {
+            navigator.clipboard.writeText(String(out)).then(
+              () => toast(t('출력 복사됨'), 'ok'),
+              () => toast(t('복사 실패'), 'err'),
+            );
+          }
+        }];
+      })()),
+      // QQ20 (v2.66.95) — pin/unpin data (n8n parity)
+      ...((() => {
+        const sn = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
+        if (!sn || (sn.type !== 'session' && sn.type !== 'subagent')) return [];
+        const isPinned = !!(sn.data && sn.data.pinned && (sn.data.pinnedOutput || '').trim());
+        if (isPinned) {
+          return [{ icon: '📌', label: t('핀 해제'), shortcut: '', fn: () => _wfTogglePin(nid, false) }];
+        }
+        const r = (__wf.lastRunResults || {})[nid];
+        const out = r && r.output;
+        if (!out) return [];
+        return [{ icon: '📌', label: t('마지막 출력 핀 설정'), shortcut: '', fn: () => _wfTogglePin(nid, true) }];
+      })()),
+      { sep: true },
+      { icon: '🗑', label: t('삭제'), shortcut: '⌫', danger: true, fn: () => _wfDeleteSelectedNode() },
+    ];
+    for (const item of items) {
+      if (item.sep) {
+        const s = document.createElement('div');
+        s.style.cssText = 'height:1px;background:var(--border);margin:4px 0;';
+        menu.appendChild(s);
+        continue;
       }
-      const r = (__wf.lastRunResults || {})[nid];
-      const out = r && r.output;
-      if (!out) return [];
-      return [{ icon: '📌', label: t('마지막 출력 핀 설정'), shortcut: '', fn: () => _wfTogglePin(nid, true) }];
-    })()),
-    { sep: true },
-    { icon: '🗑', label: t('삭제'), shortcut: '⌫', danger: true, fn: () => _wfDeleteSelectedNode() },
-  ];
-  for (const item of items) {
-    if (item.sep) {
-      const s = document.createElement('div');
-      s.style.cssText = 'height:1px;background:var(--border);margin:4px 0;';
-      menu.appendChild(s);
-      continue;
-    }
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;'
-      + 'padding:6px 12px;cursor:pointer;color:' + (item.danger ? '#fca5a5' : 'var(--text)') + ';';
-    row.innerHTML = `<span>${item.icon}</span><span style="flex:1">${escapeHtml(item.label)}</span><span style="opacity:0.55;font-size:10px;">${item.shortcut || ''}</span>`;
-    row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.06)';
-    row.onmouseleave = () => row.style.background = '';
-    row.onclick = () => { try { item.fn(); } catch(e) {} _wfCloseNodeContextMenu(); };
-    menu.appendChild(row);
-  }
-  document.body.appendChild(menu);
-  // Reposition if it spills off the viewport.
-  const r = menu.getBoundingClientRect();
-  if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
-  if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
-  // Close on outside click or Esc.
-  setTimeout(() => {
-    const closer = (ev) => {
-      if (!menu.contains(ev.target)) _wfCloseNodeContextMenu();
-    };
-    document.addEventListener('mousedown', closer, { once: true });
-    document.addEventListener('keydown', function k(ev) {
-      if (ev.key === 'Escape') { _wfCloseNodeContextMenu(); document.removeEventListener('keydown', k); }
-    });
-  }, 0);
-}
-
-function _wfCloseNodeContextMenu() {
-  const m = document.getElementById('wfNodeCtxMenu');
-  if (m) m.remove();
-}
-
-// QQ13 (v2.66.88) — empty-canvas context menu. Fast access to:
-// add node, paste, fit, toggle grid, toggle inspector.
-function _wfShowEmptyCanvasContextMenu(x, y) {
-  const old = document.getElementById('wfNodeCtxMenu');
-  if (old) old.remove();
-  const menu = document.createElement('div');
-  menu.id = 'wfNodeCtxMenu';
-  menu.style.cssText = 'position:fixed;z-index:10000;min-width:170px;'
-    + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);'
-    + 'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);'
-    + 'padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
-  const hasClipboard = (__wf._clipboard && __wf._clipboard.length > 0);
-  const items = [
-    { icon: '＋', label: t('새 노드 추가'), shortcut: '⌘N', fn: () => _wfOpenNodeEditor(null) },
-    { icon: '📋', label: t('붙여넣기'), shortcut: '⌘V', disabled: !hasClipboard,
-      fn: () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', metaKey: true })); } },
-    { sep: true },
-    { icon: '🎯', label: t('화면 맞춤'), shortcut: '⌘0', fn: () => _wfFitView && _wfFitView() },
-    { icon: '⊞',  label: t('격자 표시 토글'), fn: () => _wfToggleGrid && _wfToggleGrid() },
-    { icon: '📋', label: t('인스펙터 토글'), shortcut: '⌘I', fn: () => _wfToggleInspector && _wfToggleInspector() },
-  ];
-  for (const item of items) {
-    if (item.sep) {
-      const s = document.createElement('div');
-      s.style.cssText = 'height:1px;background:var(--border);margin:4px 0;';
-      menu.appendChild(s); continue;
-    }
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;'
-      + 'padding:6px 12px;cursor:' + (item.disabled ? 'default' : 'pointer') + ';'
-      + 'opacity:' + (item.disabled ? 0.45 : 1) + ';color:var(--text);';
-    row.innerHTML = `<span>${item.icon}</span><span style="flex:1">${escapeHtml(item.label)}</span><span style="opacity:0.55;font-size:10px;">${item.shortcut || ''}</span>`;
-    if (!item.disabled) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;'
+        + 'padding:6px 12px;cursor:pointer;color:' + (item.danger ? '#fca5a5' : 'var(--text)') + ';';
+      row.innerHTML = `<span>${item.icon}</span><span style="flex:1">${escapeHtml(item.label)}</span><span style="opacity:0.55;font-size:10px;">${item.shortcut || ''}</span>`;
       row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.06)';
       row.onmouseleave = () => row.style.background = '';
-      row.onclick = () => { try { item.fn(); } catch (e) {} _wfCloseNodeContextMenu(); };
+      row.onclick = () => { try { item.fn(); } catch (e) { } _wfCloseNodeContextMenu(); };
+      menu.appendChild(row);
     }
-    menu.appendChild(row);
+    document.body.appendChild(menu);
+    // Reposition if it spills off the viewport.
+    const r = menu.getBoundingClientRect();
+    if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
+    if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
+    // Close on outside click or Esc.
+    setTimeout(() => {
+      const closer = (ev) => {
+        if (!menu.contains(ev.target)) _wfCloseNodeContextMenu();
+      };
+      document.addEventListener('mousedown', closer, { once: true });
+      document.addEventListener('keydown', function k(ev) {
+        if (ev.key === 'Escape') { _wfCloseNodeContextMenu(); document.removeEventListener('keydown', k); }
+      });
+    }, 0);
   }
-  document.body.appendChild(menu);
-  const r = menu.getBoundingClientRect();
-  if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
-  if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
-  setTimeout(() => {
-    const closer = (ev) => { if (!menu.contains(ev.target)) _wfCloseNodeContextMenu(); };
-    document.addEventListener('mousedown', closer, { once: true });
-    document.addEventListener('keydown', function k(ev) {
-      if (ev.key === 'Escape') { _wfCloseNodeContextMenu(); document.removeEventListener('keydown', k); }
-    });
-  }, 0);
-}
 
-// PP2 (v2.66.72) — toggle node disabled state. Disabled nodes skip on
-// the next run and render at half opacity / grayscale on the canvas.
-// QQ110 (v2.70.6) — exposed on window so the inline checkbox in the
-// inspector node-card (line ~6146) and the QQ19 ctx-menu can resolve.
-window._wfToggleNodeDisabled = function _wfToggleNodeDisabled(nid) {
-  if (!__wf.current) return;
-  const n = __wf.current.nodes.find(x => x.id === nid);
-  if (!n) return;
-  // QQ160 — push undo here so the ctx-menu '비활성화 토글' path is also
-  // covered. The QQ159 keyboard handler already pushes its own undo
-  // before delegating to this fn for the single-select case; that's
-  // fine — undo entries dedupe by snapshot anyway and an extra
-  // entry just costs a Cmd+Z press.
-  if (typeof _wfPushUndo === 'function') _wfPushUndo();
-  n.data = n.data || {};
-  n.data.disabled = !n.data.disabled;
-  __wf.dirty = true;
-  if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
-  _wfUpdateToolbar();
-  toast(n.data.disabled ? `⏸ ${t('비활성화됨')}` : `▶ ${t('활성화됨')}`, 'ok');
-};
-
-// QQ18 (v2.66.93) — single-node execution (n8n "Execute Node" parity).
-// Fires one session/subagent node in isolation and shows the raw response
-// in a modal so users can iterate without running the whole DAG.
-async function _wfRunSingleNode(nid) {
-  if (!__wf.current) return;
-  const n = __wf.current.nodes.find(x => x.id === nid);
-  if (!n) return;
-  if (n.type !== 'session' && n.type !== 'subagent') {
-    toast(t('단독 실행은 session/subagent 노드만 지원'), 'warn');
-    return;
+  function _wfCloseNodeContextMenu() {
+    const m = document.getElementById('wfNodeCtxMenu');
+    if (m) m.remove();
   }
-  if (__wf.dirty) {
-    // QQ94 (v2.68.4) — offer to auto-save the dirty workflow so users
-    // don't have to bounce out, save, and come back to retry.
-    if (confirm(t('저장되지 않은 변경 — 지금 저장하고 단독 실행할까요?'))) {
-      try { await _wfSave(); } catch (_) {}
-      if (__wf.dirty) { toast(t('저장 실패'), 'err'); return; }
-    } else {
+
+  // QQ13 (v2.66.88) — empty-canvas context menu. Fast access to:
+  // add node, paste, fit, toggle grid, toggle inspector.
+  function _wfShowEmptyCanvasContextMenu(x, y) {
+    const old = document.getElementById('wfNodeCtxMenu');
+    if (old) old.remove();
+    const menu = document.createElement('div');
+    menu.id = 'wfNodeCtxMenu';
+    menu.style.cssText = 'position:fixed;z-index:10000;min-width:170px;'
+      + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);'
+      + 'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);'
+      + 'padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
+    const hasClipboard = (__wf._clipboard && __wf._clipboard.length > 0);
+    const items = [
+      { icon: '＋', label: t('새 노드 추가'), shortcut: '⌘N', fn: () => _wfOpenNodeEditor(null) },
+      {
+        icon: '📋', label: t('붙여넣기'), shortcut: '⌘V', disabled: !hasClipboard,
+        fn: () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', metaKey: true })); }
+      },
+      { sep: true },
+      { icon: '🎯', label: t('화면 맞춤'), shortcut: '⌘0', fn: () => _wfFitView && _wfFitView() },
+      { icon: '⊞', label: t('격자 표시 토글'), fn: () => _wfToggleGrid && _wfToggleGrid() },
+      { icon: '📋', label: t('인스펙터 토글'), shortcut: '⌘I', fn: () => _wfToggleInspector && _wfToggleInspector() },
+    ];
+    for (const item of items) {
+      if (item.sep) {
+        const s = document.createElement('div');
+        s.style.cssText = 'height:1px;background:var(--border);margin:4px 0;';
+        menu.appendChild(s); continue;
+      }
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;'
+        + 'padding:6px 12px;cursor:' + (item.disabled ? 'default' : 'pointer') + ';'
+        + 'opacity:' + (item.disabled ? 0.45 : 1) + ';color:var(--text);';
+      row.innerHTML = `<span>${item.icon}</span><span style="flex:1">${escapeHtml(item.label)}</span><span style="opacity:0.55;font-size:10px;">${item.shortcut || ''}</span>`;
+      if (!item.disabled) {
+        row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.06)';
+        row.onmouseleave = () => row.style.background = '';
+        row.onclick = () => { try { item.fn(); } catch (e) { } _wfCloseNodeContextMenu(); };
+      }
+      menu.appendChild(row);
+    }
+    document.body.appendChild(menu);
+    const r = menu.getBoundingClientRect();
+    if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
+    if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
+    setTimeout(() => {
+      const closer = (ev) => { if (!menu.contains(ev.target)) _wfCloseNodeContextMenu(); };
+      document.addEventListener('mousedown', closer, { once: true });
+      document.addEventListener('keydown', function k(ev) {
+        if (ev.key === 'Escape') { _wfCloseNodeContextMenu(); document.removeEventListener('keydown', k); }
+      });
+    }, 0);
+  }
+
+  // PP2 (v2.66.72) — toggle node disabled state. Disabled nodes skip on
+  // the next run and render at half opacity / grayscale on the canvas.
+  // QQ110 (v2.70.6) — exposed on window so the inline checkbox in the
+  // inspector node-card (line ~6146) and the QQ19 ctx-menu can resolve.
+  window._wfToggleNodeDisabled = function _wfToggleNodeDisabled(nid) {
+    if (!__wf.current) return;
+    const n = __wf.current.nodes.find(x => x.id === nid);
+    if (!n) return;
+    // QQ160 — push undo here so the ctx-menu '비활성화 토글' path is also
+    // covered. The QQ159 keyboard handler already pushes its own undo
+    // before delegating to this fn for the single-select case; that's
+    // fine — undo entries dedupe by snapshot anyway and an extra
+    // entry just costs a Cmd+Z press.
+    if (typeof _wfPushUndo === 'function') _wfPushUndo();
+    n.data = n.data || {};
+    n.data.disabled = !n.data.disabled;
+    __wf.dirty = true;
+    if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+    _wfUpdateToolbar();
+    toast(n.data.disabled ? `⏸ ${t('비활성화됨')}` : `▶ ${t('활성화됨')}`, 'ok');
+  };
+
+  // QQ18 (v2.66.93) — single-node execution (n8n "Execute Node" parity).
+  // Fires one session/subagent node in isolation and shows the raw response
+  // in a modal so users can iterate without running the whole DAG.
+  async function _wfRunSingleNode(nid) {
+    if (!__wf.current) return;
+    const n = __wf.current.nodes.find(x => x.id === nid);
+    if (!n) return;
+    if (n.type !== 'session' && n.type !== 'subagent') {
+      toast(t('단독 실행은 session/subagent 노드만 지원'), 'warn');
       return;
     }
-  }
-  const btnLabel = `▶ ${t('단독 실행')}`;
-  toast(`⏳ ${escapeHtml(n.title || n.id)} ${t('실행 중...')}`, 'info');
-  let res;
-  try {
-    res = await fetch('/api/workflows/run-node', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wfId: __wf.current.id, nodeId: nid, inputs: [] }),
-    }).then(r => r.json());
-  } catch (e) {
-    toast(`❌ ${t('실행 실패')}: ${e.message || e}`, 'err');
-    return;
-  }
-  if (!res || !res.ok) {
-    toast(`❌ ${t('실행 실패')}: ${escapeHtml((res && res.error) || 'unknown')}`, 'err');
-    return;
-  }
-  const r = res.result || {};
-  const out = r.output || r.error || '(empty)';
-  const provider = r.provider || r.providerId || '';
-  const model = r.model || '';
-  const dur = r.durationMs ? fmtDur(r.durationMs) : '';
-  const tokens = r.tokens || r.tokenCount || '';
-  const cost = r.cost != null ? ('$' + Number(r.cost).toFixed(4)) : '';
-  const ok = r.success !== false && !r.error;
-  const html = `
+    if (__wf.dirty) {
+      // QQ94 (v2.68.4) — offer to auto-save the dirty workflow so users
+      // don't have to bounce out, save, and come back to retry.
+      if (confirm(t('저장되지 않은 변경 — 지금 저장하고 단독 실행할까요?'))) {
+        try { await _wfSave(); } catch (_) { }
+        if (__wf.dirty) { toast(t('저장 실패'), 'err'); return; }
+      } else {
+        return;
+      }
+    }
+    const btnLabel = `▶ ${t('단독 실행')}`;
+    toast(`⏳ ${escapeHtml(n.title || n.id)} ${t('실행 중...')}`, 'info');
+    let res;
+    try {
+      res = await fetch('/api/workflows/run-node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wfId: __wf.current.id, nodeId: nid, inputs: [] }),
+      }).then(r => r.json());
+    } catch (e) {
+      toast(`❌ ${t('실행 실패')}: ${e.message || e}`, 'err');
+      return;
+    }
+    if (!res || !res.ok) {
+      toast(`❌ ${t('실행 실패')}: ${escapeHtml((res && res.error) || 'unknown')}`, 'err');
+      return;
+    }
+    const r = res.result || {};
+    const out = r.output || r.error || '(empty)';
+    const provider = r.provider || r.providerId || '';
+    const model = r.model || '';
+    const dur = r.durationMs ? fmtDur(r.durationMs) : '';
+    const tokens = r.tokens || r.tokenCount || '';
+    const cost = r.cost != null ? ('$' + Number(r.cost).toFixed(4)) : '';
+    const ok = r.success !== false && !r.error;
+    const html = `
     <div style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">
       <div class="card" style="max-width:760px;width:100%;max-height:80vh;overflow:auto;padding:16px;">
         <div class="flex items-center gap-2 mb-2">
@@ -5455,37 +5654,37 @@ async function _wfRunSingleNode(nid) {
           ${provider ? `<span class="chip">${escapeHtml(provider)}</span>` : ''}
           ${model ? `<span class="chip">${escapeHtml(model)}</span>` : ''}
           ${dur ? `<span class="chip">⏱ ${dur}</span>` : ''}
-          ${tokens ? `<span class="chip">🔤 ${typeof tokens==='number'?tokens.toLocaleString():tokens}</span>` : ''}
+          ${tokens ? `<span class="chip">🔤 ${typeof tokens === 'number' ? tokens.toLocaleString() : tokens}</span>` : ''}
           ${cost ? `<span class="chip chip-warn">${cost}</span>` : ''}
         </div>
         <pre style="background:var(--code-bg);border:1px solid var(--border);padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto;">${escapeHtml(String(out))}</pre>
         <div class="flex gap-2 mt-3">
-          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(String(out)).replace(/"/g,'&quot;')}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
+          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(String(out)).replace(/"/g, '&quot;')}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
         </div>
       </div>
     </div>`;
-  const wrap = document.createElement('div');
-  wrap.innerHTML = html;
-  document.body.appendChild(wrap.firstElementChild);
-  // Mirror into lastRunResults so the inspector chip strip refreshes too.
-  __wf.lastRunResults = __wf.lastRunResults || {};
-  __wf.lastRunResults[nid] = r;
-  __wf._inspectorDirty = true;
-  _wfRenderInspector();
-}
+    const wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstElementChild);
+    // Mirror into lastRunResults so the inspector chip strip refreshes too.
+    __wf.lastRunResults = __wf.lastRunResults || {};
+    __wf.lastRunResults[nid] = r;
+    __wf._inspectorDirty = true;
+    _wfRenderInspector();
+  }
 
-// QQ108 (v2.69.1) — full-output modal for the inspector preview panel.
-// Opens the complete nr.output / nr.error in a scrollable overlay so users
-// can read long responses without leaving the workflow canvas.
-// QQ109 (v2.69.2) — exposed on window so the inline onclick fires.
-window._wfShowNodeOutputModal = function _wfShowNodeOutputModal(nid) {
-  const nr = (__wf.lastRunResults || {})[nid];
-  if (!nr) return;
-  const n = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
-  const title = (n && (n.title || (WF_TYPE_MAP[n.type] || {}).label)) || nid;
-  const outText = nr.output || nr.error || '';
-  const isErr = !nr.output && nr.error;
-  const html = `
+  // QQ108 (v2.69.1) — full-output modal for the inspector preview panel.
+  // Opens the complete nr.output / nr.error in a scrollable overlay so users
+  // can read long responses without leaving the workflow canvas.
+  // QQ109 (v2.69.2) — exposed on window so the inline onclick fires.
+  window._wfShowNodeOutputModal = function _wfShowNodeOutputModal(nid) {
+    const nr = (__wf.lastRunResults || {})[nid];
+    if (!nr) return;
+    const n = (__wf.current && __wf.current.nodes || []).find(x => x.id === nid);
+    const title = (n && (n.title || (WF_TYPE_MAP[n.type] || {}).label)) || nid;
+    const outText = nr.output || nr.error || '';
+    const isErr = !nr.output && nr.error;
+    const html = `
     <div style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">
       <div class="card" style="max-width:820px;width:100%;max-height:85vh;overflow:auto;padding:16px;">
         <div class="flex items-center gap-2 mb-3">
@@ -5493,83 +5692,83 @@ window._wfShowNodeOutputModal = function _wfShowNodeOutputModal(nid) {
           <div class="text-sm font-semibold flex-1 truncate">${escapeHtml(title)} — ${t('노드 출력')}</div>
           <button class="btn text-xs" onclick="this.closest('[style*=\\'z-index:99999\\']').remove()">✕</button>
         </div>
-        <pre style="background:var(--code-bg);border:1px solid var(--border);padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;${isErr?'color:#fca5a5;':''}">${escapeHtml(outText)}</pre>
+        <pre style="background:var(--code-bg);border:1px solid var(--border);padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;${isErr ? 'color:#fca5a5;' : ''}">${escapeHtml(outText)}</pre>
         <div class="flex gap-2 mt-3">
-          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(outText).replace(/"/g,'&quot;')}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
+          <button class="btn text-xs" onclick="navigator.clipboard.writeText(${JSON.stringify(outText).replace(/"/g, '&quot;')}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
           <span class="text-[10px] text-[var(--text-dim)] self-center">${outText.length.toLocaleString()} ${t('자')}</span>
         </div>
       </div>
     </div>`;
-  const wrap = document.createElement('div');
-  wrap.innerHTML = html;
-  document.body.appendChild(wrap.firstElementChild);
-};
+    const wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstElementChild);
+  };
 
-// QQ20 (v2.66.95) — pin/unpin node data (n8n "Pin Data" parity).
-// Pinning freezes the last output so subsequent runs return it without
-// invoking the provider — saves cost + lets users iterate downstream
-// nodes without re-running expensive LLM calls.
-window._wfTogglePin = _wfTogglePin;
-function _wfTogglePin(nid, pin) {
-  if (!__wf.current) return;
-  const n = __wf.current.nodes.find(x => x.id === nid);
-  if (!n) return;
-  n.data = n.data || {};
-  if (pin) {
-    const r = (__wf.lastRunResults || {})[nid];
-    const out = r && r.output;
-    if (!out) {
-      toast(t('핀할 마지막 출력이 없습니다 — 먼저 실행하세요'), 'warn');
-      return;
+  // QQ20 (v2.66.95) — pin/unpin node data (n8n "Pin Data" parity).
+  // Pinning freezes the last output so subsequent runs return it without
+  // invoking the provider — saves cost + lets users iterate downstream
+  // nodes without re-running expensive LLM calls.
+  window._wfTogglePin = _wfTogglePin;
+  function _wfTogglePin(nid, pin) {
+    if (!__wf.current) return;
+    const n = __wf.current.nodes.find(x => x.id === nid);
+    if (!n) return;
+    n.data = n.data || {};
+    if (pin) {
+      const r = (__wf.lastRunResults || {})[nid];
+      const out = r && r.output;
+      if (!out) {
+        toast(t('핀할 마지막 출력이 없습니다 — 먼저 실행하세요'), 'warn');
+        return;
+      }
+      // QQ160 — push undo BEFORE mutating so Cmd+Z reverts the pin/unpin.
+      if (typeof _wfPushUndo === 'function') _wfPushUndo();
+      n.data.pinned = true;
+      n.data.pinnedOutput = String(out).slice(0, 32000);
+      toast(`📌 ${t('핀 설정됨')} — ${escapeHtml(n.title || n.id)}`, 'ok');
+    } else {
+      if (typeof _wfPushUndo === 'function') _wfPushUndo();
+      n.data.pinned = false;
+      n.data.pinnedOutput = '';
+      toast(`${t('핀 해제됨')} — ${escapeHtml(n.title || n.id)}`, 'ok');
     }
-    // QQ160 — push undo BEFORE mutating so Cmd+Z reverts the pin/unpin.
-    if (typeof _wfPushUndo === 'function') _wfPushUndo();
-    n.data.pinned = true;
-    n.data.pinnedOutput = String(out).slice(0, 32000);
-    toast(`📌 ${t('핀 설정됨')} — ${escapeHtml(n.title || n.id)}`, 'ok');
-  } else {
-    if (typeof _wfPushUndo === 'function') _wfPushUndo();
-    n.data.pinned = false;
-    n.data.pinnedOutput = '';
-    toast(`${t('핀 해제됨')} — ${escapeHtml(n.title || n.id)}`, 'ok');
+    __wf.dirty = true;
+    if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
+    __wf._inspectorDirty = true;
+    _wfRenderInspector();
+    _wfUpdateToolbar();
   }
-  __wf.dirty = true;
-  if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
-  __wf._inspectorDirty = true;
-  _wfRenderInspector();
-  _wfUpdateToolbar();
-}
 
-// LL20 (v2.66.49) — edge context menu (Delete only, for now).
-function _wfShowEdgeContextMenu(eid, x, y) {
-  const old = document.getElementById('wfNodeCtxMenu');
-  if (old) old.remove();
-  const menu = document.createElement('div');
-  menu.id = 'wfNodeCtxMenu';
-  menu.style.cssText = 'position:fixed;z-index:10000;min-width:140px;'
-    + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);'
-    + 'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);'
-    + 'padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;align-items:center;gap:8px;'
-    + 'padding:6px 12px;cursor:pointer;color:#fca5a5;';
-  row.innerHTML = `<span>🗑</span><span style="flex:1">${escapeHtml(t('연결 삭제'))}</span><span style="opacity:0.55;font-size:10px;">⌫</span>`;
-  row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.06)';
-  row.onmouseleave = () => row.style.background = '';
-  row.onclick = () => { try { _wfDeleteSelectedEdge(); } catch(e) {} _wfCloseNodeContextMenu(); };
-  menu.appendChild(row);
-  document.body.appendChild(menu);
-  const r = menu.getBoundingClientRect();
-  if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
-  if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
-  setTimeout(() => {
-    const closer = (ev) => { if (!menu.contains(ev.target)) _wfCloseNodeContextMenu(); };
-    document.addEventListener('mousedown', closer, { once: true });
-    document.addEventListener('keydown', function k(ev) {
-      if (ev.key === 'Escape') { _wfCloseNodeContextMenu(); document.removeEventListener('keydown', k); }
-    });
-  }, 0);
-}
+  // LL20 (v2.66.49) — edge context menu (Delete only, for now).
+  function _wfShowEdgeContextMenu(eid, x, y) {
+    const old = document.getElementById('wfNodeCtxMenu');
+    if (old) old.remove();
+    const menu = document.createElement('div');
+    menu.id = 'wfNodeCtxMenu';
+    menu.style.cssText = 'position:fixed;z-index:10000;min-width:140px;'
+      + 'background:var(--surface,#1c1c1e);border:1px solid var(--border);'
+      + 'border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.35);'
+      + 'padding:4px 0;font-size:12px;left:' + x + 'px;top:' + y + 'px;';
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;'
+      + 'padding:6px 12px;cursor:pointer;color:#fca5a5;';
+    row.innerHTML = `<span>🗑</span><span style="flex:1">${escapeHtml(t('연결 삭제'))}</span><span style="opacity:0.55;font-size:10px;">⌫</span>`;
+    row.onmouseenter = () => row.style.background = 'rgba(255,255,255,0.06)';
+    row.onmouseleave = () => row.style.background = '';
+    row.onclick = () => { try { _wfDeleteSelectedEdge(); } catch (e) { } _wfCloseNodeContextMenu(); };
+    menu.appendChild(row);
+    document.body.appendChild(menu);
+    const r = menu.getBoundingClientRect();
+    if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
+    if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
+    setTimeout(() => {
+      const closer = (ev) => { if (!menu.contains(ev.target)) _wfCloseNodeContextMenu(); };
+      document.addEventListener('mousedown', closer, { once: true });
+      document.addEventListener('keydown', function k(ev) {
+        if (ev.key === 'Escape') { _wfCloseNodeContextMenu(); document.removeEventListener('keydown', k); }
+      });
+    }, 0);
+  }
 
   document.addEventListener('mousemove', (e) => {
     if (!__wf.drag) return;
@@ -5592,7 +5791,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
     __wf.lastTouchTs = Date.now();
     const te = e.touches[0];
     onMove({ clientX: te.clientX, clientY: te.clientY }, true);
-    try { e.preventDefault(); } catch (_) {}
+    try { e.preventDefault(); } catch (_) { }
   }, { passive: false });
   document.addEventListener('touchend', (e) => {
     if (!__wf.drag) return;
@@ -5607,7 +5806,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
     window.__wfKeydownRegistered = true;
     _KEYDOWN_HANDLERS.push((e) => {
       if (state.view !== 'workflows') return;
-      const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
+      const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement || {}).tagName);
 
       // ? — shortcut help (skip inside input)
       if (e.key === '?' && !inInput && !e.ctrlKey && !e.metaKey) {
@@ -5656,7 +5855,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
           v.zoom = Math.max(0.3, Math.min(2.5, (v.zoom || 1) * factor));
           __wf.current.viewport = v;
           const vp = document.getElementById('wfViewport');
-          if (vp) vp.setAttribute('transform', `translate(${v.panX||0},${v.panY||0}) scale(${v.zoom||1})`);
+          if (vp) vp.setAttribute('transform', `translate(${v.panX || 0},${v.panY || 0}) scale(${v.zoom || 1})`);
           if (typeof _wfRenderMinimap === 'function') _wfRenderMinimap();
         }
         return true;
@@ -5688,7 +5887,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
         const edges = (__wf.current.edges || []).filter(ed => idSet.has(ed.from) && idSet.has(ed.to));
         __wf._clipboard = nodes.map(n => JSON.parse(JSON.stringify(n)));
         __wf._clipboardEdges = edges.map(ed => JSON.parse(JSON.stringify(ed)));
-        toast(`${nodes.length} ${t('노드 복사됨')}${edges.length?` · ${edges.length} ${t('엣지')}`:''}`, 'ok');
+        toast(`${nodes.length} ${t('노드 복사됨')}${edges.length ? ` · ${edges.length} ${t('엣지')}` : ''}`, 'ok');
         return true;
       }
 
@@ -5715,7 +5914,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
         __wf.dirty = true;
         _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
         if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
-        toast(`${nodes.length} ${t('노드 잘라내기 완료')}${edges.length?` · ${edges.length} ${t('엣지')}`:''}`, 'ok');
+        toast(`${nodes.length} ${t('노드 잘라내기 완료')}${edges.length ? ` · ${edges.length} ${t('엣지')}` : ''}`, 'ok');
         return true;
       }
 
@@ -5760,7 +5959,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
           __wf.dirty = true;
           _wfRenderCanvas(); _wfRenderInspector(); _wfUpdateToolbar();
           if (typeof _wfSyncMultiSelectClasses === 'function') _wfSyncMultiSelectClasses();
-          toast(`${pasted.length} ${t('노드 붙여넣기 완료')}${pastedEdges.length?` · ${pastedEdges.length} ${t('엣지')}`:''}`, 'ok');
+          toast(`${pasted.length} ${t('노드 붙여넣기 완료')}${pastedEdges.length ? ` · ${pastedEdges.length} ${t('엣지')}` : ''}`, 'ok');
         }
         return true;
       }
@@ -5787,7 +5986,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
           const ids = all.map(w => w.id);
           let idx = __wf.current ? ids.indexOf(__wf.current.id) : -1;
           if (e.key === '[') idx = (idx <= 0) ? ids.length - 1 : idx - 1;
-          else               idx = (idx < 0 || idx >= ids.length - 1) ? 0 : idx + 1;
+          else idx = (idx < 0 || idx >= ids.length - 1) ? 0 : idx + 1;
           _wfOpen(ids[idx]);
           return true;
         }
@@ -5799,7 +5998,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       // QQ165 — Cmd/Ctrl+Shift+N creates a new WORKFLOW. Mirrors the
       // chat QQ164 shortcut for a parallel experience.
       if (mod && e.shiftKey && (e.key === 'n' || e.key === 'N') && !inInput
-          && state.view === 'workflows') {
+        && state.view === 'workflows') {
         e.preventDefault();
         if (typeof _wfCreateNew === 'function') _wfCreateNew();
         return true;
@@ -5807,13 +6006,13 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       // QQ168 — Cmd/Ctrl+Shift+E exports the current workflow as JSON.
       // Parallels the chat QQ166 export shortcut.
       if (mod && e.shiftKey && (e.key === 'e' || e.key === 'E') && !inInput
-          && state.view === 'workflows') {
+        && state.view === 'workflows') {
         e.preventDefault();
         if (typeof _wfExport === 'function') _wfExport();
         return true;
       }
       if (mod && (e.key === 'n' || e.key === 'N') && !inInput
-          && state.view === 'workflows') {
+        && state.view === 'workflows') {
         e.preventDefault();
         if (typeof _wfOpenNodeEditor === 'function') _wfOpenNodeEditor(null);
         return true;
@@ -5832,14 +6031,14 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       // selected node. Pairs with Tab cycling for fully keyboard-
       // driven editing: Tab to land on a node, Cmd+E to open it.
       if (mod && (e.key === 'e' || e.key === 'E') && !inInput
-          && __wf.current && __wf.selectedNodeId) {
+        && __wf.current && __wf.selectedNodeId) {
         e.preventDefault();
         if (typeof _wfOpenNodeEditor === 'function') _wfOpenNodeEditor(__wf.selectedNodeId);
         return true;
       }
       // Enter key on an SVG node also opens the editor (n8n parity).
       if (e.key === 'Enter' && !mod && !inInput
-          && __wf.current && __wf.selectedNodeId) {
+        && __wf.current && __wf.selectedNodeId) {
         e.preventDefault();
         if (typeof _wfOpenNodeEditor === 'function') _wfOpenNodeEditor(__wf.selectedNodeId);
         return true;
@@ -5857,7 +6056,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
           const cur = __wf.selectedNodeId;
           let idx = ids.indexOf(cur);
           if (e.shiftKey) idx = (idx <= 0) ? ids.length - 1 : idx - 1;
-          else            idx = (idx < 0 || idx >= ids.length - 1) ? 0 : idx + 1;
+          else idx = (idx < 0 || idx >= ids.length - 1) ? 0 : idx + 1;
           __wf.selectedNodeId = ids[idx]; __wf.selectedEdgeId = null;
           if (typeof _wfSyncSelectionClasses === 'function') _wfSyncSelectionClasses();
           if (typeof _wfRenderInspector === 'function') _wfRenderInspector();
@@ -5873,7 +6072,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
         if (cvs) {
           const hidden = cvs.style.display === 'none';
           cvs.style.display = hidden ? '' : 'none';
-          try { localStorage.setItem('cc.wfMinimapHidden', hidden ? '0' : '1'); } catch (_) {}
+          try { localStorage.setItem('cc.wfMinimapHidden', hidden ? '0' : '1'); } catch (_) { }
           if (hidden && typeof _wfRenderMinimap === 'function') _wfRenderMinimap();
         }
         return true;
@@ -5884,7 +6083,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       // shortcut just rearranges so the user keeps their current
       // pan/zoom and sees the topology snap into place.
       if (e.shiftKey && (e.key === 'L' || e.key === 'l') && !mod && !inInput
-          && __wf.current && (__wf.current.nodes || []).length) {
+        && __wf.current && (__wf.current.nodes || []).length) {
         e.preventDefault();
         if (typeof _wfPushUndo === 'function') _wfPushUndo();
         if (typeof _wfBeautifyLayout === 'function') _wfBeautifyLayout();
@@ -5927,8 +6126,8 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       // of the first selected node's current `disabled` value) so
       // users get a deterministic batch-disable / batch-enable.
       if (!mod && (e.key === 'd' || e.key === 'D') && !inInput
-          && __wf.current
-          && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
+        && __wf.current
+        && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
         e.preventDefault();
         if (__wfMultiSelected && __wfMultiSelected.size > 1) {
           const ids = Array.from(__wfMultiSelected);
@@ -5947,7 +6146,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
           _wfUpdateToolbar();
           toast(
             (desiredDisabled ? `⏸ ${t('비활성화됨')}` : `▶ ${t('활성화됨')}`)
-              + ` · ${targets.length}`,
+            + ` · ${targets.length}`,
             'ok'
           );
         } else {
@@ -5962,7 +6161,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       // QQ127 — multi-select aware. QQ128 — extracted into
       // window._wfDuplicateNodes so the ctx menu shares the same path.
       if (mod && e.key === 'd' && !inInput && __wf.current
-          && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
+        && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
         e.preventDefault();
         const ids = (__wfMultiSelected && __wfMultiSelected.size > 1)
           ? Array.from(__wfMultiSelected)
@@ -5972,7 +6171,7 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       }
 
       // Delete / Backspace — remove
-      if (['Delete','Backspace'].includes(e.key) && !inInput) {
+      if (['Delete', 'Backspace'].includes(e.key) && !inInput) {
         // QQ30 (v2.66.105) — multi-select delete (n8n parity).
         if (__wfMultiSelected && __wfMultiSelected.size > 1 && __wf.current) {
           e.preventDefault();
@@ -6002,8 +6201,8 @@ function _wfShowEdgeContextMenu(eid, x, y) {
       //   since last arrow press) so Cmd+Z reverses the whole burst at
       //   once instead of needing 1 undo per pixel.
       if (!mod && !inInput && __wf.current
-          && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
-        const ARROWS = { ArrowLeft: [-1,0], ArrowRight: [1,0], ArrowUp: [0,-1], ArrowDown: [0,1] };
+        && (__wf.selectedNodeId || (__wfMultiSelected && __wfMultiSelected.size))) {
+        const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
         const dir = ARROWS[e.key];
         if (dir) {
           e.preventDefault();
@@ -6146,27 +6345,27 @@ function _wfRenderInspector(opts) {
     return;
   }
   if (!(opts && opts.force)
-      && __wf._lastInspectedId === __wf.selectedNodeId
-      && !__wf._inspectorDirty) {
+    && __wf._lastInspectedId === __wf.selectedNodeId
+    && !__wf._inspectorDirty) {
     return;
   }
   __wf._lastInspectedId = __wf.selectedNodeId;
   __wf._inspectorDirty = false;
   // 워크플로우 메타 섹션 + 반복 실행 설정
-  const rp = __wf.current.repeat || { enabled:false, maxIterations:5, intervalSeconds:0, scheduleEnabled:false, scheduleStart:'09:00', scheduleEnd:'18:00', feedbackNote:'', feedbackNodeId:'' };
+  const rp = __wf.current.repeat || { enabled: false, maxIterations: 5, intervalSeconds: 0, scheduleEnabled: false, scheduleStart: '09:00', scheduleEnd: '18:00', feedbackNote: '', feedbackNodeId: '' };
   // 세션/서브에이전트 노드 목록 — 피드백 대상 선택지
   const fbOptions = (__wf.current.nodes || [])
     .filter(n => n.type === 'session' || n.type === 'subagent')
-    .map(n => `<option value="${n.id}" ${rp.feedbackNodeId===n.id?'selected':''}>${escapeHtml(n.title||n.id)}</option>`).join('');
+    .map(n => `<option value="${n.id}" ${rp.feedbackNodeId === n.id ? 'selected' : ''}>${escapeHtml(n.title || n.id)}</option>`).join('');
   const meta = `
     <div class="mb-4">
       <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('워크플로우 메타')}</div>
       <label class="text-[10px] text-[var(--text-dim)]">${t('이름')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(__wf.current.name||'')}" oninput="__wf.current.name=this.value;__wf.dirty=true;_wfUpdateToolbar();_wfRenderList();">
+      <input class="input w-full mt-1" value="${escapeHtml(__wf.current.name || '')}" oninput="__wf.current.name=this.value;__wf.dirty=true;_wfUpdateToolbar();_wfRenderList();">
       <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('설명')}</label>
-      <textarea class="input w-full mt-1" rows="2" oninput="__wf.current.description=this.value;__wf.dirty=true;_wfUpdateToolbar();">${escapeHtml(__wf.current.description||'')}</textarea>
+      <textarea class="input w-full mt-1" rows="2" oninput="__wf.current.description=this.value;__wf.dirty=true;_wfUpdateToolbar();">${escapeHtml(__wf.current.description || '')}</textarea>
       <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('태그 (쉼표 구분, 최대 10개)')}</label>
-      <input class="input w-full mt-1 text-[11px]" value="${escapeHtml(((__wf.current.tags||[]).join(', ')))}" placeholder="prod, demo, ai" onfocus="this.select()" oninput="(function(v){__wf.current.tags=v.split(',').map(s=>s.trim().toLowerCase()).filter((s,i,a)=>s&&a.indexOf(s)===i).slice(0,10);__wf.dirty=true;_wfUpdateToolbar();var w=(__wf.workflows||[]).find(x=>x.id===__wf.current.id);if(w)w.tags=__wf.current.tags.slice();_wfRenderList();})(this.value)">
+      <input class="input w-full mt-1 text-[11px]" value="${escapeHtml(((__wf.current.tags || []).join(', ')))}" placeholder="prod, demo, ai" onfocus="this.select()" oninput="(function(v){__wf.current.tags=v.split(',').map(s=>s.trim().toLowerCase()).filter((s,i,a)=>s&&a.indexOf(s)===i).slice(0,10);__wf.dirty=true;_wfUpdateToolbar();var w=(__wf.workflows||[]).find(x=>x.id===__wf.current.id);if(w)w.tags=__wf.current.tags.slice();_wfRenderList();})(this.value)">
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
@@ -6191,23 +6390,23 @@ function _wfRenderInspector(opts) {
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
       <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">🛡 ${t('policy_heading', '실행 정책')}</div>
       ${(() => {
-        const pol = __wf.current.policy || { tokenBudgetTotal: 0, fallbackProvider: '' };
-        const fp = pol.fallbackProvider || '';
-        return `
+      const pol = __wf.current.policy || { tokenBudgetTotal: 0, fallbackProvider: '' };
+      const fp = pol.fallbackProvider || '';
+      return `
           <label class="text-[10px]" style="color:var(--text-dim)">${t('policy_budget_label', '토큰 예산 (누적, 0 = 무제한)')}</label>
           <input class="input w-full text-[11px] font-mono mt-1 mb-1" type="text" inputmode="numeric" pattern="[0-9]*"
-                 value="${Number(pol.tokenBudgetTotal||0)}"
+                 value="${Number(pol.tokenBudgetTotal || 0)}"
                  oninput="const n=parseInt(this.value.replace(/\\D/g,''))||0; __wf.current.policy = __wf.current.policy || {}; __wf.current.policy.tokenBudgetTotal=n; __wf.dirty=true; _wfUpdateToolbar();">
           <div class="text-[10px] mb-2" style="color:var(--text-dim)">${t('policy_budget_hint', '누적 tokensIn+Out 이 이 값에 도달하면 이후 노드는 budget_exceeded 로 스킵. 부분 결과는 유지.')}</div>
 
           <label class="text-[10px]" style="color:var(--text-dim)">${t('policy_fallback_label', '실패 시 fallback 프로바이더')}</label>
           <select class="input w-full text-[11px] mt-1 mb-1"
                   onchange="__wf.current.policy = __wf.current.policy || {}; __wf.current.policy.fallbackProvider=this.value; __wf.dirty=true; _wfUpdateToolbar();">
-            <option value="" ${fp===''?'selected':''}>${t('policy_fallback_none', '(없음)')}</option>
-            <option value="claude-api" ${fp==='claude-api'?'selected':''}>Claude API</option>
-            <option value="openai-api" ${fp==='openai-api'?'selected':''}>OpenAI API</option>
-            <option value="gemini-api" ${fp==='gemini-api'?'selected':''}>Gemini API</option>
-            <option value="ollama-api" ${fp==='ollama-api'?'selected':''}>Ollama (local)</option>
+            <option value="" ${fp === '' ? 'selected' : ''}>${t('policy_fallback_none', '(없음)')}</option>
+            <option value="claude-api" ${fp === 'claude-api' ? 'selected' : ''}>Claude API</option>
+            <option value="openai-api" ${fp === 'openai-api' ? 'selected' : ''}>OpenAI API</option>
+            <option value="gemini-api" ${fp === 'gemini-api' ? 'selected' : ''}>Gemini API</option>
+            <option value="ollama-api" ${fp === 'ollama-api' ? 'selected' : ''}>Ollama (local)</option>
           </select>
           <div class="text-[10px]" style="color:var(--text-dim)">${t('policy_fallback_hint', 'session 노드가 assignee 로 실패 시 선택한 프로바이더로 1회 재시도. 노드 결과에 fallbackUsed 기록.')}</div>
           <!-- PP4 (v2.66.74) — per-workflow node timeout slider -->
@@ -6216,31 +6415,31 @@ function _wfRenderInspector(opts) {
             <input type="range" min="0" max="600" step="30" class="flex-1"
                    value="${Number(pol.nodeTimeout || 0)}"
                    oninput="document.getElementById('wfNodeTimeoutVal').textContent=this.value+'s'; __wf.current.policy = __wf.current.policy || {}; __wf.current.policy.nodeTimeout=parseInt(this.value)||0; __wf.dirty=true; _wfUpdateToolbar();">
-            <span id="wfNodeTimeoutVal" class="text-[11px]" style="min-width:55px;font-variant-numeric:tabular-nums;">${Number(pol.nodeTimeout||0)}s</span>
+            <span id="wfNodeTimeoutVal" class="text-[11px]" style="min-width:55px;font-variant-numeric:tabular-nums;">${Number(pol.nodeTimeout || 0)}s</span>
           </div>
           <div class="text-[10px]" style="color:var(--text-dim)">${t('0 = 서버 기본 (180s) · 30~600초 사이로 조절. 짧으면 빨리 fail, 길면 hang 인내.')}</div>
         `;
-      })()}
+    })()}
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
       <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">🔔 ${t('notify_heading', '완료 알림')}</div>
       ${(() => {
-        const nf = __wf.current.notify || { slack: '', discord: '' };
-        return `
-          <input class="input w-full text-[11px] font-mono mb-1" placeholder="https://hooks.slack.com/..." value="${escapeHtml(nf.slack||'')}"
+      const nf = __wf.current.notify || { slack: '', discord: '' };
+      return `
+          <input class="input w-full text-[11px] font-mono mb-1" placeholder="https://hooks.slack.com/..." value="${escapeHtml(nf.slack || '')}"
                  oninput="__wf.current.notify = __wf.current.notify || {}; __wf.current.notify.slack=this.value; __wf.dirty=true; _wfUpdateToolbar();">
           <div class="flex gap-1 mb-2">
             <button class="btn text-[10px] flex-1" onclick="_wfNotifyTest('slack')">💬 ${t('notify_test_slack', 'Slack 테스트')}</button>
           </div>
-          <input class="input w-full text-[11px] font-mono mb-1" placeholder="https://discord.com/api/webhooks/..." value="${escapeHtml(nf.discord||'')}"
+          <input class="input w-full text-[11px] font-mono mb-1" placeholder="https://discord.com/api/webhooks/..." value="${escapeHtml(nf.discord || '')}"
                  oninput="__wf.current.notify = __wf.current.notify || {}; __wf.current.notify.discord=this.value; __wf.dirty=true; _wfUpdateToolbar();">
           <div class="flex gap-1 mb-2">
             <button class="btn text-[10px] flex-1" onclick="_wfNotifyTest('discord')">🎮 ${t('notify_test_discord', 'Discord 테스트')}</button>
           </div>
           <div class="text-[10px]" style="color:var(--text-dim)">${t('notify_hint', '워크플로우 run 완료/실패 시 지정 채널로 상태·비용·실행 시간 전송. Slack hooks.slack.com / Discord discord.com 호스트만 허용.')}</div>
         `;
-      })()}
+    })()}
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
@@ -6259,15 +6458,15 @@ function _wfRenderInspector(opts) {
         ${t('cron 표현식으로 워크플로우를 주기적으로 자동 실행합니다.')}
       </div>
       ${(() => {
-        const sched = __wf.current.schedule || { enabled: false, cron: '' };
-        return `
+      const sched = __wf.current.schedule || { enabled: false, cron: '' };
+      return `
           <label class="flex items-center gap-2 text-[11px] cursor-pointer select-none mb-2">
-            <input type="checkbox" ${sched.enabled?'checked':''} onchange="__wf.current.schedule = __wf.current.schedule || {enabled:false,cron:''}; __wf.current.schedule.enabled=this.checked; __wf.dirty=true; __wf._inspectorDirty=true; _wfRenderInspector();">
+            <input type="checkbox" ${sched.enabled ? 'checked' : ''} onchange="__wf.current.schedule = __wf.current.schedule || {enabled:false,cron:''}; __wf.current.schedule.enabled=this.checked; __wf.dirty=true; __wf._inspectorDirty=true; _wfRenderInspector();">
             <span>${t('스케줄 활성')}</span>
           </label>
           ${sched.enabled ? `
             <label class="text-[10px] text-[var(--text-dim)] mt-1 block">${t('Cron 표현식')}</label>
-            <input class="input w-full mt-1 font-mono text-[11px]" value="${escapeHtml(sched.cron||'')}"
+            <input class="input w-full mt-1 font-mono text-[11px]" value="${escapeHtml(sched.cron || '')}"
               placeholder="0 9 * * *"
               oninput="__wf.current.schedule.cron=this.value; __wf.dirty=true;">
             <div class="flex flex-wrap gap-1 mt-2">
@@ -6284,7 +6483,7 @@ function _wfRenderInspector(opts) {
             </div>
           ` : ''}
         `;
-      })()}
+    })()}
     </div>
 
     <div class="mb-4 pt-3 border-t border-[var(--border)]">
@@ -6294,34 +6493,34 @@ function _wfRenderInspector(opts) {
       </div>
 
       <label class="flex items-center gap-2 text-[11px] cursor-pointer select-none">
-        <input type="checkbox" ${rp.enabled?'checked':''} onchange="_wfRepeatSet('enabled',this.checked)">
+        <input type="checkbox" ${rp.enabled ? 'checked' : ''} onchange="_wfRepeatSet('enabled',this.checked)">
         <span>${t('반복 실행 활성')}</span>
       </label>
 
       ${rp.enabled ? `
         <label class="text-[10px] text-[var(--text-dim)] mt-3 block">${t('최대 반복 횟수')}</label>
-        <input type="text" inputmode="numeric" class="input w-full mt-1" value="${rp.maxIterations||5}"
+        <input type="text" inputmode="numeric" class="input w-full mt-1" value="${rp.maxIterations || 5}"
           oninput="_wfRepeatSet('maxIterations', Math.max(1, Math.min(100, parseInt((this.value||'').replace(/\\D/g,''))||1)))">
 
         <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('반복 사이 대기 (초)')}</label>
-        <input type="text" inputmode="numeric" class="input w-full mt-1" value="${rp.intervalSeconds||0}"
+        <input type="text" inputmode="numeric" class="input w-full mt-1" value="${rp.intervalSeconds || 0}"
           oninput="_wfRepeatSet('intervalSeconds', Math.max(0, Math.min(86400, parseInt((this.value||'').replace(/\\D/g,''))||0)))">
 
         <label class="flex items-center gap-2 text-[11px] mt-3 cursor-pointer select-none">
-          <input type="checkbox" ${rp.scheduleEnabled?'checked':''} onchange="_wfRepeatSet('scheduleEnabled',this.checked)">
+          <input type="checkbox" ${rp.scheduleEnabled ? 'checked' : ''} onchange="_wfRepeatSet('scheduleEnabled',this.checked)">
           <span>${t('스케줄 (시간대 내에서만 실행)')}</span>
         </label>
         ${rp.scheduleEnabled ? `
           <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('시작 시각')}</label>
-          <input type="time" class="input w-full mt-1" value="${escapeHtml(rp.scheduleStart||'09:00')}" onchange="_wfRepeatSet('scheduleStart',this.value)">
+          <input type="time" class="input w-full mt-1" value="${escapeHtml(rp.scheduleStart || '09:00')}" onchange="_wfRepeatSet('scheduleStart',this.value)">
           <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('종료 시각')}</label>
-          <input type="time" class="input w-full mt-1" value="${escapeHtml(rp.scheduleEnd||'18:00')}" onchange="_wfRepeatSet('scheduleEnd',this.value)">
+          <input type="time" class="input w-full mt-1" value="${escapeHtml(rp.scheduleEnd || '18:00')}" onchange="_wfRepeatSet('scheduleEnd',this.value)">
         ` : ''}
 
         <label class="text-[10px] text-[var(--text-dim)] mt-3 block">${t('피드백 노트 (반복 시 이전 결과에 덧붙여 피드백 노드로 주입)')}</label>
         <textarea class="input w-full mt-1" rows="3"
           placeholder="${t('예: 이 결과를 기반으로 다음 액션 기획을 해줘. 실현 가능성과 우선순위를 명확히.')}"
-          onchange="_wfRepeatSet('feedbackNote',this.value)">${escapeHtml(rp.feedbackNote||'')}</textarea>
+          onchange="_wfRepeatSet('feedbackNote',this.value)">${escapeHtml(rp.feedbackNote || '')}</textarea>
 
         <label class="text-[10px] text-[var(--text-dim)] mt-2 block">${t('피드백 대상 노드 (비우면 자동: start 다음 세션)')}</label>
         <select class="input w-full mt-1" onchange="_wfRepeatSet('feedbackNodeId',this.value)">
@@ -6338,7 +6537,7 @@ function _wfRenderInspector(opts) {
       const ids = Object.keys(lr);
       if (ids.length < 2) return '';
       const rows = ids
-        .map(id => ({ id, r: lr[id], n: (__wf.current.nodes||[]).find(nn => nn.id === id) }))
+        .map(id => ({ id, r: lr[id], n: (__wf.current.nodes || []).find(nn => nn.id === id) }))
         .filter(x => x.r && typeof x.r.durationMs === 'number' && x.r.durationMs > 0)
         .sort((a, b) => b.r.durationMs - a.r.durationMs)
         .slice(0, 12);
@@ -6351,12 +6550,12 @@ function _wfRenderInspector(opts) {
           <div class="text-[10px] mb-2" style="color:var(--text-dim);">${t('합계')}: ${fmtDur(total)} · ${t('상위')} ${rows.length} ${t('노드')}</div>
           <div class="flex flex-col gap-1">
             ${rows.map(x => {
-              const pct = Math.round(((x.r.durationMs||0) / max) * 100);
-              const isErr = x.r.status === 'err' || x.r.error;
-              const c = isErr ? '#f87171' : (x.r.pinned ? '#f59e0b' : '#60a5fa');
-              const baseLabel = (x.n && (x.n.title || x.n.type)) || x.id;
-              const label = (x.r.pinned ? '📌 ' : (isErr ? '❌ ' : '')) + baseLabel;
-              return `
+        const pct = Math.round(((x.r.durationMs || 0) / max) * 100);
+        const isErr = x.r.status === 'err' || x.r.error;
+        const c = isErr ? '#f87171' : (x.r.pinned ? '#f59e0b' : '#60a5fa');
+        const baseLabel = (x.n && (x.n.title || x.n.type)) || x.id;
+        const label = (x.r.pinned ? '📌 ' : (isErr ? '❌ ' : '')) + baseLabel;
+        return `
                 <div onclick="__wf.selectedNodeId='${x.id}';__wf._inspectorDirty=true;_wfRenderInspector();_wfSyncSelectionClasses();" style="cursor:pointer;">
                   <div class="flex justify-between items-center text-[10px]" style="color:var(--text-mute);">
                     <span class="truncate" style="max-width:160px;">${escapeHtml(label)}</span>
@@ -6366,7 +6565,7 @@ function _wfRenderInspector(opts) {
                     <div style="height:100%;width:${pct}%;background:${c};"></div>
                   </div>
                 </div>`;
-            }).join('')}
+      }).join('')}
           </div>
         </div>
       `;
@@ -6380,14 +6579,14 @@ function _wfRenderInspector(opts) {
       const typeMeta = WF_TYPE_MAP[n.type] || WF_TYPE_MAP.session;
       const d = n.data || {};
       const preview = (n.type === 'session' || n.type === 'subagent')
-        ? `@${escapeHtml(d.assignee||'auto')} · ${escapeHtml((d.subject||'').slice(0,60) || t('(업무 없음)'))}`
+        ? `@${escapeHtml(d.assignee || 'auto')} · ${escapeHtml((d.subject || '').slice(0, 60) || t('(업무 없음)'))}`
         : escapeHtml(typeMeta.label);
       // 실행 결과에서 프로바이더/비용 정보 추출
       let runInfoBlock = '';
       const nr = (__wf.lastRunResults || {})[n.id];
       if (nr) {
         const providerName = nr.provider || nr.providerId || '';
-        const providerIcon = ((__wfProviders||{providers:[]}).providers.find(p => p.id === providerName || p.name === providerName) || {}).icon || '';
+        const providerIcon = ((__wfProviders || { providers: [] }).providers.find(p => p.id === providerName || p.name === providerName) || {}).icon || '';
         const model = nr.model || '';
         const dur = nr.durationMs ? fmtDur(nr.durationMs) : '';
         const tokens = nr.tokens || nr.tokenCount || (nr.output ? nr.output.length : 0);
@@ -6415,7 +6614,7 @@ function _wfRenderInspector(opts) {
             <summary class="text-[10px] cursor-pointer select-none" style="color:var(--text-dim);user-select:none;">📄 ${t('출력')} · ${outText.length.toLocaleString()} ${t('자')}</summary>
             <pre class="text-[10px] mt-1 max-h-32 overflow-auto" style="white-space:pre-wrap;word-break:break-word;${outColor}">${escapeHtml(outPreview)}${outOverflow ? '…' : ''}</pre>
             <div class="flex gap-1 mt-1">
-              <button class="btn text-[10px]" onclick="navigator.clipboard.writeText(${JSON.stringify(outText).replace(/"/g,'&quot;')}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
+              <button class="btn text-[10px]" onclick="navigator.clipboard.writeText(${JSON.stringify(outText).replace(/"/g, '&quot;')}).then(()=>toast(t('복사됨'),'ok'))">📋 ${t('복사')}</button>
               ${outOverflow ? `<button class="btn text-[10px]" onclick="_wfShowNodeOutputModal('${n.id}')">⬆ ${t('전체 보기')}</button>` : ''}
             </div>
           </details>` : '';
@@ -6435,7 +6634,7 @@ function _wfRenderInspector(opts) {
           <div class="card p-3 mb-2" style="background:rgba(255,255,255,0.03);">
             <div class="flex items-center gap-2 mb-1">
               <span style="font-size:1.2rem;">${typeMeta.icon}</span>
-              <div class="text-sm font-semibold truncate">${escapeHtml(n.title||typeMeta.label)}</div>
+              <div class="text-sm font-semibold truncate">${escapeHtml(n.title || typeMeta.label)}</div>
             </div>
             <div class="text-[11px] text-[var(--text-mute)]">${preview}</div>
             ${runInfoBlock}
@@ -6445,23 +6644,23 @@ function _wfRenderInspector(opts) {
             ${(n.type === 'session' || n.type === 'subagent') ? `<button class="btn text-xs" onclick="_wfRunSingleNode('${n.id}')" title="${t('이 노드만 실행 (n8n parity)')}" aria-label="${t('이 노드만 실행')}">▶ ${t('단독 실행')}</button>` : ''}
             <!-- PP3 (v2.66.73) — quick disable toggle right inside the inspector. -->
             <label class="flex items-center gap-1 text-[10px] cursor-pointer" title="${t('비활성화 (D)')}">
-              <input type="checkbox" ${d.disabled?'checked':''} onchange="_wfToggleNodeDisabled('${n.id}')">
+              <input type="checkbox" ${d.disabled ? 'checked' : ''} onchange="_wfToggleNodeDisabled('${n.id}')">
               ${t('비활성')}
             </label>
             <button class="btn text-xs" onclick="_wfDeleteSelectedNode()" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);" aria-label="${t('노드 삭제')}">🗑️</button>
           </div>
           <!-- QQ3 (v2.66.78) — node-level note (n8n parity). Shown in
                hover tooltip + persisted with the workflow. -->
-          <details class="mt-2" ${(d.notes||'').trim()?'open':''}>
-            <summary class="text-[10px] text-[var(--text-dim)] cursor-pointer">📝 ${t('메모')}${(d.notes||'').trim()?' ●':''}</summary>
+          <details class="mt-2" ${(d.notes || '').trim() ? 'open' : ''}>
+            <summary class="text-[10px] text-[var(--text-dim)] cursor-pointer">📝 ${t('메모')}${(d.notes || '').trim() ? ' ●' : ''}</summary>
             <textarea class="input w-full text-[11px] mt-1" rows="2" placeholder="${t('이 노드에 대한 짧은 메모 (캔버스 hover 시 표시)')}"
-              oninput="(function(el){var nn=__wf.current.nodes.find(x=>x.id==='${n.id}');if(!nn)return;nn.data=nn.data||{};nn.data.notes=el.value;__wf.dirty=true;_wfUpdateToolbar();})(this)">${escapeHtml(d.notes||'')}</textarea>
+              oninput="(function(el){var nn=__wf.current.nodes.find(x=>x.id==='${n.id}');if(!nn)return;nn.data=nn.data||{};nn.data.notes=el.value;__wf.dirty=true;_wfUpdateToolbar();})(this)">${escapeHtml(d.notes || '')}</textarea>
           </details>
-          ${((n.type==='session'||n.type==='subagent') && d.pinned && (d.pinnedOutput||'').trim()) ? `
+          ${((n.type === 'session' || n.type === 'subagent') && d.pinned && (d.pinnedOutput || '').trim()) ? `
             <!-- QQ21 (v2.66.96) — pin status visible in inspector. -->
             <details class="mt-2" style="border:1px solid rgba(245,158,11,0.35);border-radius:6px;background:rgba(245,158,11,0.06);padding:6px 8px;">
-              <summary class="text-[10px] cursor-pointer" style="color:#fbbf24;">📌 ${t('핀 설정됨')} · ${(d.pinnedOutput||'').length.toLocaleString()} ${t('자')}</summary>
-              <pre class="text-[10px] mt-2 max-h-40 overflow-auto" style="white-space:pre-wrap;word-break:break-word;color:var(--text-mute);">${escapeHtml((d.pinnedOutput||'').slice(0,2000))}${(d.pinnedOutput||'').length>2000?'…':''}</pre>
+              <summary class="text-[10px] cursor-pointer" style="color:#fbbf24;">📌 ${t('핀 설정됨')} · ${(d.pinnedOutput || '').length.toLocaleString()} ${t('자')}</summary>
+              <pre class="text-[10px] mt-2 max-h-40 overflow-auto" style="white-space:pre-wrap;word-break:break-word;color:var(--text-mute);">${escapeHtml((d.pinnedOutput || '').slice(0, 2000))}${(d.pinnedOutput || '').length > 2000 ? '…' : ''}</pre>
               <button class="btn text-[10px] mt-2" onclick="_wfTogglePin('${n.id}', false)">${t('핀 해제')}</button>
             </details>` : ''}
         </div>
@@ -6654,7 +6853,7 @@ function _wfOpenNodeEditor(nid) {
     </div>
   `;
   document.body.appendChild(w);
-  try { _makeDraggable(w); } catch (e) {}
+  try { _makeDraggable(w); } catch (e) { }
   _translateDOM(w);
   _wfRenderEditorBody(winId);
 }
@@ -6677,7 +6876,7 @@ function _wfMaxNodeEditor(winId) {
     w.style.width = '90vw'; w.style.maxHeight = '90vh';
   } else {
     w.style.width = '480px'; w.style.maxHeight = '82vh';
-    w.style.left = Math.max(80, window.innerWidth/2 - 240) + 'px';
+    w.style.left = Math.max(80, window.innerWidth / 2 - 240) + 'px';
     w.style.top = '80px';
   }
 }
@@ -6690,30 +6889,30 @@ function _wfPickNodeType(winId, type) {
   draft.type = type;
   // 타입별 기본 data 세팅
   if (type === 'session' || type === 'subagent') {
-    draft.data = { subject:'', description:'', assignee:'sonnet-4.6', agentRole:'', cwd:'', inputsMode:'concat' };
-  } else if (type === 'branch')    draft.data = { condition:'', conditionType:'contains' };
-  else if (type === 'aggregate') draft.data = { mode:'concat' };
-  else if (type === 'output')    draft.data = { exportTo:'' };
-  else if (type === 'sticky')    draft.data = { text:'', color:'yellow', width:220, height:140 };
-  else if (type === 'http')      draft.data = { url:'', method:'GET', headers:{}, body:'', extractPath:'', allowInternal: false };
-  else if (type === 'transform') draft.data = { transformType:'template', template:'{{input}}', jsonPath:'', regexPattern:'', regexReplacement:'', separator:'\\n' };
-  else if (type === 'variable')  draft.data = { varName:'var1', defaultValue:'', scope:'global' };
-  else if (type === 'subworkflow') draft.data = { workflowId:'', passInput:true };
-  else if (type === 'embedding') draft.data = { provider:'ollama-api', model:'bge-m3', outputFormat:'json' };
-  else if (type === 'loop') draft.data = { loopType:'for_each', maxIterations:10, separator:'\\n', condition:'' };
-  else if (type === 'retry') draft.data = { maxRetries:3, backoffMs:1000, backoffMultiplier:2.0, retryOn:'error' };
-  else if (type === 'error_handler') draft.data = { onError:'skip', defaultOutput:'' };
-  else if (type === 'merge') draft.data = { mergeMode:'all', requiredCount:1, timeout:300 };
-  else if (type === 'delay') draft.data = { delayMs:1000, delayType:'fixed', maxDelayMs:5000 };
-  else if (type === 'slack_approval') draft.data = { channel:'', messageTemplate:'', timeoutSeconds:300, pollIntervalSeconds:5, onTimeout:'approve', defaultOutput:'', includeInput:true };
-  else if (type === 'obsidian_log') draft.data = { vaultPath:'~/ObsidianVault', project:'lazyclaude', heading:'', tagsCsv:'', passThrough:true, defaultOutput:'' };
-  else if (type === 'auto_resume') draft.data = { sessionId:'', cwd:'', prompt:'', pollInterval:300, idleSeconds:90, maxAttempts:12, useContinue:false, installHooks:false, action:'set' };
-  else if (type === 'ralph') draft.data = { prompt:'', assignee:'', completion:'<promise>DONE</promise>', maxIterations:25, budgetUsd:5, systemPrompt:'', cwd:'' };
-  else if (type === 'docker_run') draft.data = { image:'alpine:3', command:'echo hello', mountPath:'', mountReadonly:true, network:'none', env:{}, timeoutSec:60, memMb:512 };
+    draft.data = { subject: '', description: '', assignee: 'sonnet-4.6', agentRole: '', cwd: '', inputsMode: 'concat' };
+  } else if (type === 'branch') draft.data = { condition: '', conditionType: 'contains' };
+  else if (type === 'aggregate') draft.data = { mode: 'concat' };
+  else if (type === 'output') draft.data = { exportTo: '' };
+  else if (type === 'sticky') draft.data = { text: '', color: 'yellow', width: 220, height: 140 };
+  else if (type === 'http') draft.data = { url: '', method: 'GET', headers: {}, body: '', extractPath: '', allowInternal: false };
+  else if (type === 'transform') draft.data = { transformType: 'template', template: '{{input}}', jsonPath: '', regexPattern: '', regexReplacement: '', separator: '\\n' };
+  else if (type === 'variable') draft.data = { varName: 'var1', defaultValue: '', scope: 'global' };
+  else if (type === 'subworkflow') draft.data = { workflowId: '', passInput: true };
+  else if (type === 'embedding') draft.data = { provider: 'ollama-api', model: 'bge-m3', outputFormat: 'json' };
+  else if (type === 'loop') draft.data = { loopType: 'for_each', maxIterations: 10, separator: '\\n', condition: '' };
+  else if (type === 'retry') draft.data = { maxRetries: 3, backoffMs: 1000, backoffMultiplier: 2.0, retryOn: 'error' };
+  else if (type === 'error_handler') draft.data = { onError: 'skip', defaultOutput: '' };
+  else if (type === 'merge') draft.data = { mergeMode: 'all', requiredCount: 1, timeout: 300 };
+  else if (type === 'delay') draft.data = { delayMs: 1000, delayType: 'fixed', maxDelayMs: 5000 };
+  else if (type === 'slack_approval') draft.data = { channel: '', messageTemplate: '', timeoutSeconds: 300, pollIntervalSeconds: 5, onTimeout: 'approve', defaultOutput: '', includeInput: true };
+  else if (type === 'obsidian_log') draft.data = { vaultPath: '~/ObsidianVault', project: 'lazyclaude', heading: '', tagsCsv: '', passThrough: true, defaultOutput: '' };
+  else if (type === 'auto_resume') draft.data = { sessionId: '', cwd: '', prompt: '', pollInterval: 300, idleSeconds: 90, maxAttempts: 12, useContinue: false, installHooks: false, action: 'set' };
+  else if (type === 'ralph') draft.data = { prompt: '', assignee: '', completion: '<promise>DONE</promise>', maxIterations: 25, budgetUsd: 5, systemPrompt: '', cwd: '' };
+  else if (type === 'docker_run') draft.data = { image: 'alpine:3', command: 'echo hello', mountPath: '', mountReadonly: true, network: 'none', env: {}, timeoutSec: 60, memMb: 512 };
   else draft.data = {};
   if (!draft.title) draft.title = t(WF_TYPE_MAP[type].label);
   // 타입 선택 직후 카테고리 그리드 자동 접힘 (UX 개선)
-  try { localStorage.setItem('wfEditorCatExpanded', 'false'); } catch(e) {}
+  try { localStorage.setItem('wfEditorCatExpanded', 'false'); } catch (e) { }
   _wfRenderEditorBody(winId);
   // 첫 입력 필드에 포커스 (제목 또는 subject)
   setTimeout(() => {
@@ -6748,8 +6947,8 @@ function _wfToggleCat(winId) {
 // Z2 (v2.66.12) — debounced palette search. sessionStorage keeps the
 // query across re-renders within the editor window's lifetime.
 let _wfPalSearchTimer = null;
-window._wfPaletteSearch = function(winId, q) {
-  try { sessionStorage.setItem('wfPaletteSearch::' + winId, q || ''); } catch(_){}
+window._wfPaletteSearch = function (winId, q) {
+  try { sessionStorage.setItem('wfPaletteSearch::' + winId, q || ''); } catch (_) { }
   if (_wfPalSearchTimer) clearTimeout(_wfPalSearchTimer);
   _wfPalSearchTimer = setTimeout(() => _wfRenderEditorBody(winId), 100);
 };
@@ -6757,8 +6956,8 @@ window._wfPaletteSearch = function(winId, q) {
 function _wfPaletteToggleCat(winId, catId) {
   const key = `wfPaletteOpenCat::${winId}`;
   let cur = '';
-  try { cur = localStorage.getItem(key) || ''; } catch(_){}
-  try { localStorage.setItem(key, cur === catId ? '' : catId); } catch(_){}
+  try { cur = localStorage.getItem(key) || ''; } catch (_) { }
+  try { localStorage.setItem(key, cur === catId ? '' : catId); } catch (_) { }
   _wfRenderEditorBody(winId);
 }
 
@@ -6766,7 +6965,7 @@ function _wfRenderEditorBody(winId) {
   const w = document.getElementById(winId);
   if (!w) return;
   const draft = w._wfDraft;
-  const catHost  = document.getElementById(winId + '-cat');
+  const catHost = document.getElementById(winId + '-cat');
   const formHost = document.getElementById(winId + '-form');
   if (!catHost || !formHost) return;
 
@@ -6781,8 +6980,8 @@ function _wfRenderEditorBody(winId) {
   const searchKey = `wfPaletteSearch::${winId}`;
   let openCat = '';
   let searchQ = '';
-  try { openCat = localStorage.getItem(openCatKey) || ''; } catch(_){}
-  try { searchQ = sessionStorage.getItem(searchKey) || ''; } catch(_){}
+  try { openCat = localStorage.getItem(openCatKey) || ''; } catch (_) { }
+  try { searchQ = sessionStorage.getItem(searchKey) || ''; } catch (_) { }
   if (!openCat && draft.type) openCat = WF_TYPE_TO_CAT[draft.type] || '';
   if (!openCat) openCat = WF_NODE_CATEGORIES[0].id;
 
@@ -6845,7 +7044,7 @@ function _wfRenderEditorBody(winId) {
   if (ql) {
     const inp = document.getElementById(winId + '-pal-q');
     if (inp && document.activeElement !== inp) {
-      try { inp.focus(); inp.setSelectionRange(ql.length, ql.length); } catch(_){}
+      try { inp.focus(); inp.setSelectionRange(ql.length, ql.length); } catch (_) { }
     }
   }
 
@@ -6884,30 +7083,30 @@ function _wfRenderEditorBody(winId) {
   let body = descCard + `
     <div class="pt-3 border-t border-[var(--border)] mt-1">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block mb-1">${t('제목')}</label>
-      <input class="input w-full" value="${escapeHtml(draft.title||'')}" oninput="_wfDraftSet('${winId}','title',this.value)">
+      <input class="input w-full" value="${escapeHtml(draft.title || '')}" oninput="_wfDraftSet('${winId}','title',this.value)">
     </div>
   `;
   if (draft.type === 'session' || draft.type === 'subagent') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('업무 (subject)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.subject||'')}" oninput="_wfDraftSetData('${winId}','subject',this.value)" placeholder="${t('이 세션이 수행할 업무 한 줄')}">
+      <input class="input w-full mt-1" value="${escapeHtml(d.subject || '')}" oninput="_wfDraftSetData('${winId}','subject',this.value)" placeholder="${t('이 세션이 수행할 업무 한 줄')}">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('설명 (description)')}</label>
-      <textarea class="input w-full mt-1" rows="4" oninput="_wfDraftSetData('${winId}','description',this.value)" placeholder="${t('상세 지시·제약·출력 형식')}">${escapeHtml(d.description||'')}</textarea>
+      <textarea class="input w-full mt-1" rows="4" oninput="_wfDraftSetData('${winId}','description',this.value)" placeholder="${t('상세 지시·제약·출력 형식')}">${escapeHtml(d.description || '')}</textarea>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('AI 프로바이더 : 모델')}</label>
-      <select class="input w-full mt-1" onchange="if(this.value==='__custom__'){const v=prompt('provider:model 입력 (예: openai:gpt-4.1)');if(v){_wfDraftSetData('${winId}','assignee',v);this.value=v;}else{this.value='${escapeHtml(d.assignee||'sonnet-4.6')}';}}else{_wfDraftSetData('${winId}','assignee',this.value);}">
-        ${_wfAssigneeOptions(d.assignee||'sonnet-4.6')}
+      <select class="input w-full mt-1" onchange="if(this.value==='__custom__'){const v=prompt('provider:model 입력 (예: openai:gpt-4.1)');if(v){_wfDraftSetData('${winId}','assignee',v);this.value=v;}else{this.value='${escapeHtml(d.assignee || 'sonnet-4.6')}';}}else{_wfDraftSetData('${winId}','assignee',this.value);}">
+        ${_wfAssigneeOptions(d.assignee || 'sonnet-4.6')}
       </select>
       ${draft.type === 'subagent' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('에이전트 역할')}</label>
-        <input class="input w-full mt-1" value="${escapeHtml(d.agentRole||'')}" oninput="_wfDraftSetData('${winId}','agentRole',this.value)" placeholder="researcher / writer / reviewer …">
+        <input class="input w-full mt-1" value="${escapeHtml(d.agentRole || '')}" oninput="_wfDraftSetData('${winId}','agentRole',this.value)" placeholder="researcher / writer / reviewer …">
       ` : ''}
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('작업 디렉토리 (cwd)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.cwd||'')}" oninput="_wfDraftSetData('${winId}','cwd',this.value)" placeholder="~/projects/my-app">
+      <input class="input w-full mt-1" value="${escapeHtml(d.cwd || '')}" oninput="_wfDraftSetData('${winId}','cwd',this.value)" placeholder="~/projects/my-app">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('입력 합치기 모드')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','inputsMode',this.value)">
-        <option value="concat" ${d.inputsMode==='concat'?'selected':''}>${t('이어붙이기 (concat)')}</option>
-        <option value="first"  ${d.inputsMode==='first'?'selected':''}>${t('첫 입력만 (first)')}</option>
-        <option value="json"   ${d.inputsMode==='json'?'selected':''}>${t('JSON 배열 (json)')}</option>
+        <option value="concat" ${d.inputsMode === 'concat' ? 'selected' : ''}>${t('이어붙이기 (concat)')}</option>
+        <option value="first"  ${d.inputsMode === 'first' ? 'selected' : ''}>${t('첫 입력만 (first)')}</option>
+        <option value="json"   ${d.inputsMode === 'json' ? 'selected' : ''}>${t('JSON 배열 (json)')}</option>
       </select>
 
       <div class="mt-4 pt-3 border-t border-[var(--border)]">
@@ -6917,33 +7116,33 @@ function _wfRenderEditorBody(winId) {
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('시스템 프롬프트 (페르소나)')}</label>
         <textarea class="input w-full mt-1" rows="4"
           placeholder="${t('예: 너는 10년차 시니어 백엔드 엔지니어다. Node.js·PostgreSQL 전문. 보안과 성능을 우선시한다.')}"
-          oninput="_wfDraftSetData('${winId}','systemPrompt',this.value)">${escapeHtml(d.systemPrompt||'')}</textarea>
+          oninput="_wfDraftSetData('${winId}','systemPrompt',this.value)">${escapeHtml(d.systemPrompt || '')}</textarea>
 
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('추가 시스템 프롬프트 (기본에 덧붙임)')}</label>
         <textarea class="input w-full mt-1" rows="2"
           placeholder="${t('기본 claude 프롬프트에 추가할 규약·제약')}"
-          oninput="_wfDraftSetData('${winId}','appendSystemPrompt',this.value)">${escapeHtml(d.appendSystemPrompt||'')}</textarea>
+          oninput="_wfDraftSetData('${winId}','appendSystemPrompt',this.value)">${escapeHtml(d.appendSystemPrompt || '')}</textarea>
 
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('허용 도구 (쉼표 구분)')}</label>
-        <input class="input w-full mt-1" value="${escapeHtml(d.allowedTools||'')}"
+        <input class="input w-full mt-1" value="${escapeHtml(d.allowedTools || '')}"
           placeholder="Bash(git:*),Read,Edit"
           oninput="_wfDraftSetData('${winId}','allowedTools',this.value)">
 
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('차단 도구 (쉼표 구분)')}</label>
-        <input class="input w-full mt-1" value="${escapeHtml(d.disallowedTools||'')}"
+        <input class="input w-full mt-1" value="${escapeHtml(d.disallowedTools || '')}"
           placeholder="Bash(rm:*),Bash(curl:*)"
           oninput="_wfDraftSetData('${winId}','disallowedTools',this.value)">
 
         <div class="mt-3 p-2 rounded" style="background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.2);">
           <div class="text-[11px] font-semibold mb-1">🔄 ${t('이전 세션 이어서 (resume)')}</div>
           <label class="flex items-center gap-2 text-[11px]">
-            <input type="checkbox" ${d.continueFromPrev?'checked':''}
+            <input type="checkbox" ${d.continueFromPrev ? 'checked' : ''}
               onchange="_wfDraftSetData('${winId}','continueFromPrev',this.checked)">
             <span>${t('연결된 이전 노드의 session_id 자동 이어받기')}</span>
           </label>
           <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-2 block">${t('또는 session_id 직접 입력')}</label>
           <div class="flex items-center gap-1 mt-1">
-            <input class="input flex-1" value="${escapeHtml(d.resumeSessionId||'')}"
+            <input class="input flex-1" value="${escapeHtml(d.resumeSessionId || '')}"
               placeholder="abc123-..."
               oninput="_wfDraftSetData('${winId}','resumeSessionId',this.value)">
             <button class="btn text-[10px]" onclick="_wfPickRecentSession('${winId}')" title="${t('최근 세션 목록에서 선택')}">📂 ${t('최근')}</button>
@@ -6959,72 +7158,72 @@ function _wfRenderEditorBody(winId) {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('조건 유형')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','conditionType',this.value)">
-        <option value="contains" ${(d.conditionType||'contains')==='contains'?'selected':''}>${t('포함 (contains)')}</option>
-        <option value="equals" ${d.conditionType==='equals'?'selected':''}>${t('일치 (equals)')}</option>
-        <option value="not_equals" ${d.conditionType==='not_equals'?'selected':''}>${t('불일치 (not_equals)')}</option>
-        <option value="greater" ${d.conditionType==='greater'?'selected':''}>${t('초과 (greater)')}</option>
-        <option value="less" ${d.conditionType==='less'?'selected':''}>${t('미만 (less)')}</option>
-        <option value="regex" ${d.conditionType==='regex'?'selected':''}>${t('정규식 (regex)')}</option>
-        <option value="length_gt" ${d.conditionType==='length_gt'?'selected':''}>${t('길이 초과 (length_gt)')}</option>
-        <option value="length_lt" ${d.conditionType==='length_lt'?'selected':''}>${t('길이 미만 (length_lt)')}</option>
-        <option value="is_empty" ${d.conditionType==='is_empty'?'selected':''}>${t('비어있음 (is_empty)')}</option>
-        <option value="not_empty" ${d.conditionType==='not_empty'?'selected':''}>${t('비어있지 않음 (not_empty)')}</option>
-        <option value="expression" ${d.conditionType==='expression'?'selected':''}>${t('자유 표현식 (expression)')}</option>
+        <option value="contains" ${(d.conditionType || 'contains') === 'contains' ? 'selected' : ''}>${t('포함 (contains)')}</option>
+        <option value="equals" ${d.conditionType === 'equals' ? 'selected' : ''}>${t('일치 (equals)')}</option>
+        <option value="not_equals" ${d.conditionType === 'not_equals' ? 'selected' : ''}>${t('불일치 (not_equals)')}</option>
+        <option value="greater" ${d.conditionType === 'greater' ? 'selected' : ''}>${t('초과 (greater)')}</option>
+        <option value="less" ${d.conditionType === 'less' ? 'selected' : ''}>${t('미만 (less)')}</option>
+        <option value="regex" ${d.conditionType === 'regex' ? 'selected' : ''}>${t('정규식 (regex)')}</option>
+        <option value="length_gt" ${d.conditionType === 'length_gt' ? 'selected' : ''}>${t('길이 초과 (length_gt)')}</option>
+        <option value="length_lt" ${d.conditionType === 'length_lt' ? 'selected' : ''}>${t('길이 미만 (length_lt)')}</option>
+        <option value="is_empty" ${d.conditionType === 'is_empty' ? 'selected' : ''}>${t('비어있음 (is_empty)')}</option>
+        <option value="not_empty" ${d.conditionType === 'not_empty' ? 'selected' : ''}>${t('비어있지 않음 (not_empty)')}</option>
+        <option value="expression" ${d.conditionType === 'expression' ? 'selected' : ''}>${t('자유 표현식 (expression)')}</option>
       </select>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('조건 값')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.condition||'')}" oninput="_wfDraftSetData('${winId}','condition',this.value)" placeholder="${(d.conditionType||'contains')==='regex'?'\\\\d+':'success'}">
+      <input class="input w-full mt-1" value="${escapeHtml(d.condition || '')}" oninput="_wfDraftSetData('${winId}','condition',this.value)" placeholder="${(d.conditionType || 'contains') === 'regex' ? '\\\\d+' : 'success'}">
       <div class="text-[10px] text-[var(--text-dim)] mt-2 p-2 rounded" style="background:var(--code-bg);">
-        ${t('현재 조건')}: <code>${escapeHtml(d.conditionType||'contains')}</code> → <code>${escapeHtml(d.condition||'('+t('없음')+')')}</code>
+        ${t('현재 조건')}: <code>${escapeHtml(d.conditionType || 'contains')}</code> → <code>${escapeHtml(d.condition || '(' + t('없음') + ')')}</code>
       </div>
     `;
   } else if (draft.type === 'aggregate') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('합치기 모드')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','mode',this.value)">
-        <option value="concat" ${d.mode==='concat'?'selected':''}>${t('텍스트 concat')}</option>
-        <option value="json"   ${d.mode==='json'?'selected':''}>${t('JSON 배열')}</option>
+        <option value="concat" ${d.mode === 'concat' ? 'selected' : ''}>${t('텍스트 concat')}</option>
+        <option value="json"   ${d.mode === 'json' ? 'selected' : ''}>${t('JSON 배열')}</option>
       </select>
     `;
   } else if (draft.type === 'output') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('파일로 저장 (선택, ~/ 하위만)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.exportTo||'')}" oninput="_wfDraftSetData('${winId}','exportTo',this.value)" placeholder="~/workflow-output.md">
+      <input class="input w-full mt-1" value="${escapeHtml(d.exportTo || '')}" oninput="_wfDraftSetData('${winId}','exportTo',this.value)" placeholder="~/workflow-output.md">
     `;
   } else if (draft.type === 'sticky') {
     // QQ36 (v2.66.111) — sticky note editor.
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('메모 텍스트 (마크다운)')}</label>
-      <textarea class="input w-full mt-1" rows="6" oninput="_wfDraftSetData('${winId}','text',this.value)" placeholder="## ${t('메모 제목')}\n${t('내용...')}" style="font-family:ui-monospace,monospace;">${escapeHtml(d.text||'')}</textarea>
+      <textarea class="input w-full mt-1" rows="6" oninput="_wfDraftSetData('${winId}','text',this.value)" placeholder="## ${t('메모 제목')}\n${t('내용...')}" style="font-family:ui-monospace,monospace;">${escapeHtml(d.text || '')}</textarea>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('색상')}</label>
       <div class="flex gap-1 mt-1">
-        ${['yellow','blue','green','pink','gray'].map(c => `<button class="btn text-[10px]" style="background:${{yellow:'#fef3c7',blue:'#dbeafe',green:'#dcfce7',pink:'#fce7f3',gray:'#e5e7eb'}[c]};color:#000;border:${d.color===c?'2px solid var(--accent)':'1px solid var(--border)'};" onclick="_wfDraftSetData('${winId}','color','${c}');this.parentNode.querySelectorAll('button').forEach(b=>b.style.border='1px solid var(--border)');this.style.border='2px solid var(--accent)'">${c}</button>`).join('')}
+        ${['yellow', 'blue', 'green', 'pink', 'gray'].map(c => `<button class="btn text-[10px]" style="background:${{ yellow: '#fef3c7', blue: '#dbeafe', green: '#dcfce7', pink: '#fce7f3', gray: '#e5e7eb' }[c]};color:#000;border:${d.color === c ? '2px solid var(--accent)' : '1px solid var(--border)'};" onclick="_wfDraftSetData('${winId}','color','${c}');this.parentNode.querySelectorAll('button').forEach(b=>b.style.border='1px solid var(--border)');this.style.border='2px solid var(--accent)'">${c}</button>`).join('')}
       </div>
       <div class="flex gap-2 mt-3">
         <div class="flex-1">
           <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block">${t('너비')} (px)</label>
-          <input type="number" min="120" max="800" class="input w-full mt-1" value="${d.width||220}" oninput="_wfDraftSetData('${winId}','width',Math.max(120,Math.min(800,parseInt(this.value)||220)))">
+          <input type="number" min="120" max="800" class="input w-full mt-1" value="${d.width || 220}" oninput="_wfDraftSetData('${winId}','width',Math.max(120,Math.min(800,parseInt(this.value)||220)))">
         </div>
         <div class="flex-1">
           <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block">${t('높이')} (px)</label>
-          <input type="number" min="80" max="800" class="input w-full mt-1" value="${d.height||140}" oninput="_wfDraftSetData('${winId}','height',Math.max(80,Math.min(800,parseInt(this.value)||140)))">
+          <input type="number" min="80" max="800" class="input w-full mt-1" value="${d.height || 140}" oninput="_wfDraftSetData('${winId}','height',Math.max(80,Math.min(800,parseInt(this.value)||140)))">
         </div>
       </div>
     `;
   } else if (draft.type === 'http') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('URL')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.url||'')}" oninput="_wfDraftSetData('${winId}','url',this.value)" placeholder="https://api.example.com/data">
+      <input class="input w-full mt-1" value="${escapeHtml(d.url || '')}" oninput="_wfDraftSetData('${winId}','url',this.value)" placeholder="https://api.example.com/data">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('HTTP 메서드')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','method',this.value)">
-        ${['GET','POST','PUT','PATCH','DELETE'].map(m => `<option value="${m}" ${d.method===m?'selected':''}>${m}</option>`).join('')}
+        ${['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(m => `<option value="${m}" ${d.method === m ? 'selected' : ''}>${m}</option>`).join('')}
       </select>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('요청 Body (POST/PUT 전용, {{input}} 치환)')}</label>
-      <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','body',this.value)" placeholder='{"query": "{{input}}"}'>${escapeHtml(d.body||'')}</textarea>
+      <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','body',this.value)" placeholder='{"query": "{{input}}"}'>${escapeHtml(d.body || '')}</textarea>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('응답 추출 경로 (JSON dot path, 비우면 전체)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.extractPath||'')}" oninput="_wfDraftSetData('${winId}','extractPath',this.value)" placeholder="data.result">
+      <input class="input w-full mt-1" value="${escapeHtml(d.extractPath || '')}" oninput="_wfDraftSetData('${winId}','extractPath',this.value)" placeholder="data.result">
       <div class="mt-3 p-3 rounded" style="background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.3);">
         <label class="flex items-start gap-2 cursor-pointer select-none text-[11px]">
-          <input type="checkbox" ${d.allowInternal?'checked':''} onchange="_wfDraftSetData('${winId}','allowInternal',this.checked)" style="margin-top:2px;">
+          <input type="checkbox" ${d.allowInternal ? 'checked' : ''} onchange="_wfDraftSetData('${winId}','allowInternal',this.checked)" style="margin-top:2px;">
           <div>
             <div class="font-semibold">⚠️ ${t('내부/사설 호스트 허용 (SSRF 가드 해제)')}</div>
             <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('기본값은 localhost/127.x/10.x/169.254.x/클라우드 메타데이터 호스트 호출을 차단합니다. 자기 로컬 서비스를 의도적으로 호출할 때만 체크.')}</div>
@@ -7036,50 +7235,50 @@ function _wfRenderEditorBody(winId) {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('변환 유형')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','transformType',this.value)">
-        <option value="template" ${d.transformType==='template'?'selected':''}>${t('템플릿 치환')}</option>
-        <option value="json_extract" ${d.transformType==='json_extract'?'selected':''}>${t('JSON 경로 추출')}</option>
-        <option value="regex" ${d.transformType==='regex'?'selected':''}>${t('Regex 치환')}</option>
-        <option value="concat" ${d.transformType==='concat'?'selected':''}>${t('입력 결합')}</option>
+        <option value="template" ${d.transformType === 'template' ? 'selected' : ''}>${t('템플릿 치환')}</option>
+        <option value="json_extract" ${d.transformType === 'json_extract' ? 'selected' : ''}>${t('JSON 경로 추출')}</option>
+        <option value="regex" ${d.transformType === 'regex' ? 'selected' : ''}>${t('Regex 치환')}</option>
+        <option value="concat" ${d.transformType === 'concat' ? 'selected' : ''}>${t('입력 결합')}</option>
       </select>
       ${d.transformType === 'template' || !d.transformType ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('템플릿 ({{input}} 로 이전 출력 참조)')}</label>
-        <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','template',this.value)" placeholder="요약: {{input}}">${escapeHtml(d.template||'{{input}}')}</textarea>
+        <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','template',this.value)" placeholder="요약: {{input}}">${escapeHtml(d.template || '{{input}}')}</textarea>
       ` : ''}
       ${d.transformType === 'json_extract' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('JSON 경로 (dot 구분)')}</label>
-        <input class="input w-full mt-1" value="${escapeHtml(d.jsonPath||'')}" oninput="_wfDraftSetData('${winId}','jsonPath',this.value)" placeholder="data.items.0.name">
+        <input class="input w-full mt-1" value="${escapeHtml(d.jsonPath || '')}" oninput="_wfDraftSetData('${winId}','jsonPath',this.value)" placeholder="data.items.0.name">
       ` : ''}
       ${d.transformType === 'regex' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('정규식 패턴')}</label>
-        <input class="input w-full mt-1" value="${escapeHtml(d.regexPattern||'')}" oninput="_wfDraftSetData('${winId}','regexPattern',this.value)" placeholder="\\d+">
+        <input class="input w-full mt-1" value="${escapeHtml(d.regexPattern || '')}" oninput="_wfDraftSetData('${winId}','regexPattern',this.value)" placeholder="\\d+">
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('치환 문자열')}</label>
-        <input class="input w-full mt-1" value="${escapeHtml(d.regexReplacement||'')}" oninput="_wfDraftSetData('${winId}','regexReplacement',this.value)" placeholder="[숫자]">
+        <input class="input w-full mt-1" value="${escapeHtml(d.regexReplacement || '')}" oninput="_wfDraftSetData('${winId}','regexReplacement',this.value)" placeholder="[숫자]">
       ` : ''}
       ${d.transformType === 'concat' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('구분자')}</label>
-        <input class="input w-full mt-1" value="${escapeHtml(d.separator||'\\n')}" oninput="_wfDraftSetData('${winId}','separator',this.value)" placeholder="\\n">
+        <input class="input w-full mt-1" value="${escapeHtml(d.separator || '\\n')}" oninput="_wfDraftSetData('${winId}','separator',this.value)" placeholder="\\n">
       ` : ''}
     `;
   } else if (draft.type === 'variable') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('변수 이름')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.varName||'')}" oninput="_wfDraftSetData('${winId}','varName',this.value)" placeholder="result_text">
+      <input class="input w-full mt-1" value="${escapeHtml(d.varName || '')}" oninput="_wfDraftSetData('${winId}','varName',this.value)" placeholder="result_text">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('스코프')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','scope',this.value)">
-        <option value="global" ${(d.scope||'global')==='global'?'selected':''}>${t('글로벌 (global) — 모든 노드에서 접근')}</option>
-        <option value="local" ${d.scope==='local'?'selected':''}>${t('로컬 (local) — 현재 워크플로우 내')}</option>
+        <option value="global" ${(d.scope || 'global') === 'global' ? 'selected' : ''}>${t('글로벌 (global) — 모든 노드에서 접근')}</option>
+        <option value="local" ${d.scope === 'local' ? 'selected' : ''}>${t('로컬 (local) — 현재 워크플로우 내')}</option>
       </select>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('기본값 (입력 없을 때)')}</label>
-      <textarea class="input w-full mt-1" rows="2" oninput="_wfDraftSetData('${winId}','defaultValue',this.value)" placeholder="">${escapeHtml(d.defaultValue||'')}</textarea>
+      <textarea class="input w-full mt-1" rows="2" oninput="_wfDraftSetData('${winId}','defaultValue',this.value)" placeholder="">${escapeHtml(d.defaultValue || '')}</textarea>
       <div class="mt-3 p-3 rounded" style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.2);">
         <div class="text-[11px] font-semibold mb-1" style="color:var(--cyan);">💡 ${t('사용법')}</div>
-        <div class="text-[10px] text-[var(--text-mute)]">${t('다른 노드에서')} <code class="font-mono" style="background:var(--code-bg);padding:1px 5px;border-radius:3px;">{{${escapeHtml(d.varName||'var1')}}}</code> ${t('으로 참조할 수 있습니다.')}</div>
-        <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('스코프')}: ${(d.scope||'global')==='global'? t('글로벌 — 워크플로우 전체에서 접근 가능') : t('로컬 — 이 워크플로우 실행 내에서만 유효')}</div>
+        <div class="text-[10px] text-[var(--text-mute)]">${t('다른 노드에서')} <code class="font-mono" style="background:var(--code-bg);padding:1px 5px;border-radius:3px;">{{${escapeHtml(d.varName || 'var1')}}}</code> ${t('으로 참조할 수 있습니다.')}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('스코프')}: ${(d.scope || 'global') === 'global' ? t('글로벌 — 워크플로우 전체에서 접근 가능') : t('로컬 — 이 워크플로우 실행 내에서만 유효')}</div>
       </div>
     `;
   } else if (draft.type === 'subworkflow') {
     const wfOpts = __wf.workflows.filter(w => __wf.current && w.id !== __wf.current.id)
-      .map(w => `<option value="${escapeHtml(w.id)}" ${d.workflowId===w.id?'selected':''}>${escapeHtml(w.name)} (${w.nodeCount} nodes)</option>`).join('');
+      .map(w => `<option value="${escapeHtml(w.id)}" ${d.workflowId === w.id ? 'selected' : ''}>${escapeHtml(w.name)} (${w.nodeCount} nodes)</option>`).join('');
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('호출할 워크플로우')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','workflowId',this.value)">
@@ -7087,17 +7286,17 @@ function _wfRenderEditorBody(winId) {
         ${wfOpts}
       </select>
       <label class="flex items-center gap-2 mt-3 text-xs" style="color:var(--text-mute)">
-        <input type="checkbox" ${d.passInput!==false?'checked':''} onchange="_wfDraftSetData('${winId}','passInput',this.checked)">
+        <input type="checkbox" ${d.passInput !== false ? 'checked' : ''} onchange="_wfDraftSetData('${winId}','passInput',this.checked)">
         ${t('이전 노드 출력을 입력으로 전달')}
       </label>
     `;
   } else if (draft.type === 'embedding') {
     // embed capability 가진 프로바이더만 옵션으로
-    const ep = (__wfProviders||{providers:[]}).providers.filter(p => p.available && (p.capabilities||[]).includes('embed'));
+    const ep = (__wfProviders || { providers: [] }).providers.filter(p => p.available && (p.capabilities || []).includes('embed'));
     const provOpts = ep.map(p => {
-      const models = (p.models||[]).filter(m => (m.capabilities||[]).includes('embed'));
+      const models = (p.models || []).filter(m => (m.capabilities || []).includes('embed'));
       return models.map(m =>
-        `<option value="${escapeHtml(p.id)}|${escapeHtml(m.id)}" ${d.provider===p.id && d.model===m.id?'selected':''}>${p.icon} ${escapeHtml(p.name)} — ${escapeHtml(m.label||m.id)}</option>`
+        `<option value="${escapeHtml(p.id)}|${escapeHtml(m.id)}" ${d.provider === p.id && d.model === m.id ? 'selected' : ''}>${p.icon} ${escapeHtml(p.name)} — ${escapeHtml(m.label || m.id)}</option>`
       ).join('');
     }).join('');
     body += `
@@ -7107,9 +7306,9 @@ function _wfRenderEditorBody(winId) {
       </select>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('출력 형식')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','outputFormat',this.value)">
-        <option value="json" ${d.outputFormat==='json'?'selected':''}>JSON (벡터 포함)</option>
-        <option value="dimensions" ${d.outputFormat==='dimensions'?'selected':''}>${t('차원 수만')}</option>
-        <option value="raw" ${d.outputFormat==='raw'?'selected':''}>${t('전체 원본')}</option>
+        <option value="json" ${d.outputFormat === 'json' ? 'selected' : ''}>JSON (벡터 포함)</option>
+        <option value="dimensions" ${d.outputFormat === 'dimensions' ? 'selected' : ''}>${t('차원 수만')}</option>
+        <option value="raw" ${d.outputFormat === 'raw' ? 'selected' : ''}>${t('전체 원본')}</option>
       </select>
       <div class="text-xs mt-3 p-2 rounded" style="background:var(--code-bg);color:var(--text-dim)">
         💡 ${t('이전 노드의 텍스트 출력이 임베딩 입력으로 사용됩니다. 여러 입력은 각각 벡터화됩니다.')}
@@ -7119,71 +7318,71 @@ function _wfRenderEditorBody(winId) {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('루프 유형')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','loopType',this.value);_wfRenderEditorBody('${winId}');">
-        <option value="for_each" ${d.loopType==='for_each'?'selected':''}>${t('리스트 순회 (for_each)')}</option>
-        <option value="count" ${d.loopType==='count'?'selected':''}>${t('횟수 반복 (count)')}</option>
-        <option value="while" ${d.loopType==='while'?'selected':''}>${t('조건 반복 (while)')}</option>
+        <option value="for_each" ${d.loopType === 'for_each' ? 'selected' : ''}>${t('리스트 순회 (for_each)')}</option>
+        <option value="count" ${d.loopType === 'count' ? 'selected' : ''}>${t('횟수 반복 (count)')}</option>
+        <option value="while" ${d.loopType === 'while' ? 'selected' : ''}>${t('조건 반복 (while)')}</option>
       </select>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('최대 반복 횟수')}</label>
-      <input type="number" class="input w-full mt-1" min="1" max="1000" value="${d.maxIterations||10}" oninput="_wfDraftSetData('${winId}','maxIterations',parseInt(this.value)||10)">
+      <input type="number" class="input w-full mt-1" min="1" max="1000" value="${d.maxIterations || 10}" oninput="_wfDraftSetData('${winId}','maxIterations',parseInt(this.value)||10)">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('구분자 (입력 분할용)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.separator||'\\n')}" oninput="_wfDraftSetData('${winId}','separator',this.value)" placeholder="\\n">
+      <input class="input w-full mt-1" value="${escapeHtml(d.separator || '\\n')}" oninput="_wfDraftSetData('${winId}','separator',this.value)" placeholder="\\n">
       ${d.loopType === 'while' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('반복 조건 (while)')}</label>
-        <input class="input w-full mt-1" value="${escapeHtml(d.condition||'')}" oninput="_wfDraftSetData('${winId}','condition',this.value)" placeholder="${t('조건이 참인 동안 반복')}">
+        <input class="input w-full mt-1" value="${escapeHtml(d.condition || '')}" oninput="_wfDraftSetData('${winId}','condition',this.value)" placeholder="${t('조건이 참인 동안 반복')}">
       ` : ''}
     `;
   } else if (draft.type === 'retry') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('최대 재시도 횟수')}</label>
-      <input type="number" class="input w-full mt-1" min="1" max="10" value="${d.maxRetries||3}" oninput="_wfDraftSetData('${winId}','maxRetries',Math.max(1,Math.min(10,parseInt(this.value)||3)))">
+      <input type="number" class="input w-full mt-1" min="1" max="10" value="${d.maxRetries || 3}" oninput="_wfDraftSetData('${winId}','maxRetries',Math.max(1,Math.min(10,parseInt(this.value)||3)))">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('백오프 대기 시간 (ms)')}</label>
-      <input type="number" class="input w-full mt-1" min="0" value="${d.backoffMs||1000}" oninput="_wfDraftSetData('${winId}','backoffMs',parseInt(this.value)||1000)">
+      <input type="number" class="input w-full mt-1" min="0" value="${d.backoffMs || 1000}" oninput="_wfDraftSetData('${winId}','backoffMs',parseInt(this.value)||1000)">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('백오프 배수')}</label>
-      <input type="number" class="input w-full mt-1" min="1" max="10" step="0.1" value="${d.backoffMultiplier||2.0}" oninput="_wfDraftSetData('${winId}','backoffMultiplier',parseFloat(this.value)||2.0)">
+      <input type="number" class="input w-full mt-1" min="1" max="10" step="0.1" value="${d.backoffMultiplier || 2.0}" oninput="_wfDraftSetData('${winId}','backoffMultiplier',parseFloat(this.value)||2.0)">
       <div class="text-xs mt-3 p-2 rounded" style="background:var(--code-bg);color:var(--text-dim)">
-        💡 ${t('재시도 간격: 1차=')}${d.backoffMs||1000}ms, ${t('2차=')}${(d.backoffMs||1000)*(d.backoffMultiplier||2)}ms, ${t('3차=')}${(d.backoffMs||1000)*Math.pow(d.backoffMultiplier||2,2)}ms ...
+        💡 ${t('재시도 간격: 1차=')}${d.backoffMs || 1000}ms, ${t('2차=')}${(d.backoffMs || 1000) * (d.backoffMultiplier || 2)}ms, ${t('3차=')}${(d.backoffMs || 1000) * Math.pow(d.backoffMultiplier || 2, 2)}ms ...
       </div>
     `;
   } else if (draft.type === 'error_handler') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('에러 처리 전략')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','onError',this.value);_wfRenderEditorBody('${winId}');">
-        <option value="skip" ${d.onError==='skip'?'selected':''}>${t('무시하고 계속 (skip)')}</option>
-        <option value="default" ${d.onError==='default'?'selected':''}>${t('기본값 반환 (default)')}</option>
-        <option value="route" ${d.onError==='route'?'selected':''}>${t('다른 노드로 분기 (route)')}</option>
+        <option value="skip" ${d.onError === 'skip' ? 'selected' : ''}>${t('무시하고 계속 (skip)')}</option>
+        <option value="default" ${d.onError === 'default' ? 'selected' : ''}>${t('기본값 반환 (default)')}</option>
+        <option value="route" ${d.onError === 'route' ? 'selected' : ''}>${t('다른 노드로 분기 (route)')}</option>
       </select>
       ${d.onError === 'default' || d.onError === 'route' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${d.onError === 'default' ? t('기본 출력값') : t('라우팅 대상 (노드 ID 또는 출력)')}</label>
-        <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','defaultOutput',this.value)" placeholder="${d.onError === 'default' ? t('에러 발생 시 반환할 기본값') : t('에러 발생 시 전달할 값')}">${escapeHtml(d.defaultOutput||'')}</textarea>
+        <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','defaultOutput',this.value)" placeholder="${d.onError === 'default' ? t('에러 발생 시 반환할 기본값') : t('에러 발생 시 전달할 값')}">${escapeHtml(d.defaultOutput || '')}</textarea>
       ` : ''}
     `;
   } else if (draft.type === 'merge') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('합류 모드')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','mergeMode',this.value);_wfRenderEditorBody('${winId}');">
-        <option value="all" ${d.mergeMode==='all'?'selected':''}>${t('전체 대기 (all)')}</option>
-        <option value="any" ${d.mergeMode==='any'?'selected':''}>${t('하나라도 도착 (any)')}</option>
-        <option value="count" ${d.mergeMode==='count'?'selected':''}>${t('지정 개수 도착 (count)')}</option>
+        <option value="all" ${d.mergeMode === 'all' ? 'selected' : ''}>${t('전체 대기 (all)')}</option>
+        <option value="any" ${d.mergeMode === 'any' ? 'selected' : ''}>${t('하나라도 도착 (any)')}</option>
+        <option value="count" ${d.mergeMode === 'count' ? 'selected' : ''}>${t('지정 개수 도착 (count)')}</option>
       </select>
       ${d.mergeMode === 'count' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('필요 입력 수')}</label>
-        <input type="number" class="input w-full mt-1" min="1" value="${d.requiredCount||1}" oninput="_wfDraftSetData('${winId}','requiredCount',Math.max(1,parseInt(this.value)||1))">
+        <input type="number" class="input w-full mt-1" min="1" value="${d.requiredCount || 1}" oninput="_wfDraftSetData('${winId}','requiredCount',Math.max(1,parseInt(this.value)||1))">
       ` : ''}
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('타임아웃 (초)')}</label>
-      <input type="number" class="input w-full mt-1" min="0" value="${d.timeout||300}" oninput="_wfDraftSetData('${winId}','timeout',parseInt(this.value)||300)">
+      <input type="number" class="input w-full mt-1" min="0" value="${d.timeout || 300}" oninput="_wfDraftSetData('${winId}','timeout',parseInt(this.value)||300)">
     `;
   } else if (draft.type === 'delay') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('대기 시간 (ms)')}</label>
-      <input type="number" class="input w-full mt-1" min="0" value="${d.delayMs||1000}" oninput="_wfDraftSetData('${winId}','delayMs',parseInt(this.value)||1000)">
+      <input type="number" class="input w-full mt-1" min="0" value="${d.delayMs || 1000}" oninput="_wfDraftSetData('${winId}','delayMs',parseInt(this.value)||1000)">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('딜레이 유형')}</label>
       <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','delayType',this.value);_wfRenderEditorBody('${winId}');">
-        <option value="fixed" ${d.delayType==='fixed'?'selected':''}>${t('고정 (fixed)')}</option>
-        <option value="random" ${d.delayType==='random'?'selected':''}>${t('랜덤 (random)')}</option>
+        <option value="fixed" ${d.delayType === 'fixed' ? 'selected' : ''}>${t('고정 (fixed)')}</option>
+        <option value="random" ${d.delayType === 'random' ? 'selected' : ''}>${t('랜덤 (random)')}</option>
       </select>
       ${d.delayType === 'random' ? `
         <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('최대 대기 시간 (ms)')}</label>
-        <input type="number" class="input w-full mt-1" min="0" value="${d.maxDelayMs||5000}" oninput="_wfDraftSetData('${winId}','maxDelayMs',parseInt(this.value)||5000)">
+        <input type="number" class="input w-full mt-1" min="0" value="${d.maxDelayMs || 5000}" oninput="_wfDraftSetData('${winId}','maxDelayMs',parseInt(this.value)||5000)">
       ` : ''}
     `;
   } else if (draft.type === 'start') {
@@ -7193,32 +7392,32 @@ function _wfRenderEditorBody(winId) {
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('PROMPT (반복 입력)')}</label>
       <textarea class="input w-full mt-1" rows="6"
         placeholder="${t('매 iteration에 동일하게 주입될 PROMPT.md 본문. 비워두면 입력 노드의 출력이 사용됩니다.')}"
-        oninput="_wfDraftSetData('${winId}','prompt',this.value)">${escapeHtml(d.prompt||'')}</textarea>
+        oninput="_wfDraftSetData('${winId}','prompt',this.value)">${escapeHtml(d.prompt || '')}</textarea>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('AI 프로바이더 : 모델')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.assignee||'')}"
+      <input class="input w-full mt-1" value="${escapeHtml(d.assignee || '')}"
         placeholder="claude:sonnet" oninput="_wfDraftSetData('${winId}','assignee',this.value)">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Completion 표식 (정확 일치)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.completion||'<promise>DONE</promise>')}"
+      <input class="input w-full mt-1" value="${escapeHtml(d.completion || '<promise>DONE</promise>')}"
         oninput="_wfDraftSetData('${winId}','completion',this.value)">
       <div class="grid grid-cols-2 gap-2 mt-3">
         <div>
           <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block">${t('Max iterations')}</label>
           <input class="input w-full mt-1" type="number" min="1" max="200"
-            value="${d.maxIterations||25}"
+            value="${d.maxIterations || 25}"
             oninput="_wfDraftSetData('${winId}','maxIterations',parseInt(this.value||'25',10))">
         </div>
         <div>
           <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider block">${t('예산 USD')}</label>
           <input class="input w-full mt-1" type="number" min="0.01" max="100" step="0.5"
-            value="${d.budgetUsd||5}"
+            value="${d.budgetUsd || 5}"
             oninput="_wfDraftSetData('${winId}','budgetUsd',parseFloat(this.value||'5'))">
         </div>
       </div>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('시스템 프롬프트 (선택)')}</label>
       <textarea class="input w-full mt-1" rows="2"
-        oninput="_wfDraftSetData('${winId}','systemPrompt',this.value)">${escapeHtml(d.systemPrompt||'')}</textarea>
+        oninput="_wfDraftSetData('${winId}','systemPrompt',this.value)">${escapeHtml(d.systemPrompt || '')}</textarea>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('작업 디렉토리 (cwd)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.cwd||'')}"
+      <input class="input w-full mt-1" value="${escapeHtml(d.cwd || '')}"
         placeholder="~/projects/my-app"
         oninput="_wfDraftSetData('${winId}','cwd',this.value)">
       <div class="text-[10px] mt-3" style="color:var(--text-dim)">
@@ -7228,18 +7427,18 @@ function _wfRenderEditorBody(winId) {
   } else if (draft.type === 'docker_run') {
     body += `
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('Docker 이미지')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.image||'alpine:3')}"
+      <input class="input w-full mt-1" value="${escapeHtml(d.image || 'alpine:3')}"
         placeholder="alpine:3" oninput="_wfDraftSetData('${winId}','image',this.value)">
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('명령 (sh -c 로 실행)')}</label>
       <textarea class="input w-full mt-1" rows="4"
         placeholder="echo hello && uname -a"
-        oninput="_wfDraftSetData('${winId}','command',this.value)">${escapeHtml(d.command||'')}</textarea>
+        oninput="_wfDraftSetData('${winId}','command',this.value)">${escapeHtml(d.command || '')}</textarea>
       <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('볼륨 마운트 경로 (선택)')}</label>
-      <input class="input w-full mt-1" value="${escapeHtml(d.mountPath||'')}"
+      <input class="input w-full mt-1" value="${escapeHtml(d.mountPath || '')}"
         placeholder="/Users/o/myproject"
         oninput="_wfDraftSetData('${winId}','mountPath',this.value)">
       <label class="text-[11px] flex items-center gap-2 mt-2">
-        <input type="checkbox" ${d.mountReadonly?'checked':''}
+        <input type="checkbox" ${d.mountReadonly ? 'checked' : ''}
           onchange="_wfDraftSetData('${winId}','mountReadonly',this.checked)">
         ${t('읽기 전용 마운트 (권장)')}
       </label>
@@ -7247,20 +7446,20 @@ function _wfRenderEditorBody(winId) {
         <div>
           <label class="text-[10px] block">${t('네트워크')}</label>
           <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','network',this.value)">
-            <option value="none" ${d.network!=='bridge'?'selected':''}>none</option>
-            <option value="bridge" ${d.network==='bridge'?'selected':''}>bridge</option>
+            <option value="none" ${d.network !== 'bridge' ? 'selected' : ''}>none</option>
+            <option value="bridge" ${d.network === 'bridge' ? 'selected' : ''}>bridge</option>
           </select>
         </div>
         <div>
           <label class="text-[10px] block">${t('타임아웃 (s)')}</label>
           <input class="input w-full mt-1" type="number" min="1" max="600"
-            value="${d.timeoutSec||60}"
+            value="${d.timeoutSec || 60}"
             oninput="_wfDraftSetData('${winId}','timeoutSec',parseInt(this.value||'60',10))">
         </div>
         <div>
           <label class="text-[10px] block">${t('메모리 (MB)')}</label>
           <input class="input w-full mt-1" type="number" min="64" max="4096"
-            value="${d.memMb||512}"
+            value="${d.memMb || 512}"
             oninput="_wfDraftSetData('${winId}','memMb',parseInt(this.value||'512',10))">
         </div>
       </div>
@@ -7318,7 +7517,7 @@ function _wfSaveNodeEditorSilent(winId) {
   __wf.dirty = true;
   // Trigger re-render of just that node + workflow-level save.
   if (typeof _wfRenderCanvas === 'function') _wfRenderCanvas();
-  if (typeof _wfSave === 'function') _wfSave({ silent: true }).catch(() => {});
+  if (typeof _wfSave === 'function') _wfSave({ silent: true }).catch(() => { });
 }
 
 function _wfSaveNodeEditor(winId) {
@@ -7335,23 +7534,23 @@ function _wfSaveNodeEditor(winId) {
     const sourceNode = (w._wfSpawnFromNid)
       ? __wf.current.nodes.find(n => n.id === w._wfSpawnFromNid)
       : (__wf.selectedNodeId
-          ? __wf.current.nodes.find(n => n.id === __wf.selectedNodeId)
-          : null);
+        ? __wf.current.nodes.find(n => n.id === __wf.selectedNodeId)
+        : null);
     if (sourceNode) {
       const SNAP = 10;
       draft.x = Math.round((sourceNode.x + (typeof WF_NODE_W !== 'undefined' ? WF_NODE_W : 200) + 60) / SNAP) * SNAP;
       draft.y = Math.round(sourceNode.y / SNAP) * SNAP;
     } else {
-      const view = __wf.current.viewport || { panX:0, panY:0, zoom:1 };
+      const view = __wf.current.viewport || { panX: 0, panY: 0, zoom: 1 };
       const host = document.getElementById('wfCanvasHost');
-      const rect = host ? host.getBoundingClientRect() : { width:600, height:400 };
-      draft.x = Math.round((rect.width/2 - (view.panX||0)) / (view.zoom||1) - WF_NODE_W/2);
-      draft.y = Math.round((rect.height/2 - (view.panY||0)) / (view.zoom||1) - WF_NODE_H/2);
+      const rect = host ? host.getBoundingClientRect() : { width: 600, height: 400 };
+      draft.x = Math.round((rect.width / 2 - (view.panX || 0)) / (view.zoom || 1) - WF_NODE_W / 2);
+      draft.y = Math.round((rect.height / 2 - (view.panY || 0)) / (view.zoom || 1) - WF_NODE_H / 2);
     }
     __wf.current.nodes.push(draft);
     // QQ7 — auto-wire when source exists and types make sense.
     if (sourceNode && draft.type !== 'start' && sourceNode.type !== 'output') {
-      const eid = 'e-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+      const eid = 'e-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
       const fromPort = (sourceNode.type === 'branch') ? 'out_y' : 'out';
       __wf.current.edges = __wf.current.edges || [];
       __wf.current.edges.push({
@@ -7548,7 +7747,7 @@ async function _wfSave() {
     viewport: __wf.current.viewport,
   };
   const r = await api('/api/workflows/save', {
-    method: 'POST', headers: { 'Content-Type':'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
@@ -7570,7 +7769,7 @@ async function _wfExport() {
   if (!__wf.current) { toast(t('워크플로우를 먼저 선택하세요'), 'warn'); return; }
   try {
     const r = await api('/api/workflows/export', {
-      method: 'POST', headers: { 'Content-Type':'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: __wf.current.id }),
     });
     if (!r.ok) { toast(errMsg(r), 'err'); return; }
@@ -7596,7 +7795,7 @@ async function _wfImport(event) {
     const text = await file.text();
     const json = JSON.parse(text);
     const r = await api('/api/workflows/import', {
-      method: 'POST', headers: { 'Content-Type':'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(json),
     });
     if (!r.ok) { toast(errMsg(r), 'err'); return; }
@@ -7614,17 +7813,17 @@ async function _wfDryRun() {
   if (!__wf.current) { toast(t('워크플로우를 선택하세요'), 'warn'); return; }
   if (__wf.dirty) await _wfSave();
   const r = await api('/api/workflows/dry-run', {
-    method: 'POST', headers: { 'Content-Type':'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: __wf.current.id }),
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
-  const levels = (r.levels || []).map((lv, i) => `<div class="text-[11px]"><span class="chip text-[9px]">L${i}</span> ${lv.map(id=>`<span class="chip text-[10px] mono">${escapeHtml(id)}</span>`).join(' ')}</div>`).join('');
+  const levels = (r.levels || []).map((lv, i) => `<div class="text-[11px]"><span class="chip text-[9px]">L${i}</span> ${lv.map(id => `<span class="chip text-[10px] mono">${escapeHtml(id)}</span>`).join(' ')}</div>`).join('');
   const planRows = (r.plan || []).map(p => `
     <tr>
       <td class="mono text-[11px]">${escapeHtml(p.id)}</td>
       <td class="text-[11px]">${escapeHtml(p.kind)}</td>
       <td class="text-[11px]">${escapeHtml(p.label)}</td>
-      <td class="text-[11px] mono">${escapeHtml(p.assignee||'')}</td>
+      <td class="text-[11px] mono">${escapeHtml(p.assignee || '')}</td>
       <td class="text-[11px]">${p.willRun ? '<span class="chip chip-ok text-[9px]">run</span>' : '<span class="chip text-[9px]">skip</span>'}</td>
     </tr>`).join('');
   const unresolvedRows = (r.unresolved || []).map(u => `<li class="text-[11px]"><span class="chip chip-warn text-[9px]">${t('미해결')}</span> <code class="mono">${escapeHtml(u.nodeId)}</code> → <code class="mono">{{${escapeHtml(u.key)}}}</code></li>`).join('');
@@ -7633,7 +7832,7 @@ async function _wfDryRun() {
       <div>
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('드라이런')}</div>
         <h2 class="text-lg font-bold">🧪 ${t('워크플로우 실행 계획')}</h2>
-        <div class="text-[11px] text-[var(--text-mute)] mt-1">${r.nodeCount} ${t('노드')} · ${r.edgeCount} ${t('엣지')} · ${(r.levels||[]).length} ${t('병렬 레벨')}</div>
+        <div class="text-[11px] text-[var(--text-mute)] mt-1">${r.nodeCount} ${t('노드')} · ${r.edgeCount} ${t('엣지')} · ${(r.levels || []).length} ${t('병렬 레벨')}</div>
       </div>
       <button class="btn-ghost btn" onclick="closeModal()">✕</button>
     </div>
@@ -7644,7 +7843,7 @@ async function _wfDryRun() {
       </div>
       ${unresolvedRows ? `
         <div class="mb-4">
-          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">⚠️ ${t('미해결 변수')} (${(r.unresolved||[]).length})</div>
+          <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">⚠️ ${t('미해결 변수')} (${(r.unresolved || []).length})</div>
           <ul class="list-disc pl-5 space-y-1">${unresolvedRows}</ul>
         </div>` : `<div class="chip chip-ok text-[10px] mb-4">${t('변수 전부 해결됨')}</div>`}
       <div class="mb-2">
@@ -7707,7 +7906,7 @@ async function _wfRun() {
   // 저장 먼저
   if (__wf.dirty) await _wfSave();
   const r = await api('/api/workflows/run', {
-    method: 'POST', headers: { 'Content-Type':'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: __wf.current.id }),
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
@@ -7841,7 +8040,7 @@ function _wfApplyRunStatus(run) {
   // event arrives just once. Persist a per-run sentinel so the toast
   // and browser notification fire exactly once per run id.
   if ((run.status === 'ok' || run.status === 'err') && run.runId
-       && __wf._lastCompletedRunId !== run.runId) {
+    && __wf._lastCompletedRunId !== run.runId) {
     __wf._lastCompletedRunId = run.runId;
     const wfName = (__wf.current && __wf.current.name) || t('워크플로우');
     if (run.status === 'ok') {
@@ -7912,13 +8111,13 @@ function _wfRenderRunBanner(run) {
     host.appendChild(el);
     // Cache refs.
     el._refs = {
-      icon:    el.querySelector('.wfrb-icon'),
-      titleT:  el.querySelector('.wfrb-title-text'),
+      icon: el.querySelector('.wfrb-icon'),
+      titleT: el.querySelector('.wfrb-title-text'),
       subject: el.querySelector('.wfrb-subject'),
-      meta:    el.querySelector('.wfrb-meta-text'),
-      focus:   el.querySelector('.wfrb-focus'),
+      meta: el.querySelector('.wfrb-meta-text'),
+      focus: el.querySelector('.wfrb-focus'),
       barFill: el.querySelector('.wfrb-bar-fill'),
-      pct:     el.querySelector('.wfrb-pct'),
+      pct: el.querySelector('.wfrb-pct'),
     };
   }
 
@@ -7931,9 +8130,9 @@ function _wfRenderRunBanner(run) {
     el.className = 'visible ' + stateClass;
   }
   const r = el._refs;
-  if (r.icon.textContent    !== icon)         r.icon.textContent = icon;
-  if (r.titleT.textContent  !== title + ': ') r.titleT.textContent = title + ': ';
-  if (r.subject.textContent !== subject)      r.subject.textContent = subject;
+  if (r.icon.textContent !== icon) r.icon.textContent = icon;
+  if (r.titleT.textContent !== title + ': ') r.titleT.textContent = title + ': ';
+  if (r.subject.textContent !== subject) r.subject.textContent = subject;
   // PP5 (v2.66.75) — live cumulative cost in the banner. Reads
   // `cost` / `costUsd` from each finished node's result. Skips when
   // every node is free (no providers reporting cost).
@@ -7941,12 +8140,12 @@ function _wfRenderRunBanner(run) {
   for (const rr of Object.values(results)) {
     if (!rr) continue;
     const c = (typeof rr.cost === 'number') ? rr.cost
-              : (typeof rr.costUsd === 'number') ? rr.costUsd : 0;
+      : (typeof rr.costUsd === 'number') ? rr.costUsd : 0;
     if (c) totalCost += c;
   }
   const costStr = totalCost > 0 ? ` · $${totalCost.toFixed(4)}` : '';
   const metaStr = `${done}/${total} · ${elapsedStr}${costStr}`;
-  if (r.meta.textContent !== metaStr)         r.meta.textContent = metaStr;
+  if (r.meta.textContent !== metaStr) r.meta.textContent = metaStr;
   // Focus button toggles based on running state
   const showFocus = (status === 'running' && runningNid);
   r.focus.style.display = showFocus ? '' : 'none';
@@ -7954,9 +8153,9 @@ function _wfRenderRunBanner(run) {
     r.focus.onclick = () => _wfFocusNode(runningNid);
   }
   const widthStr = pct + '%';
-  if (r.barFill.style.width !== widthStr)     r.barFill.style.width = widthStr;
+  if (r.barFill.style.width !== widthStr) r.barFill.style.width = widthStr;
   const pctStr = pct + '%';
-  if (r.pct.textContent !== pctStr)           r.pct.textContent = pctStr;
+  if (r.pct.textContent !== pctStr) r.pct.textContent = pctStr;
 
   // 완료/실패 3.5초 후 자동 숨김
   if (status === 'ok' || status === 'err') {
@@ -8003,7 +8202,7 @@ function _wfStartElapsedTicker() {
         for (const rr of Object.values(results)) {
           if (!rr) continue;
           const c = (typeof rr.cost === 'number') ? rr.cost
-                    : (typeof rr.costUsd === 'number') ? rr.costUsd : 0;
+            : (typeof rr.costUsd === 'number') ? rr.costUsd : 0;
           if (c) totalCost += c;
         }
         const costStr = totalCost > 0 ? ` · $${totalCost.toFixed(4)}` : '';
@@ -8098,7 +8297,7 @@ function _wfRenderSessionsPanel(forceShow) {
   }
   if (!forceShow && !panel) return; // 토글로 닫혔으면 다시 만들지 않음
   // DD3 — skip innerHTML rebuild if the visible signature didn't change
-  const sig = rows.map(r => `${r.nid}:${r.status}:${r.sid.slice(0,8)}`).join('|');
+  const sig = rows.map(r => `${r.nid}:${r.status}:${r.sid.slice(0, 8)}`).join('|');
   if (panel && panel._lastSig === sig) return;
   if (!panel) {
     panel = document.createElement('div');
@@ -8111,8 +8310,8 @@ function _wfRenderSessionsPanel(forceShow) {
   }
   const STATUS_BADGE = {
     running: '<span style="color:#fbbf24">● ' + t('실행 중') + '</span>',
-    ok:      '<span style="color:#4ade80">✓ ' + t('완료') + '</span>',
-    err:     '<span style="color:#f87171">✗ ' + t('실패') + '</span>',
+    ok: '<span style="color:#4ade80">✓ ' + t('완료') + '</span>',
+    err: '<span style="color:#f87171">✗ ' + t('실패') + '</span>',
     skipped: '<span style="color:#6b6b6f">— ' + t('건너뜀') + '</span>',
   };
   const list = rows.length ? rows.map(r => {
@@ -8131,8 +8330,8 @@ function _wfRenderSessionsPanel(forceShow) {
     const isSiblingCancel = r.error && r.error.includes('cancelled by sibling-node failure');
     const errLine = r.error
       ? (isSiblingCancel
-          ? `<div style="color:#fbbf24;font-size:10px;margin-top:2px;">⏹ ${escapeHtml(t('형제 노드 실패로 자동 취소됨'))}</div>`
-          : `<div style="color:#f87171;font-size:10px;margin-top:2px;">⚠ ${escapeHtml(r.error.slice(0,140))}</div>`)
+        ? `<div style="color:#fbbf24;font-size:10px;margin-top:2px;">⏹ ${escapeHtml(t('형제 노드 실패로 자동 취소됨'))}</div>`
+        : `<div style="color:#f87171;font-size:10px;margin-top:2px;">⚠ ${escapeHtml(r.error.slice(0, 140))}</div>`)
       : '';
     return `<div style="padding:8px 10px;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:6px;">
@@ -8206,11 +8405,11 @@ function _wfShowNodeTooltip(nid, evt) {
     ${(usage.input_tokens || r.inputTokens || usage.output_tokens || r.outputTokens)
       ? `<div class="wfnt-row wfnt-meta"><span>${t('토큰')}</span><span>${tokens}</span></div>` : ''}
     ${r.cached === true
-      ? `<div class="wfnt-row wfnt-meta"><span>🗄</span><span>${t('캐시 적중')} ${r.cachedAgeS!=null?'· '+r.cachedAgeS+'s':''}</span></div>` : ''}
+      ? `<div class="wfnt-row wfnt-meta"><span>🗄</span><span>${t('캐시 적중')} ${r.cachedAgeS != null ? '· ' + r.cachedAgeS + 's' : ''}</span></div>` : ''}
     ${r.image
       ? `<div class="wfnt-row wfnt-meta"><span>🐳</span><span class="font-mono">${escapeHtml(r.image)}</span></div>` : ''}
     ${r.ralphRunId
-      ? `<div class="wfnt-row wfnt-meta"><span>🦞</span><span>${escapeHtml(r.ralphRunId)} · ${r.ralphIters||0} iter · $${(r.ralphCostUsd||0).toFixed(4)}</span></div>` : ''}
+      ? `<div class="wfnt-row wfnt-meta"><span>🦞</span><span>${escapeHtml(r.ralphRunId)} · ${r.ralphIters || 0} iter · $${(r.ralphCostUsd || 0).toFixed(4)}</span></div>` : ''}
     ${status === 'err' && r && r.error
       ? `<div class="wfnt-out wfnt-err">${escapeHtml(String(r.error).slice(0, 260))}</div>`
       : (output ? `<div class="wfnt-out">${escapeHtml(output)}${more}</div>` : '')}
@@ -8290,7 +8489,7 @@ function _wfFocusNode(nid) {
 }
 
 function _wfStopSSE() {
-  if (__wf._sse) { try { __wf._sse.close(); } catch(e){} __wf._sse = null; }
+  if (__wf._sse) { try { __wf._sse.close(); } catch (e) { } __wf._sse = null; }
 }
 
 function _wfStartPolling() {
@@ -8321,7 +8520,7 @@ function _wfStartPolling() {
         const data = JSON.parse(e.data);
         const run = data.run || data;
         _wfApplyRunStatus(run);
-      } catch(ex) { /* silent */ }
+      } catch (ex) { /* silent */ }
     });
 
     sse.addEventListener('done', (e) => {
@@ -8330,7 +8529,7 @@ function _wfStartPolling() {
         const run = data.run || data;
         _wfApplyRunStatus(run);
         _wfShowRunResult(run);
-      } catch(ex) { /* silent */ }
+      } catch (ex) { /* silent */ }
       __wf.runId = null;
       _wfSetRunButtonState(false);
       _wfStopSSE();
@@ -8342,7 +8541,7 @@ function _wfStartPolling() {
         try {
           const data = JSON.parse(e.data);
           toast(errMsg(data), 'err');
-        } catch(ex) { toast(t('실행 오류'), 'err'); }
+        } catch (ex) { toast(t('실행 오류'), 'err'); }
         __wf.runId = null;
         _wfStopSSE();
       }
@@ -8365,7 +8564,7 @@ function _wfStartPolling() {
         if (__wf.runId) _wfStartPollingFallback();
       }
     };
-  } catch(e) {
+  } catch (e) {
     // EventSource constructor itself threw — fall back immediately
     _wfStartPollingFallback();
   }
@@ -8448,8 +8647,8 @@ async function _wfShowRunResult(run) {
   };
   const rows = Object.entries(results).map(([nid, r]) => {
     const node = (__wf.current.nodes || []).find(n => n.id === nid) || {};
-    const icon = (WF_TYPE_MAP[node.type]||{}).icon || '•';
-    const preview = (r.output||'').slice(0, 500);
+    const icon = (WF_TYPE_MAP[node.type] || {}).icon || '•';
+    const preview = (r.output || '').slice(0, 500);
     // NN1 (v2.66.61) — distinguish "cancelled by sibling-node failure"
     // from a genuine err. Sibling-cancelled nodes weren't the real
     // problem; the user shouldn't be tempted to switch their provider.
@@ -8465,22 +8664,22 @@ async function _wfShowRunResult(run) {
     }
     // Only offer the switch-provider UI on a *genuine* err.
     const switchUI = (r.status === 'err' && !isSiblingCancel
-                      && (node.type === 'session' || node.type === 'subagent'))
+      && (node.type === 'session' || node.type === 'subagent'))
       ? _switchSelectFor(nid, (node.data || {}).assignee || '') : '';
     const sid = r.sessionId || '';
     const sidRow = sid ? `
       <div class="mt-2 pt-2 border-t border-[var(--border)] flex items-center gap-2">
         <span class="text-[10px] text-[var(--text-dim)]">session_id</span>
         <code class="text-[10px] flex-1 truncate" style="color:#c4b5fd;">${escapeHtml(sid)}</code>
-        <button class="btn text-[10px]" onclick="_copyToClipboard(this, ${JSON.stringify(sid).replace(/"/g,'&quot;')})">📋</button>
-        <button class="btn text-[10px]" onclick="_wfUseAsResume('${nid}', ${JSON.stringify(sid).replace(/"/g,'&quot;')})" title="${t('다른 노드의 resume 필드에 붙여넣기')}">↪ ${t('이어쓰기')}</button>
+        <button class="btn text-[10px]" onclick="_copyToClipboard(this, ${JSON.stringify(sid).replace(/"/g, '&quot;')})">📋</button>
+        <button class="btn text-[10px]" onclick="_wfUseAsResume('${nid}', ${JSON.stringify(sid).replace(/"/g, '&quot;')})" title="${t('다른 노드의 resume 필드에 붙여넣기')}">↪ ${t('이어쓰기')}</button>
       </div>` : '';
     const statusLabel = isSiblingCancel ? t('자동 취소됨') : (r.status || '');
     const statusColor = isSiblingCancel ? '#fbbf24' : 'var(--text-dim)';
     return `<div class="card p-3" ${isSiblingCancel ? 'style="border-color:rgba(251,191,36,0.35);"' : ''}>
       <div class="flex items-center justify-between mb-1">
-        <div class="text-xs font-semibold">${icon} ${escapeHtml(node.title||nid)} <span class="text-[10px]" style="color:${statusColor};">(${statusLabel})</span></div>
-        <div class="text-[10px] text-[var(--text-dim)]">${r.durationMs||0}ms</div>
+        <div class="text-xs font-semibold">${icon} ${escapeHtml(node.title || nid)} <span class="text-[10px]" style="color:${statusColor};">(${statusLabel})</span></div>
+        <div class="text-[10px] text-[var(--text-dim)]">${r.durationMs || 0}ms</div>
       </div>
       ${preview ? `<pre class="text-[11px] whitespace-pre-wrap break-words" style="max-height:160px;overflow-y:auto;">${escapeHtml(preview)}</pre>` : ''}
       ${err}
@@ -8497,7 +8696,7 @@ async function _wfShowRunResult(run) {
       ${run.error ? `<div class="text-sm text-red-400 mb-2">⚠ ${escapeHtml(run.error)}</div>` : ''}
       ${iterInfo}
       ${failFastSummary}
-      <div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">${rows || '<div class="empty card p-4">'+t('결과 없음')+'</div>'}</div>
+      <div class="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">${rows || '<div class="empty card p-4">' + t('결과 없음') + '</div>'}</div>
     </div>
   `);
 }
@@ -8521,7 +8720,7 @@ async function _wfSwitchProvider(nid) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ workflow: __wf.current }),
     });
-  } catch(e) { /* silent — re-run still works against in-memory copy */ }
+  } catch (e) { /* silent — re-run still works against in-memory copy */ }
   toast(`${prev || '(none)'} → ${newAssignee} ${t('적용됨, 재실행합니다')}`, 'ok');
   closeModal();
   await _wfRun();
@@ -8571,7 +8770,7 @@ async function _wfPickRecentSession(winId) {
   `);
 }
 
-window._wfApplyRecentSession = function(winId, sid) {
+window._wfApplyRecentSession = function (winId, sid) {
   if (!sid) return;
   if (typeof _wfDraftSetData === 'function') _wfDraftSetData(winId, 'resumeSessionId', sid);
   // Re-render the editor so the input shows the new value
@@ -8587,7 +8786,7 @@ async function _wfUseAsResume(sourceNid, sessionId) {
     (n.type === 'session' || n.type === 'subagent') && n.id !== sourceNid);
   if (!candidates.length) { toast(t('적용할 노드가 없습니다'), 'warn'); return; }
   const optionsText = candidates.map((n, i) =>
-    `${i+1}. ${n.title || n.type} (${n.id})`).join('\n');
+    `${i + 1}. ${n.title || n.type} (${n.id})`).join('\n');
   const pick = await promptModal({
     title: t('resume 대상 노드'),
     message: t('이 session_id 를 어떤 노드의 resume 필드에 넣을까요? 번호 입력:') + '\n' + optionsText,
@@ -8627,12 +8826,12 @@ async function _wfSpawnSession(nid) {
   const lines = [];
   lines.push(`<div class="mac-term-line meta">$ ${escapeHtml(assignee || 'session')} — ${escapeHtml(subject)}</div>`);
   lines.push(`<div class="mac-term-line meta">cwd: ${escapeHtml(cwd)}</div>`);
-  if (n.type)        lines.push(`<div class="mac-term-line meta">type: ${escapeHtml(n.type)}</div>`);
+  if (n.type) lines.push(`<div class="mac-term-line meta">type: ${escapeHtml(n.type)}</div>`);
   if (lastResults) {
     lines.push(`<div class="mac-term-line meta">status: ${escapeHtml(lastResults.status || '')}${lastResults.startedAt ? ' · ' + new Date(lastResults.startedAt).toLocaleTimeString() : ''}</div>`);
   }
   lines.push(`<div class="mac-term-line meta">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>`);
-  if (subject)     lines.push(`<div class="mac-term-line user"><span class="mac-prompt">▸</span> ${escapeHtml(subject)}</div>`);
+  if (subject) lines.push(`<div class="mac-term-line user"><span class="mac-prompt">▸</span> ${escapeHtml(subject)}</div>`);
   if (description) lines.push(`<div class="mac-term-line assist">${escapeHtml(description)}</div>`);
   if (lastResults && lastResults.output) {
     lines.push(`<div class="mac-term-line meta">─── ${t('출력')} ───</div>`);
@@ -8667,27 +8866,27 @@ async function _wfSpawnSession(nid) {
   }, 80);
 }
 
-window._wfMacTermSpawnReal = async function() {
+window._wfMacTermSpawnReal = async function () {
   const nid = window.__wfMacTermNid;
   if (!nid || !__wf.current) return;
   const n = __wf.current.nodes.find(x => x.id === nid);
   if (!n) return;
   const d = n.data || {};
   const r = await api('/api/session/spawn', {
-    method: 'POST', headers: { 'Content-Type':'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       cwd: d.cwd || '~',
       prompt: [d.subject, d.description].filter(Boolean).join('\n\n'),
-      assignee:            d.assignee || '',
-      systemPrompt:        d.systemPrompt || '',
-      appendSystemPrompt:  d.appendSystemPrompt || '',
-      allowedTools:        d.allowedTools || '',
-      disallowedTools:     d.disallowedTools || '',
-      resumeSessionId:     d.resumeSessionId || '',
+      assignee: d.assignee || '',
+      systemPrompt: d.systemPrompt || '',
+      appendSystemPrompt: d.appendSystemPrompt || '',
+      allowedTools: d.allowedTools || '',
+      disallowedTools: d.disallowedTools || '',
+      resumeSessionId: d.resumeSessionId || '',
     }),
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
-  const PROVIDER_LABELS = { 'claude-cli':'Claude', 'gemini-cli':'Gemini', 'ollama':'Ollama', 'codex':'Codex' };
+  const PROVIDER_LABELS = { 'claude-cli': 'Claude', 'gemini-cli': 'Gemini', 'ollama': 'Ollama', 'codex': 'Codex' };
   const label = PROVIDER_LABELS[r.provider] || 'Claude';
   toast(`${label} ${t('세션 시작됨')}${r.model ? ' (' + r.model + ')' : ''}`, 'ok');
 };
@@ -8707,42 +8906,50 @@ const WF_TEMPLATES = [
       name: t('팀 개발 스프린트'),
       description: t('리드 ↔ 프론트·백엔드 병렬 협업 플로우. DAG 이 두 번째 리드에서 다시 분배하며 반복 스프린트를 확장할 수 있음.'),
       nodes: [
-        { id:'n-s',  type:'start',     x:40,  y:180, title:t('시작'), data:{} },
-        { id:'n-l1', type:'session',   x:260, y:180, title:t('리드 스프린트 기획'), data:{
-          subject: t('이번 스프린트 목표와 업무 분담'),
-          description: t('아래 형식으로 답하라.') + '\n\n# ' + t('프론트') + '\n' + t('(프론트엔드에게 전달할 구체적 업무 지시)') + '\n\n# ' + t('백엔드') + '\n' + t('(백엔드에게 전달할 구체적 업무 지시)'),
-          assignee: 'opus-4.7', agentRole: 'team-lead', cwd: '~', inputsMode: 'concat',
-          systemPrompt: t('너는 스프린트를 이끄는 테크 리드다. 요구사항을 명확한 실행 단위로 분해해 프론트·백엔드 팀에게 분배한다. 모호함을 남기지 말고 수용 기준까지 명시하라.'),
-        }},
-        { id:'n-fe', type:'subagent',  x:520, y:60,  title:t('프론트엔드'), data:{
-          subject: t('프론트엔드 구현'),
-          description: t('리드 지시 중 프론트 섹션만 구현. React + TypeScript 기준. 완료된 파일 경로·핵심 변경 요약 반환.'),
-          assignee: 'sonnet-4.6', agentRole: 'frontend-dev', cwd: '~', inputsMode: 'first',
-          systemPrompt: t('너는 React + TypeScript + Tailwind 에 능숙한 시니어 프론트엔드 개발자다. 접근성·성능·타입 안전성을 우선시한다. 입력에서 프론트 관련 업무만 실행하고, 백엔드 섹션은 무시한다.'),
-        }},
-        { id:'n-be', type:'subagent',  x:520, y:300, title:t('백엔드'), data:{
-          subject: t('백엔드 구현'),
-          description: t('리드 지시 중 백엔드 섹션만 구현. API · DB · 테스트까지. 완료된 파일 경로·핵심 변경 요약 반환.'),
-          assignee: 'sonnet-4.6', agentRole: 'backend-dev', cwd: '~', inputsMode: 'first',
-          systemPrompt: t('너는 Node.js · PostgreSQL · REST/GraphQL 에 능숙한 시니어 백엔드 개발자다. 보안·확장성·테스트 커버리지를 우선시한다. 입력에서 백엔드 관련 업무만 실행하고, 프론트 섹션은 무시한다.'),
-        }},
-        { id:'n-agg', type:'aggregate', x:780, y:180, title:t('결과 취합'), data:{ mode: 'concat' }},
-        { id:'n-l2',  type:'session',   x:1040, y:180, title:t('리드 리뷰 + 다음 기획'), data:{
-          subject: t('스프린트 리뷰 및 다음 스프린트 계획'),
-          description: t('두 결과를 보고 1) 문제/개선, 2) 다음 스프린트 업무 분담(다시 프론트·백엔드 섹션) 을 생성. 같은 포맷 유지.'),
-          assignee: 'opus-4.7', agentRole: 'team-lead', cwd: '~', inputsMode: 'concat',
-          systemPrompt: t('너는 스프린트를 이끄는 테크 리드다. 이전 스프린트 결과를 비판적으로 평가하고, 리스크를 식별하며, 다음 스프린트의 업무 분담을 명확히 작성한다.'),
-        }},
-        { id:'n-o',   type:'output',    x:1300, y:180, title:t('최종 결과'), data:{} },
+        { id: 'n-s', type: 'start', x: 40, y: 180, title: t('시작'), data: {} },
+        {
+          id: 'n-l1', type: 'session', x: 260, y: 180, title: t('리드 스프린트 기획'), data: {
+            subject: t('이번 스프린트 목표와 업무 분담'),
+            description: t('아래 형식으로 답하라.') + '\n\n# ' + t('프론트') + '\n' + t('(프론트엔드에게 전달할 구체적 업무 지시)') + '\n\n# ' + t('백엔드') + '\n' + t('(백엔드에게 전달할 구체적 업무 지시)'),
+            assignee: 'opus-4.7', agentRole: 'team-lead', cwd: '~', inputsMode: 'concat',
+            systemPrompt: t('너는 스프린트를 이끄는 테크 리드다. 요구사항을 명확한 실행 단위로 분해해 프론트·백엔드 팀에게 분배한다. 모호함을 남기지 말고 수용 기준까지 명시하라.'),
+          }
+        },
+        {
+          id: 'n-fe', type: 'subagent', x: 520, y: 60, title: t('프론트엔드'), data: {
+            subject: t('프론트엔드 구현'),
+            description: t('리드 지시 중 프론트 섹션만 구현. React + TypeScript 기준. 완료된 파일 경로·핵심 변경 요약 반환.'),
+            assignee: 'sonnet-4.6', agentRole: 'frontend-dev', cwd: '~', inputsMode: 'first',
+            systemPrompt: t('너는 React + TypeScript + Tailwind 에 능숙한 시니어 프론트엔드 개발자다. 접근성·성능·타입 안전성을 우선시한다. 입력에서 프론트 관련 업무만 실행하고, 백엔드 섹션은 무시한다.'),
+          }
+        },
+        {
+          id: 'n-be', type: 'subagent', x: 520, y: 300, title: t('백엔드'), data: {
+            subject: t('백엔드 구현'),
+            description: t('리드 지시 중 백엔드 섹션만 구현. API · DB · 테스트까지. 완료된 파일 경로·핵심 변경 요약 반환.'),
+            assignee: 'sonnet-4.6', agentRole: 'backend-dev', cwd: '~', inputsMode: 'first',
+            systemPrompt: t('너는 Node.js · PostgreSQL · REST/GraphQL 에 능숙한 시니어 백엔드 개발자다. 보안·확장성·테스트 커버리지를 우선시한다. 입력에서 백엔드 관련 업무만 실행하고, 프론트 섹션은 무시한다.'),
+          }
+        },
+        { id: 'n-agg', type: 'aggregate', x: 780, y: 180, title: t('결과 취합'), data: { mode: 'concat' } },
+        {
+          id: 'n-l2', type: 'session', x: 1040, y: 180, title: t('리드 리뷰 + 다음 기획'), data: {
+            subject: t('스프린트 리뷰 및 다음 스프린트 계획'),
+            description: t('두 결과를 보고 1) 문제/개선, 2) 다음 스프린트 업무 분담(다시 프론트·백엔드 섹션) 을 생성. 같은 포맷 유지.'),
+            assignee: 'opus-4.7', agentRole: 'team-lead', cwd: '~', inputsMode: 'concat',
+            systemPrompt: t('너는 스프린트를 이끄는 테크 리드다. 이전 스프린트 결과를 비판적으로 평가하고, 리스크를 식별하며, 다음 스프린트의 업무 분담을 명확히 작성한다.'),
+          }
+        },
+        { id: 'n-o', type: 'output', x: 1300, y: 180, title: t('최종 결과'), data: {} },
       ],
       edges: [
-        { id:'e1', from:'n-s',  to:'n-l1', fromPort:'out', toPort:'in' },
-        { id:'e2', from:'n-l1', to:'n-fe', fromPort:'out', toPort:'in' },
-        { id:'e3', from:'n-l1', to:'n-be', fromPort:'out', toPort:'in' },
-        { id:'e4', from:'n-fe', to:'n-agg', fromPort:'out', toPort:'in' },
-        { id:'e5', from:'n-be', to:'n-agg', fromPort:'out', toPort:'in' },
-        { id:'e6', from:'n-agg',to:'n-l2', fromPort:'out', toPort:'in' },
-        { id:'e7', from:'n-l2', to:'n-o',  fromPort:'out', toPort:'in' },
+        { id: 'e1', from: 'n-s', to: 'n-l1', fromPort: 'out', toPort: 'in' },
+        { id: 'e2', from: 'n-l1', to: 'n-fe', fromPort: 'out', toPort: 'in' },
+        { id: 'e3', from: 'n-l1', to: 'n-be', fromPort: 'out', toPort: 'in' },
+        { id: 'e4', from: 'n-fe', to: 'n-agg', fromPort: 'out', toPort: 'in' },
+        { id: 'e5', from: 'n-be', to: 'n-agg', fromPort: 'out', toPort: 'in' },
+        { id: 'e6', from: 'n-agg', to: 'n-l2', fromPort: 'out', toPort: 'in' },
+        { id: 'e7', from: 'n-l2', to: 'n-o', fromPort: 'out', toPort: 'in' },
       ],
     }),
   },
@@ -8757,29 +8964,35 @@ const WF_TEMPLATES = [
       name: t('리서치 → 초안 → 리뷰'),
       description: t('순차 3 단계 리서치 파이프라인.'),
       nodes: [
-        { id:'n-s', type:'start',    x:40,  y:180, title:t('시작') },
-        { id:'n-r', type:'subagent', x:260, y:180, title:t('리서치'), data:{
-          subject: t('주제 심층 리서치'),
-          description: t('웹·문서·기존 자료를 종합해 핵심 근거와 인용 정리.'),
-          assignee: 'sonnet-4.6', agentRole: 'researcher', cwd: '~', inputsMode: 'first',
-        }},
-        { id:'n-w', type:'subagent', x:520, y:180, title:t('작가 초안'), data:{
-          subject: t('초안 작성'),
-          description: t('리서치 결과를 바탕으로 독자 친화적인 초안 작성. 톤·구조 명확히.'),
-          assignee: 'sonnet-4.6', agentRole: 'writer', cwd: '~', inputsMode: 'first',
-        }},
-        { id:'n-v', type:'subagent', x:780, y:180, title:t('리뷰'), data:{
-          subject: t('편집 리뷰'),
-          description: t('정확성·톤·가독성·중복을 체크하고 다듬은 최종본 반환.'),
-          assignee: 'opus-4.7', agentRole: 'reviewer', cwd: '~', inputsMode: 'first',
-        }},
-        { id:'n-o', type:'output',   x:1040, y:180, title:t('최종 문서') },
+        { id: 'n-s', type: 'start', x: 40, y: 180, title: t('시작') },
+        {
+          id: 'n-r', type: 'subagent', x: 260, y: 180, title: t('리서치'), data: {
+            subject: t('주제 심층 리서치'),
+            description: t('웹·문서·기존 자료를 종합해 핵심 근거와 인용 정리.'),
+            assignee: 'sonnet-4.6', agentRole: 'researcher', cwd: '~', inputsMode: 'first',
+          }
+        },
+        {
+          id: 'n-w', type: 'subagent', x: 520, y: 180, title: t('작가 초안'), data: {
+            subject: t('초안 작성'),
+            description: t('리서치 결과를 바탕으로 독자 친화적인 초안 작성. 톤·구조 명확히.'),
+            assignee: 'sonnet-4.6', agentRole: 'writer', cwd: '~', inputsMode: 'first',
+          }
+        },
+        {
+          id: 'n-v', type: 'subagent', x: 780, y: 180, title: t('리뷰'), data: {
+            subject: t('편집 리뷰'),
+            description: t('정확성·톤·가독성·중복을 체크하고 다듬은 최종본 반환.'),
+            assignee: 'opus-4.7', agentRole: 'reviewer', cwd: '~', inputsMode: 'first',
+          }
+        },
+        { id: 'n-o', type: 'output', x: 1040, y: 180, title: t('최종 문서') },
       ],
       edges: [
-        { id:'e1', from:'n-s', to:'n-r' },
-        { id:'e2', from:'n-r', to:'n-w' },
-        { id:'e3', from:'n-w', to:'n-v' },
-        { id:'e4', from:'n-v', to:'n-o' },
+        { id: 'e1', from: 'n-s', to: 'n-r' },
+        { id: 'e2', from: 'n-r', to: 'n-w' },
+        { id: 'e3', from: 'n-w', to: 'n-v' },
+        { id: 'e4', from: 'n-v', to: 'n-o' },
       ],
     }),
   },
@@ -8794,34 +9007,34 @@ const WF_TEMPLATES = [
       name: t('병렬 3 작업'),
       description: t('시작 → 3 개 병렬 세션 → 취합 → 결과.'),
       nodes: [
-        { id:'n-s',  type:'start',     x:40,  y:220, title:t('시작') },
-        { id:'n-a',  type:'session',   x:260, y:60,  title:t('작업 A'), data:{ subject:t('작업 A'), description:'...', assignee:'sonnet-4.6', inputsMode:'first' }},
-        { id:'n-b',  type:'session',   x:260, y:220, title:t('작업 B'), data:{ subject:t('작업 B'), description:'...', assignee:'sonnet-4.6', inputsMode:'first' }},
-        { id:'n-c',  type:'session',   x:260, y:380, title:t('작업 C'), data:{ subject:t('작업 C'), description:'...', assignee:'sonnet-4.6', inputsMode:'first' }},
-        { id:'n-ag', type:'aggregate', x:520, y:220, title:t('취합'),   data:{ mode:'concat' }},
-        { id:'n-o',  type:'output',    x:780, y:220, title:t('결과') },
+        { id: 'n-s', type: 'start', x: 40, y: 220, title: t('시작') },
+        { id: 'n-a', type: 'session', x: 260, y: 60, title: t('작업 A'), data: { subject: t('작업 A'), description: '...', assignee: 'sonnet-4.6', inputsMode: 'first' } },
+        { id: 'n-b', type: 'session', x: 260, y: 220, title: t('작업 B'), data: { subject: t('작업 B'), description: '...', assignee: 'sonnet-4.6', inputsMode: 'first' } },
+        { id: 'n-c', type: 'session', x: 260, y: 380, title: t('작업 C'), data: { subject: t('작업 C'), description: '...', assignee: 'sonnet-4.6', inputsMode: 'first' } },
+        { id: 'n-ag', type: 'aggregate', x: 520, y: 220, title: t('취합'), data: { mode: 'concat' } },
+        { id: 'n-o', type: 'output', x: 780, y: 220, title: t('결과') },
       ],
       edges: [
-        { id:'e1', from:'n-s', to:'n-a' },
-        { id:'e2', from:'n-s', to:'n-b' },
-        { id:'e3', from:'n-s', to:'n-c' },
-        { id:'e4', from:'n-a', to:'n-ag' },
-        { id:'e5', from:'n-b', to:'n-ag' },
-        { id:'e6', from:'n-c', to:'n-ag' },
-        { id:'e7', from:'n-ag', to:'n-o' },
+        { id: 'e1', from: 'n-s', to: 'n-a' },
+        { id: 'e2', from: 'n-s', to: 'n-b' },
+        { id: 'e3', from: 'n-s', to: 'n-c' },
+        { id: 'e4', from: 'n-a', to: 'n-ag' },
+        { id: 'e5', from: 'n-b', to: 'n-ag' },
+        { id: 'e6', from: 'n-c', to: 'n-ag' },
+        { id: 'e7', from: 'n-ag', to: 'n-o' },
       ],
     }),
   },
 ];
 
 const WF_TPL_CATEGORIES = [
-  { id: 'all',      label: '전체' },
+  { id: 'all', label: '전체' },
   { id: 'analysis', label: '분석' },
-  { id: 'ai',       label: 'AI' },
-  { id: 'dev',      label: '개발' },
-  { id: 'data',     label: '데이터' },
-  { id: 'pattern',  label: '패턴' },
-  { id: 'custom',   label: '커스텀' },
+  { id: 'ai', label: 'AI' },
+  { id: 'dev', label: '개발' },
+  { id: 'data', label: '데이터' },
+  { id: 'pattern', label: '패턴' },
+  { id: 'custom', label: '커스텀' },
 ];
 
 let __wfTplFilter = 'all';
@@ -8860,7 +9073,7 @@ async function _wfShowTemplates() {
       </div>
       <div class="text-[11px] text-[var(--text-mute)] leading-relaxed mb-2">${escapeHtml(t(tpl.desc))}</div>
       <div class="flex items-center gap-2">
-        <span class="chip text-[9px]">${escapeHtml(t(WF_TPL_CATEGORIES.find(c=>c.id===tpl.category)?.label || tpl.category || ''))}</span>
+        <span class="chip text-[9px]">${escapeHtml(t(WF_TPL_CATEGORIES.find(c => c.id === tpl.category)?.label || tpl.category || ''))}</span>
         <button class="btn-primary btn text-[10px]" onclick="event.stopPropagation();_wfUseTemplate('${tpl.id}')">+ ${t('이 템플릿으로 새 워크플로우 생성')}</button>
       </div>
     </div>
@@ -8873,26 +9086,26 @@ async function _wfShowTemplates() {
     <div class="card p-4 hover-lift wf-tpl-card" data-category="${escapeHtml(cat)}" style="cursor:pointer;position:relative;" onclick="_wfUseCustomTemplate('${tpl.id}')">
       <div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;">
         ${isBuiltin
-          ? `<span class="chip chip-ok text-[9px]" style="font-weight:600;">BUILT-IN</span>`
-          : `<button class="btn text-[10px]" style="color:#fca5a5;" onclick="event.stopPropagation();_wfDeleteCustomTemplate('${tpl.id}')">🗑️</button>`
-        }
+        ? `<span class="chip chip-ok text-[9px]" style="font-weight:600;">BUILT-IN</span>`
+        : `<button class="btn text-[10px]" style="color:#fca5a5;" onclick="event.stopPropagation();_wfDeleteCustomTemplate('${tpl.id}')">🗑️</button>`
+      }
       </div>
       <div class="flex items-center gap-2 mb-2">
-        <span style="font-size:1.5rem;">${escapeHtml(tpl.icon||'💾')}</span>
+        <span style="font-size:1.5rem;">${escapeHtml(tpl.icon || '💾')}</span>
         <span class="text-sm font-semibold">${escapeHtml(tpl.name)}</span>
       </div>
       <div class="text-[11px] text-[var(--text-mute)] leading-relaxed mb-1">${escapeHtml(tpl.description || '')}</div>
       <div class="flex items-center justify-between mt-2">
         <div class="flex items-center gap-2">
           <span class="text-[10px] text-[var(--text-dim)]">${tpl.nodeCount || 0} ${t('노드')} · ${tpl.edgeCount || 0} ${t('연결')}</span>
-          <span class="chip text-[9px]">${escapeHtml(t(WF_TPL_CATEGORIES.find(c=>c.id===cat)?.label || cat))}</span>
+          <span class="chip text-[9px]">${escapeHtml(t(WF_TPL_CATEGORIES.find(c => c.id === cat)?.label || cat))}</span>
         </div>
         <button class="btn-primary btn text-[10px]" onclick="event.stopPropagation();_wfUseCustomTemplate('${tpl.id}')">+ ${t('이 템플릿으로 새 워크플로우 생성')}</button>
       </div>
     </div>`;
   }).join('') : `<div class="card p-4 text-xs text-[var(--text-dim)] text-center">${t('저장된 커스텀 템플릿이 없습니다')}</div>`;
 
-  const canSaveCurrent = !!(__wf.current && (__wf.current.nodes||[]).length);
+  const canSaveCurrent = !!(__wf.current && (__wf.current.nodes || []).length);
 
   const catFilterBtns = WF_TPL_CATEGORIES.map(c =>
     `<button class="btn text-[10px] wf-tpl-cat-btn ${__wfTplFilter === c.id ? 'btn-active' : ''}" data-cat="${c.id}" onclick="_wfFilterTemplates('${c.id}')">${escapeHtml(t(c.label))}</button>`
@@ -8915,7 +9128,7 @@ async function _wfShowTemplates() {
 
       <div class="flex items-center justify-between mt-4 mb-2">
         <div class="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">${t('내 커스텀 템플릿')}</div>
-        <button class="btn-primary btn text-xs" ${canSaveCurrent?'':'disabled style="opacity:0.5;pointer-events:none;"'}
+        <button class="btn-primary btn text-xs" ${canSaveCurrent ? '' : 'disabled style="opacity:0.5;pointer-events:none;"'}
                 onclick="_wfSaveCurrentAsTemplate()">+ ${t('현재 워크플로우를 템플릿으로 저장')}</button>
       </div>
       <div class="flex flex-col gap-2">${customCards}</div>
@@ -8935,7 +9148,7 @@ async function _wfUseTemplate(tplId) {
   // templates also assume claude:sonnet by default.
   await _wfPatchTemplateAssignees(body.nodes);
   const r = await api('/api/workflows/save', {
-    method: 'POST', headers: { 'Content-Type':'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
@@ -8965,7 +9178,7 @@ async function _wfUseCustomTemplate(tplId) {
     viewport: tpl.viewport,
   };
   const s = await api('/api/workflows/save', {
-    method: 'POST', headers: { 'Content-Type':'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!s.ok) { toast(errMsg(s), 'err'); return; }
@@ -9003,7 +9216,7 @@ async function _wfSaveCurrentAsTemplate() {
     viewport: __wf.current.viewport,
   };
   const r = await api('/api/workflows/templates/save', {
-    method: 'POST', headers: { 'Content-Type':'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
@@ -9021,7 +9234,7 @@ async function _wfDeleteCustomTemplate(tplId) {
   });
   if (!ok) return;
   const r = await api('/api/workflows/templates/delete', {
-    method: 'POST', headers: { 'Content-Type':'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: tplId }),
   });
   if (!r.ok) { toast(errMsg(r), 'err'); return; }
@@ -9051,7 +9264,7 @@ async function _wfLoadVersionHistory() {
     ` + versions.map((v, idx) => `
       <div class="flex items-center justify-between py-2 border-b border-[var(--border)]" style="gap:6px;">
         <label class="flex items-center gap-1 flex-shrink-0">
-          <input type="checkbox" class="wf-version-compare-cb" data-saved-at="${escapeHtml(v.savedAt)}" data-name="${escapeHtml(v.name||t('이름 없음'))}" data-node-count="${v.nodeCount||0}" style="accent-color:var(--accent);" />
+          <input type="checkbox" class="wf-version-compare-cb" data-saved-at="${escapeHtml(v.savedAt)}" data-name="${escapeHtml(v.name || t('이름 없음'))}" data-node-count="${v.nodeCount || 0}" style="accent-color:var(--accent);" />
         </label>
         <div class="flex-1 min-w-0">
           <div class="text-[11px] font-semibold truncate" style="color:var(--text)">${escapeHtml(v.name || t('이름 없음'))}</div>
@@ -9117,7 +9330,7 @@ const WF_TUT_STEPS = [
   {
     title: '2. 🚀 시작 노드 자동 배치',
     caption: '워크플로우의 진입점인 🚀 시작 노드가 캔버스 왼쪽에 자동 배치됩니다.',
-    nodes: [{ id:'s', type:'start', x:40, y:40, title:'시작' }],
+    nodes: [{ id: 's', type: 'start', x: 40, y: 40, title: '시작' }],
     edges: [],
     cursor: { x: 220, y: 70 },
   },
@@ -9125,9 +9338,9 @@ const WF_TUT_STEPS = [
     title: '3. 🗂️ 세션 + 🤝 서브에이전트 추가',
     caption: '＋ 노드 추가 → 카테고리 선택 창에서 🗂️ 세션과 🤝 서브에이전트를 추가. subject(업무) · 모델 · 역할을 입력.',
     nodes: [
-      { id:'s', type:'start',    x:40,  y:40,  title:'시작' },
-      { id:'a', type:'session',  x:260, y:40,  title:'리서치', sub:'@sonnet-4.6' },
-      { id:'b', type:'subagent', x:480, y:40,  title:'작성',  sub:'@writer' },
+      { id: 's', type: 'start', x: 40, y: 40, title: '시작' },
+      { id: 'a', type: 'session', x: 260, y: 40, title: '리서치', sub: '@sonnet-4.6' },
+      { id: 'b', type: 'subagent', x: 480, y: 40, title: '작성', sub: '@writer' },
     ],
     edges: [],
     cursor: { x: 580, y: -16, click: true, label: '＋ 노드' },
@@ -9136,11 +9349,11 @@ const WF_TUT_STEPS = [
     title: '4. 🧩 취합 + 🔀 분기 추가',
     caption: '🧩 취합 노드는 여러 입력을 concat/JSON 으로 합침. 🔀 분기 노드는 조건 문자열 일치 여부로 Y/N 포트를 활성화.',
     nodes: [
-      { id:'s', type:'start',     x:40,  y:40,  title:'시작' },
-      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6' },
-      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer' },
-      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
-      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
+      { id: 's', type: 'start', x: 40, y: 40, title: '시작' },
+      { id: 'a', type: 'session', x: 260, y: 40, title: '리서치', sub: '@sonnet-4.6' },
+      { id: 'b', type: 'subagent', x: 480, y: 40, title: '작성', sub: '@writer' },
+      { id: 'c', type: 'aggregate', x: 260, y: 200, title: '취합' },
+      { id: 'd', type: 'branch', x: 480, y: 200, title: '분기' },
     ],
     edges: [],
     cursor: { x: 330, y: 230 },
@@ -9149,15 +9362,15 @@ const WF_TUT_STEPS = [
     title: '5. 포트 드래그로 화살표 연결',
     caption: '주황 out-port 에서 보라 in-port 로 드래그하면 베지어 곡선 + 방향 화살표가 자동 생성. DAG 사이클은 즉시 거부.',
     nodes: [
-      { id:'s', type:'start',     x:40,  y:40,  title:'시작' },
-      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6' },
-      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer' },
-      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
-      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
+      { id: 's', type: 'start', x: 40, y: 40, title: '시작' },
+      { id: 'a', type: 'session', x: 260, y: 40, title: '리서치', sub: '@sonnet-4.6' },
+      { id: 'b', type: 'subagent', x: 480, y: 40, title: '작성', sub: '@writer' },
+      { id: 'c', type: 'aggregate', x: 260, y: 200, title: '취합' },
+      { id: 'd', type: 'branch', x: 480, y: 200, title: '분기' },
     ],
     edges: [
-      { from:'s', to:'a' }, { from:'a', to:'b' },
-      { from:'b', to:'c' }, { from:'c', to:'d' },
+      { from: 's', to: 'a' }, { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' }, { from: 'c', to: 'd' },
     ],
     cursor: { x: 430, y: 64 },  // b in-port 위치 힌트
   },
@@ -9165,17 +9378,17 @@ const WF_TUT_STEPS = [
     title: '6. 📤 결과 노드 + DAG 완성',
     caption: '📤 결과 노드를 추가하고 분기 → 결과로 마무리. 이 노드가 워크플로우 종착지. exportTo 경로를 지정하면 파일로 저장.',
     nodes: [
-      { id:'s', type:'start',     x:20,  y:40,  title:'시작' },
-      { id:'a', type:'session',   x:230, y:40,  title:'리서치', sub:'@sonnet-4.6' },
-      { id:'b', type:'subagent',  x:440, y:40,  title:'작성',  sub:'@writer' },
-      { id:'c', type:'aggregate', x:230, y:220, title:'취합' },
-      { id:'d', type:'branch',    x:440, y:220, title:'분기' },
-      { id:'o', type:'output',    x:640, y:130, title:'결과' },
+      { id: 's', type: 'start', x: 20, y: 40, title: '시작' },
+      { id: 'a', type: 'session', x: 230, y: 40, title: '리서치', sub: '@sonnet-4.6' },
+      { id: 'b', type: 'subagent', x: 440, y: 40, title: '작성', sub: '@writer' },
+      { id: 'c', type: 'aggregate', x: 230, y: 220, title: '취합' },
+      { id: 'd', type: 'branch', x: 440, y: 220, title: '분기' },
+      { id: 'o', type: 'output', x: 640, y: 130, title: '결과' },
     ],
     edges: [
-      { from:'s', to:'a' }, { from:'a', to:'b' },
-      { from:'b', to:'c' }, { from:'c', to:'d' },
-      { from:'d', to:'o' },
+      { from: 's', to: 'a' }, { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' }, { from: 'c', to: 'd' },
+      { from: 'd', to: 'o' },
     ],
     cursor: { x: 140, y: 230 },
   },
@@ -9183,17 +9396,17 @@ const WF_TUT_STEPS = [
     title: '7. 🎯 맞춤으로 전체 한눈에',
     caption: '캔버스 우하단 🎯 맞춤 버튼 → 모든 노드 bounding box 가 보이도록 pan/zoom 자동 조정. 복잡한 워크플로우도 한 번에 정렬.',
     nodes: [
-      { id:'s', type:'start',     x:20,  y:40,  title:'시작' },
-      { id:'a', type:'session',   x:230, y:40,  title:'리서치', sub:'@sonnet-4.6' },
-      { id:'b', type:'subagent',  x:440, y:40,  title:'작성',  sub:'@writer' },
-      { id:'c', type:'aggregate', x:230, y:220, title:'취합' },
-      { id:'d', type:'branch',    x:440, y:220, title:'분기' },
-      { id:'o', type:'output',    x:640, y:130, title:'결과' },
+      { id: 's', type: 'start', x: 20, y: 40, title: '시작' },
+      { id: 'a', type: 'session', x: 230, y: 40, title: '리서치', sub: '@sonnet-4.6' },
+      { id: 'b', type: 'subagent', x: 440, y: 40, title: '작성', sub: '@writer' },
+      { id: 'c', type: 'aggregate', x: 230, y: 220, title: '취합' },
+      { id: 'd', type: 'branch', x: 440, y: 220, title: '분기' },
+      { id: 'o', type: 'output', x: 640, y: 130, title: '결과' },
     ],
     edges: [
-      { from:'s', to:'a' }, { from:'a', to:'b' },
-      { from:'b', to:'c' }, { from:'c', to:'d' },
-      { from:'d', to:'o' },
+      { from: 's', to: 'a' }, { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' }, { from: 'c', to: 'd' },
+      { from: 'd', to: 'o' },
     ],
     cursor: { x: 660, y: 340, click: true, label: '🎯 맞춤' },
     viewport: { scale: 0.88, panX: 42, panY: 22 },  // 맞춤으로 살짝 줌아웃한 효과
@@ -9202,17 +9415,17 @@ const WF_TUT_STEPS = [
     title: '8. ▶ 실행 → 순차 자동 처리',
     caption: '상단 ▶ 실행 → DAG 토폴로지 순서로 각 노드가 보라색 펄스(실행 중) → 녹색(완료)로 전환. 세션 노드는 claude -p 로 subprocess 실행.',
     nodes: [
-      { id:'s', type:'start',     x:40,  y:40,  title:'시작',   status:'ok' },
-      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6', status:'ok' },
-      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer', status:'running' },
-      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
-      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
-      { id:'o', type:'output',    x:640, y:130, title:'결과' },
+      { id: 's', type: 'start', x: 40, y: 40, title: '시작', status: 'ok' },
+      { id: 'a', type: 'session', x: 260, y: 40, title: '리서치', sub: '@sonnet-4.6', status: 'ok' },
+      { id: 'b', type: 'subagent', x: 480, y: 40, title: '작성', sub: '@writer', status: 'running' },
+      { id: 'c', type: 'aggregate', x: 260, y: 200, title: '취합' },
+      { id: 'd', type: 'branch', x: 480, y: 200, title: '분기' },
+      { id: 'o', type: 'output', x: 640, y: 130, title: '결과' },
     ],
     edges: [
-      { from:'s', to:'a' }, { from:'a', to:'b' },
-      { from:'b', to:'c' }, { from:'c', to:'d' },
-      { from:'d', to:'o' },
+      { from: 's', to: 'a' }, { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' }, { from: 'c', to: 'd' },
+      { from: 'd', to: 'o' },
     ],
     cursor: { x: 620, y: -16, click: true, label: '▶ 실행' },
   },
@@ -9220,17 +9433,17 @@ const WF_TUT_STEPS = [
     title: '9. 완료 → 결과 모달 · 터미널 · 파일',
     caption: '완료된 노드는 녹색 테두리. 결과 모달에 노드별 출력 미리보기. 세션 노드 🖥️ 아이콘으로 Terminal 새 창에서 대화형 세션도 시작 가능. 📜 이력 으로 과거 실행 재조회.',
     nodes: [
-      { id:'s', type:'start',     x:40,  y:40,  title:'시작',   status:'ok' },
-      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6', status:'ok' },
-      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer', status:'ok' },
-      { id:'c', type:'aggregate', x:260, y:200, title:'취합',   status:'ok' },
-      { id:'d', type:'branch',    x:480, y:200, title:'분기',   status:'ok' },
-      { id:'o', type:'output',    x:640, y:130, title:'결과',   status:'ok' },
+      { id: 's', type: 'start', x: 40, y: 40, title: '시작', status: 'ok' },
+      { id: 'a', type: 'session', x: 260, y: 40, title: '리서치', sub: '@sonnet-4.6', status: 'ok' },
+      { id: 'b', type: 'subagent', x: 480, y: 40, title: '작성', sub: '@writer', status: 'ok' },
+      { id: 'c', type: 'aggregate', x: 260, y: 200, title: '취합', status: 'ok' },
+      { id: 'd', type: 'branch', x: 480, y: 200, title: '분기', status: 'ok' },
+      { id: 'o', type: 'output', x: 640, y: 130, title: '결과', status: 'ok' },
     ],
     edges: [
-      { from:'s', to:'a' }, { from:'a', to:'b' },
-      { from:'b', to:'c' }, { from:'c', to:'d' },
-      { from:'d', to:'o' },
+      { from: 's', to: 'a' }, { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' }, { from: 'c', to: 'd' },
+      { from: 'd', to: 'o' },
     ],
     cursor: { x: 300, y: 100 },
   },
@@ -9238,17 +9451,17 @@ const WF_TUT_STEPS = [
     title: '10. 🎭 세션 하네스 — 페르소나 · 허용 도구',
     caption: '노드를 선택해 우측 패널을 열면 🎭 세션 하네스 섹션에서 시스템 프롬프트(페르소나) · 추가 지시 · 허용/차단 도구를 직접 설정. 각 세션이 고유 역할로 claude CLI 호출.',
     nodes: [
-      { id:'s', type:'start',     x:40,  y:40,  title:'시작' },
-      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6' },
-      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer' },
-      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
-      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
-      { id:'o', type:'output',    x:640, y:130, title:'결과' },
+      { id: 's', type: 'start', x: 40, y: 40, title: '시작' },
+      { id: 'a', type: 'session', x: 260, y: 40, title: '리서치', sub: '@sonnet-4.6' },
+      { id: 'b', type: 'subagent', x: 480, y: 40, title: '작성', sub: '@writer' },
+      { id: 'c', type: 'aggregate', x: 260, y: 200, title: '취합' },
+      { id: 'd', type: 'branch', x: 480, y: 200, title: '분기' },
+      { id: 'o', type: 'output', x: 640, y: 130, title: '결과' },
     ],
     edges: [
-      { from:'s', to:'a' }, { from:'a', to:'b' },
-      { from:'b', to:'c' }, { from:'c', to:'d' },
-      { from:'d', to:'o' },
+      { from: 's', to: 'a' }, { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' }, { from: 'c', to: 'd' },
+      { from: 'd', to: 'o' },
     ],
     cursor: { x: 560, y: 40, click: true, label: '🎭 페르소나' },
   },
@@ -9256,17 +9469,17 @@ const WF_TUT_STEPS = [
     title: '11. 🖥️ 터미널 새 창에서 대화형 spawn',
     caption: '세션 노드 우상단 🖥️ 아이콘 → Terminal 새 창에서 claude 실행. 노드에 설정된 페르소나·허용 도구·resume 모두 CLI 플래그로 전달되어 바로 대화형 세션 시작.',
     nodes: [
-      { id:'s', type:'start',     x:40,  y:40,  title:'시작' },
-      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6' },
-      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer' },
-      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
-      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
-      { id:'o', type:'output',    x:640, y:130, title:'결과' },
+      { id: 's', type: 'start', x: 40, y: 40, title: '시작' },
+      { id: 'a', type: 'session', x: 260, y: 40, title: '리서치', sub: '@sonnet-4.6' },
+      { id: 'b', type: 'subagent', x: 480, y: 40, title: '작성', sub: '@writer' },
+      { id: 'c', type: 'aggregate', x: 260, y: 200, title: '취합' },
+      { id: 'd', type: 'branch', x: 480, y: 200, title: '분기' },
+      { id: 'o', type: 'output', x: 640, y: 130, title: '결과' },
     ],
     edges: [
-      { from:'s', to:'a' }, { from:'a', to:'b' },
-      { from:'b', to:'c' }, { from:'c', to:'d' },
-      { from:'d', to:'o' },
+      { from: 's', to: 'a' }, { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' }, { from: 'c', to: 'd' },
+      { from: 'd', to: 'o' },
     ],
     cursor: { x: 428, y: 46, click: true, label: '🖥️ spawn' },
   },
@@ -9274,17 +9487,17 @@ const WF_TUT_STEPS = [
     title: '12. 🔄 session_id 이어쓰기로 재개',
     caption: '실행 결과 모달의 session_id 를 📋 복사하거나 ↪ 이어쓰기 로 다른 노드 resume 필드에 적용. 다음 실행 시 claude --resume 으로 같은 컨텍스트에서 이어서 대화.',
     nodes: [
-      { id:'s', type:'start',     x:40,  y:40,  title:'시작',   status:'ok' },
-      { id:'a', type:'session',   x:260, y:40,  title:'리서치', sub:'@sonnet-4.6', status:'ok' },
-      { id:'b', type:'subagent',  x:480, y:40,  title:'작성',  sub:'@writer', status:'running' },
-      { id:'c', type:'aggregate', x:260, y:200, title:'취합' },
-      { id:'d', type:'branch',    x:480, y:200, title:'분기' },
-      { id:'o', type:'output',    x:640, y:130, title:'결과' },
+      { id: 's', type: 'start', x: 40, y: 40, title: '시작', status: 'ok' },
+      { id: 'a', type: 'session', x: 260, y: 40, title: '리서치', sub: '@sonnet-4.6', status: 'ok' },
+      { id: 'b', type: 'subagent', x: 480, y: 40, title: '작성', sub: '@writer', status: 'running' },
+      { id: 'c', type: 'aggregate', x: 260, y: 200, title: '취합' },
+      { id: 'd', type: 'branch', x: 480, y: 200, title: '분기' },
+      { id: 'o', type: 'output', x: 640, y: 130, title: '결과' },
     ],
     edges: [
-      { from:'s', to:'a' }, { from:'a', to:'b' },
-      { from:'b', to:'c' }, { from:'c', to:'d' },
-      { from:'d', to:'o' },
+      { from: 's', to: 'a' }, { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' }, { from: 'c', to: 'd' },
+      { from: 'd', to: 'o' },
     ],
     cursor: { x: 420, y: 72, label: '🔄 resume' },
   },
@@ -9292,15 +9505,15 @@ const WF_TUT_STEPS = [
     title: '13. 📋 템플릿 — 팀 개발 등 원클릭 시작',
     caption: '툴바 📋 템플릿 버튼에서 팀 개발 · 리서치 파이프라인 · 병렬 3 작업 프리셋을 선택하면 페르소나까지 채워진 완성 DAG 가 한 번에 생성. 내 워크플로우를 커스텀 템플릿으로 저장해 재사용도 가능.',
     nodes: [
-      { id:'s',  type:'start',     x:40,  y:130, title:'시작' },
-      { id:'l1', type:'session',   x:260, y:130, title:'리드', sub:'@team-lead' },
-      { id:'fe', type:'subagent',  x:480, y:40,  title:'프론트', sub:'@frontend-dev' },
-      { id:'be', type:'subagent',  x:480, y:220, title:'백엔드', sub:'@backend-dev' },
-      { id:'ag', type:'aggregate', x:700, y:130, title:'취합' },
+      { id: 's', type: 'start', x: 40, y: 130, title: '시작' },
+      { id: 'l1', type: 'session', x: 260, y: 130, title: '리드', sub: '@team-lead' },
+      { id: 'fe', type: 'subagent', x: 480, y: 40, title: '프론트', sub: '@frontend-dev' },
+      { id: 'be', type: 'subagent', x: 480, y: 220, title: '백엔드', sub: '@backend-dev' },
+      { id: 'ag', type: 'aggregate', x: 700, y: 130, title: '취합' },
     ],
     edges: [
-      { from:'s',  to:'l1' }, { from:'l1', to:'fe' }, { from:'l1', to:'be' },
-      { from:'fe', to:'ag' }, { from:'be', to:'ag' },
+      { from: 's', to: 'l1' }, { from: 'l1', to: 'fe' }, { from: 'l1', to: 'be' },
+      { from: 'fe', to: 'ag' }, { from: 'be', to: 'ag' },
     ],
     cursor: { x: 440, y: -16, click: true, label: '📋 템플릿' },
   },
@@ -9308,16 +9521,16 @@ const WF_TUT_STEPS = [
     title: '14. 🔁 Repeat — 자동 반복 실행',
     caption: '메타 패널의 🔁 반복 실행 섹션에서 최대 횟수·간격·스케줄(HH:MM)·피드백 노트를 설정. 실행 완료 후 결과에 노트를 덧붙여 피드백 노드로 자동 주입하며 같은 DAG 를 여러 번 반복 — 리드가 스프린트를 N회 이어서 기획/실행/리뷰하는 자동화.',
     nodes: [
-      { id:'s',  type:'start',     x:40,  y:200, title:'시작',   status:'ok' },
-      { id:'l1', type:'session',   x:260, y:200, title:'리드',   sub:'@team-lead', status:'ok' },
-      { id:'fe', type:'subagent',  x:480, y:60,  title:'프론트', sub:'@frontend-dev', status:'ok' },
-      { id:'be', type:'subagent',  x:480, y:340, title:'백엔드', sub:'@backend-dev', status:'ok' },
-      { id:'ag', type:'aggregate', x:700, y:200, title:'취합',   status:'ok' },
-      { id:'o',  type:'output',    x:920, y:200, title:'결과',   status:'running' },
+      { id: 's', type: 'start', x: 40, y: 200, title: '시작', status: 'ok' },
+      { id: 'l1', type: 'session', x: 260, y: 200, title: '리드', sub: '@team-lead', status: 'ok' },
+      { id: 'fe', type: 'subagent', x: 480, y: 60, title: '프론트', sub: '@frontend-dev', status: 'ok' },
+      { id: 'be', type: 'subagent', x: 480, y: 340, title: '백엔드', sub: '@backend-dev', status: 'ok' },
+      { id: 'ag', type: 'aggregate', x: 700, y: 200, title: '취합', status: 'ok' },
+      { id: 'o', type: 'output', x: 920, y: 200, title: '결과', status: 'running' },
     ],
     edges: [
-      { from:'s',  to:'l1' }, { from:'l1', to:'fe' }, { from:'l1', to:'be' },
-      { from:'fe', to:'ag' }, { from:'be', to:'ag' }, { from:'ag', to:'o' },
+      { from: 's', to: 'l1' }, { from: 'l1', to: 'fe' }, { from: 'l1', to: 'be' },
+      { from: 'fe', to: 'ag' }, { from: 'be', to: 'ag' }, { from: 'ag', to: 'o' },
     ],
     cursor: { x: 260, y: 250, label: '🔁 피드백' },
     // 우측 메타 패널 mockup + 피드백 노트 typewriter
@@ -9329,17 +9542,17 @@ const WF_TUT_STEPS = [
     title: '15. 🧠 멀티 AI 프로바이더 — Claude · GPT · Ollama 동시 활용',
     caption: '노드의 Assignee 를 claude:opus, openai:gpt-4.1, ollama:qwen2.5 등으로 지정하면 각 노드가 다른 AI 로 실행됩니다. 같은 프롬프트를 병렬로 3개 AI 에 보내고 결과를 합치는 멀티 AI 비교 워크플로우.',
     nodes: [
-      { id:'s',  type:'start',     x:40,  y:200, title:'시작',     status:'ok' },
-      { id:'c1', type:'session',   x:280, y:60,  title:'Claude',   sub:'claude:opus', status:'ok' },
-      { id:'g1', type:'session',   x:280, y:200, title:'GPT',      sub:'openai:gpt-4.1', status:'running' },
-      { id:'o1', type:'session',   x:280, y:340, title:'Ollama',   sub:'ollama:qwen2.5', status:'ok' },
-      { id:'mg', type:'merge',     x:520, y:200, title:'합류',     status:'idle' },
-      { id:'out',type:'output',    x:720, y:200, title:'비교 결과', status:'idle' },
+      { id: 's', type: 'start', x: 40, y: 200, title: '시작', status: 'ok' },
+      { id: 'c1', type: 'session', x: 280, y: 60, title: 'Claude', sub: 'claude:opus', status: 'ok' },
+      { id: 'g1', type: 'session', x: 280, y: 200, title: 'GPT', sub: 'openai:gpt-4.1', status: 'running' },
+      { id: 'o1', type: 'session', x: 280, y: 340, title: 'Ollama', sub: 'ollama:qwen2.5', status: 'ok' },
+      { id: 'mg', type: 'merge', x: 520, y: 200, title: '합류', status: 'idle' },
+      { id: 'out', type: 'output', x: 720, y: 200, title: '비교 결과', status: 'idle' },
     ],
     edges: [
-      { from:'s', to:'c1' }, { from:'s', to:'g1' }, { from:'s', to:'o1' },
-      { from:'c1', to:'mg' }, { from:'g1', to:'mg' }, { from:'o1', to:'mg' },
-      { from:'mg', to:'out' },
+      { from: 's', to: 'c1' }, { from: 's', to: 'g1' }, { from: 's', to: 'o1' },
+      { from: 'c1', to: 'mg' }, { from: 'g1', to: 'mg' }, { from: 'o1', to: 'mg' },
+      { from: 'mg', to: 'out' },
     ],
     cursor: { x: 280, y: 200, label: '🧠 멀티 AI' },
   },
@@ -9347,14 +9560,14 @@ const WF_TUT_STEPS = [
     title: '16. 🧲 임베딩 + 🌐 HTTP — RAG 파이프라인',
     caption: '텍스트를 Ollama bge-m3 로 임베딩 → HTTP 노드로 벡터 DB 검색 → AI 가 답변 생성. embedding + http + session 노드를 조합한 RAG(검색 증강 생성) 파이프라인.',
     nodes: [
-      { id:'s',  type:'start',     x:40,  y:180, title:'질문 입력', status:'ok' },
-      { id:'em', type:'embedding', x:240, y:180, title:'임베딩',    sub:'bge-m3', status:'ok' },
-      { id:'ht', type:'http',      x:440, y:180, title:'벡터 검색', sub:'POST /search', status:'ok' },
-      { id:'ai', type:'session',   x:640, y:180, title:'답변 생성', sub:'claude:sonnet', status:'running' },
-      { id:'o',  type:'output',    x:840, y:180, title:'최종 답변', status:'idle' },
+      { id: 's', type: 'start', x: 40, y: 180, title: '질문 입력', status: 'ok' },
+      { id: 'em', type: 'embedding', x: 240, y: 180, title: '임베딩', sub: 'bge-m3', status: 'ok' },
+      { id: 'ht', type: 'http', x: 440, y: 180, title: '벡터 검색', sub: 'POST /search', status: 'ok' },
+      { id: 'ai', type: 'session', x: 640, y: 180, title: '답변 생성', sub: 'claude:sonnet', status: 'running' },
+      { id: 'o', type: 'output', x: 840, y: 180, title: '최종 답변', status: 'idle' },
     ],
     edges: [
-      { from:'s', to:'em' }, { from:'em', to:'ht' }, { from:'ht', to:'ai' }, { from:'ai', to:'o' },
+      { from: 's', to: 'em' }, { from: 'em', to: 'ht' }, { from: 'ht', to: 'ai' }, { from: 'ai', to: 'o' },
     ],
     cursor: { x: 240, y: 180, label: '🧲 bge-m3' },
   },
@@ -9362,16 +9575,16 @@ const WF_TUT_STEPS = [
     title: '17. 🔄 Loop + 🔁 Retry + 🛡️ Error Handler',
     caption: 'Loop 노드로 입력을 분할 반복, Retry 로 실패 시 자동 재시도 (exponential backoff), Error Handler 로 에러 시 기본값 반환. 견고한 자동화 파이프라인.',
     nodes: [
-      { id:'s',  type:'start',       x:40,  y:180, title:'데이터',   status:'ok' },
-      { id:'lp', type:'loop',        x:220, y:180, title:'분할 반복', sub:'for_each', status:'ok' },
-      { id:'rt', type:'retry',       x:400, y:180, title:'재시도 ×3', sub:'backoff 2s', status:'ok' },
-      { id:'ai', type:'session',     x:580, y:120, title:'AI 처리',  sub:'claude:sonnet', status:'running' },
-      { id:'eh', type:'error_handler',x:580, y:280, title:'에러 처리',sub:'기본값 반환', status:'idle' },
-      { id:'o',  type:'output',      x:780, y:180, title:'결과',     status:'idle' },
+      { id: 's', type: 'start', x: 40, y: 180, title: '데이터', status: 'ok' },
+      { id: 'lp', type: 'loop', x: 220, y: 180, title: '분할 반복', sub: 'for_each', status: 'ok' },
+      { id: 'rt', type: 'retry', x: 400, y: 180, title: '재시도 ×3', sub: 'backoff 2s', status: 'ok' },
+      { id: 'ai', type: 'session', x: 580, y: 120, title: 'AI 처리', sub: 'claude:sonnet', status: 'running' },
+      { id: 'eh', type: 'error_handler', x: 580, y: 280, title: '에러 처리', sub: '기본값 반환', status: 'idle' },
+      { id: 'o', type: 'output', x: 780, y: 180, title: '결과', status: 'idle' },
     ],
     edges: [
-      { from:'s', to:'lp' }, { from:'lp', to:'rt' }, { from:'rt', to:'ai' },
-      { from:'ai', to:'o' }, { from:'ai', to:'eh' }, { from:'eh', to:'o' },
+      { from: 's', to: 'lp' }, { from: 'lp', to: 'rt' }, { from: 'rt', to: 'ai' },
+      { from: 'ai', to: 'o' }, { from: 'ai', to: 'eh' }, { from: 'eh', to: 'o' },
     ],
     cursor: { x: 400, y: 180, label: '🔁 retry' },
   },
@@ -9379,14 +9592,14 @@ const WF_TUT_STEPS = [
     title: '18. ⏰ Cron + 🔗 Webhook + 📦 Export/Import',
     caption: 'Cron 스케줄로 매일 9시 자동 실행 · 외부 시스템에서 Webhook URL 로 트리거 · Export/Import 로 워크플로우 JSON 공유. Ctrl+C/V 로 노드 복사, Ctrl+Z 로 실행 취소.',
     nodes: [
-      { id:'s',  type:'start',      x:40,  y:180, title:'⏰ Cron/Webhook', status:'ok' },
-      { id:'tf', type:'transform',   x:240, y:180, title:'데이터 변환',    sub:'JSON 추출', status:'ok' },
-      { id:'sw', type:'subworkflow', x:440, y:180, title:'서브 워크플로우', sub:'분석 파이프라인', status:'ok' },
-      { id:'dl', type:'delay',       x:640, y:180, title:'⏱️ 대기 5s',     sub:'5000ms', status:'ok' },
-      { id:'o',  type:'output',      x:840, y:180, title:'알림 전송',      status:'running' },
+      { id: 's', type: 'start', x: 40, y: 180, title: '⏰ Cron/Webhook', status: 'ok' },
+      { id: 'tf', type: 'transform', x: 240, y: 180, title: '데이터 변환', sub: 'JSON 추출', status: 'ok' },
+      { id: 'sw', type: 'subworkflow', x: 440, y: 180, title: '서브 워크플로우', sub: '분석 파이프라인', status: 'ok' },
+      { id: 'dl', type: 'delay', x: 640, y: 180, title: '⏱️ 대기 5s', sub: '5000ms', status: 'ok' },
+      { id: 'o', type: 'output', x: 840, y: 180, title: '알림 전송', status: 'running' },
     ],
     edges: [
-      { from:'s', to:'tf' }, { from:'tf', to:'sw' }, { from:'sw', to:'dl' }, { from:'dl', to:'o' },
+      { from: 's', to: 'tf' }, { from: 'tf', to: 'sw' }, { from: 'sw', to: 'dl' }, { from: 'dl', to: 'o' },
     ],
     cursor: { x: 440, y: 180, label: '🔁 재사용' },
   },
@@ -9402,8 +9615,8 @@ function _wfShowTutorial() {
   w.style.zIndex = ++_winMgr.zIndex;
   const initW = Math.min(820, window.innerWidth - 40);
   const initH = Math.min(640, window.innerHeight - 40);
-  w.style.left = (window.innerWidth/2 - initW/2) + 'px';
-  w.style.top  = (window.innerHeight/2 - initH/2) + 'px';
+  w.style.left = (window.innerWidth / 2 - initW / 2) + 'px';
+  w.style.top = (window.innerHeight / 2 - initH / 2) + 'px';
   w.style.width = initW + 'px';
   w.style.height = initH + 'px';
   w.style.maxHeight = 'calc(100vh - 24px)';
@@ -9459,7 +9672,7 @@ function _wfShowTutorial() {
     </div>
   `;
   document.body.appendChild(w);
-  try { _makeDraggable(w); } catch (e) {}
+  try { _makeDraggable(w); } catch (e) { }
   _translateDOM(w);
   __wfTut = { step: 0, playing: true, timer: null, winId };
   _wfTutRender();
@@ -9486,8 +9699,8 @@ function _wfMaxTutorial(winId) {
     const initW = 720, initH = 560;
     w.style.width = initW + 'px'; w.style.height = initH + 'px';
     w.style.maxHeight = 'calc(100vh - 24px)';
-    w.style.left = (window.innerWidth/2 - initW/2) + 'px';
-    w.style.top  = (window.innerHeight/2 - initH/2) + 'px';
+    w.style.left = (window.innerWidth / 2 - initW / 2) + 'px';
+    w.style.top = (window.innerHeight / 2 - initH / 2) + 'px';
   }
 }
 
@@ -9534,26 +9747,26 @@ function _wfTutRender() {
   const idx = __wfTut.step;
   const step = WF_TUT_STEPS[idx];
   const titleEl = document.getElementById('wfTutTitle');
-  const bodyEl  = document.getElementById('wfTutBody');
-  const barEl   = document.getElementById('wfTutBar');
-  const cntEl   = document.getElementById('wfTutCount');
-  const nodesG  = document.getElementById('wfTutNodes');
-  const edgesG  = document.getElementById('wfTutEdges');
-  const vpG     = document.getElementById('wfTutViewport');
+  const bodyEl = document.getElementById('wfTutBody');
+  const barEl = document.getElementById('wfTutBar');
+  const cntEl = document.getElementById('wfTutCount');
+  const nodesG = document.getElementById('wfTutNodes');
+  const edgesG = document.getElementById('wfTutEdges');
+  const vpG = document.getElementById('wfTutViewport');
   const cursorG = document.getElementById('wfTutCursor');
   const cursorLabel = document.getElementById('wfTutCursorLabel');
   const clickFx = document.getElementById('wfTutClickFx');
   if (!titleEl || !nodesG || !edgesG) return;
   titleEl.textContent = t(step.title);
-  bodyEl.textContent  = t(step.caption);
-  barEl.style.width   = ((idx + 1) / WF_TUT_STEPS.length * 100).toFixed(1) + '%';
-  cntEl.textContent   = `${idx + 1} / ${WF_TUT_STEPS.length}`;
+  bodyEl.textContent = t(step.caption);
+  barEl.style.width = ((idx + 1) / WF_TUT_STEPS.length * 100).toFixed(1) + '%';
+  cntEl.textContent = `${idx + 1} / ${WF_TUT_STEPS.length}`;
 
   // viewport (맞춤 시연용 scale/pan)
   if (vpG) {
     const vp = step.viewport || { panX: 0, panY: 0, scale: 1 };
     vpG.style.transition = 'transform 0.35s ease-out';
-    vpG.setAttribute('transform', `translate(${vp.panX||0},${vp.panY||0}) scale(${vp.scale||1})`);
+    vpG.setAttribute('transform', `translate(${vp.panX || 0},${vp.panY || 0}) scale(${vp.scale || 1})`);
   }
 
   // 노드/엣지/커서/오버레이 bounding box → SVG viewBox 동적 설정.
@@ -9602,30 +9815,30 @@ function _wfTutRender() {
         <rect x="${ox}" y="${oy}" width="${ow}" height="${oh}" rx="10" ry="10"
               fill="#1e1e26" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
         <!-- 섹션 헤더 -->
-        <text x="${ox+16}" y="${oy+26}" font-size="13" font-weight="600" fill="#fafafa">🔁 ${escapeHtml(t('반복 실행'))}</text>
+        <text x="${ox + 16}" y="${oy + 26}" font-size="13" font-weight="600" fill="#fafafa">🔁 ${escapeHtml(t('반복 실행'))}</text>
         <!-- 체크박스 라벨 -->
-        <rect x="${ox+16}" y="${oy+42}" width="14" height="14" rx="3" ry="3" fill="#4ade80"/>
-        <text x="${ox+36}" y="${oy+53}" font-size="11" fill="#fafafa">${escapeHtml(t('반복 실행 활성'))}</text>
+        <rect x="${ox + 16}" y="${oy + 42}" width="14" height="14" rx="3" ry="3" fill="#4ade80"/>
+        <text x="${ox + 36}" y="${oy + 53}" font-size="11" fill="#fafafa">${escapeHtml(t('반복 실행 활성'))}</text>
         <!-- 최대 횟수 -->
-        <text x="${ox+16}" y="${oy+82}" font-size="10" fill="rgba(255,255,255,0.5)">${escapeHtml(t('최대 반복 횟수'))}</text>
-        <rect x="${ox+16}" y="${oy+88}" width="${ow-32}" height="28" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
-        <text x="${ox+28}" y="${oy+106}" font-size="12" fill="#fafafa">5</text>
+        <text x="${ox + 16}" y="${oy + 82}" font-size="10" fill="rgba(255,255,255,0.5)">${escapeHtml(t('최대 반복 횟수'))}</text>
+        <rect x="${ox + 16}" y="${oy + 88}" width="${ow - 32}" height="28" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
+        <text x="${ox + 28}" y="${oy + 106}" font-size="12" fill="#fafafa">5</text>
         <!-- 간격 -->
-        <text x="${ox+16}" y="${oy+132}" font-size="10" fill="rgba(255,255,255,0.5)">${escapeHtml(t('반복 사이 대기 (초)'))}</text>
-        <rect x="${ox+16}" y="${oy+138}" width="${ow-32}" height="28" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
-        <text x="${ox+28}" y="${oy+156}" font-size="12" fill="#fafafa">0</text>
+        <text x="${ox + 16}" y="${oy + 132}" font-size="10" fill="rgba(255,255,255,0.5)">${escapeHtml(t('반복 사이 대기 (초)'))}</text>
+        <rect x="${ox + 16}" y="${oy + 138}" width="${ow - 32}" height="28" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"/>
+        <text x="${ox + 28}" y="${oy + 156}" font-size="12" fill="#fafafa">0</text>
         <!-- 피드백 노트 라벨 -->
-        <text x="${ox+16}" y="${oy+182}" font-size="10" fill="rgba(255,255,255,0.5)">${escapeHtml(t('피드백 노트'))}</text>
+        <text x="${ox + 16}" y="${oy + 182}" font-size="10" fill="rgba(255,255,255,0.5)">${escapeHtml(t('피드백 노트'))}</text>
         <!-- 피드백 노트 textarea mockup -->
-        <rect x="${ox+16}" y="${oy+188}" width="${ow-32}" height="140" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(167,139,250,0.4)" stroke-width="1.5"/>
+        <rect x="${ox + 16}" y="${oy + 188}" width="${ow - 32}" height="140" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(167,139,250,0.4)" stroke-width="1.5"/>
         <!-- typewriter 텍스트 (foreignObject 로 자동 줄바꿈) -->
-        <foreignObject x="${ox+24}" y="${oy+196}" width="${ow-48}" height="128">
+        <foreignObject x="${ox + 24}" y="${oy + 196}" width="${ow - 48}" height="128">
           <div xmlns="http://www.w3.org/1999/xhtml"
                id="${typedId}"
                style="color:#fafafa; font-size:11px; line-height:1.5; font-family:inherit; white-space:pre-wrap; word-break:break-word;"></div>
         </foreignObject>
         <!-- 캐럿 -->
-        <text x="${ox+24}" y="${oy+216}" id="${typedId}_caret" font-size="11" fill="#a78bfa">▍</text>
+        <text x="${ox + 24}" y="${oy + 216}" id="${typedId}_caret" font-size="11" fill="#a78bfa">▍</text>
       `;
       // typewriter 시작
       const full = t(step.typewriter || '');
@@ -9647,16 +9860,16 @@ function _wfTutRender() {
   // 엣지 — stroke-dashoffset 드로잉 (공용 _wfBezier 사용)
   edgesG.innerHTML = (step.edges || []).map((e, i) => {
     const fromN = step.nodes.find(n => n.id === e.from);
-    const toN   = step.nodes.find(n => n.id === e.to);
+    const toN = step.nodes.find(n => n.id === e.to);
     if (!fromN || !toN) return '';
-    const x1 = fromN.x + WF_NODE_W, y1 = fromN.y + WF_NODE_H/2;
-    const x2 = toN.x,               y2 = toN.y + WF_NODE_H/2;
+    const x1 = fromN.x + WF_NODE_W, y1 = fromN.y + WF_NODE_H / 2;
+    const x2 = toN.x, y2 = toN.y + WF_NODE_H / 2;
     const d = _wfBezier(x1, y1, x2, y2);
     return `<path class="wf-tut-edge" d="${d}"
       stroke="#d97757" stroke-width="2" fill="none"
       marker-end="url(#wfTutArrow)"
       pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"
-      style="animation: wfTutDraw 0.5s ease-out ${(i*0.12).toFixed(2)}s forwards;"></path>`;
+      style="animation: wfTutDraw 0.5s ease-out ${(i * 0.12).toFixed(2)}s forwards;"></path>`;
   }).join('');
 
   // 노드 (fade in + stagger) + 포트 2개 (in 보라, out 주황)
@@ -9665,14 +9878,14 @@ function _wfTutRender() {
     const meta = WF_TYPE_MAP[n.type] || WF_TYPE_MAP.session;
     const statusAttr = n.status ? ` data-status="${n.status}"` : '';
     const titleRaw = n.title || meta.label;
-    const subRaw   = n.sub  || meta.label;
+    const subRaw = n.sub || meta.label;
     const title = t(titleRaw);
-    const sub   = subRaw.startsWith('@') ? subRaw : t(subRaw);  // @sonnet-4.6 같은 값은 원문 유지
-    const portIn  = meta.portIn  ? `<circle class="wf-tut-port-in"  cx="0" cy="${WF_NODE_H/2}" r="5"></circle>` : '';
-    const portOut = meta.portOut ? `<circle class="wf-tut-port-out" cx="${WF_NODE_W}" cy="${WF_NODE_H/2}" r="5"></circle>` : '';
+    const sub = subRaw.startsWith('@') ? subRaw : t(subRaw);  // @sonnet-4.6 같은 값은 원문 유지
+    const portIn = meta.portIn ? `<circle class="wf-tut-port-in"  cx="0" cy="${WF_NODE_H / 2}" r="5"></circle>` : '';
+    const portOut = meta.portOut ? `<circle class="wf-tut-port-out" cx="${WF_NODE_W}" cy="${WF_NODE_H / 2}" r="5"></circle>` : '';
     return `
       <g class="wf-node wf-tut-node-pop"${statusAttr} transform="translate(${n.x},${n.y})"
-         style="animation-delay: ${(i*0.15).toFixed(2)}s;">
+         style="animation-delay: ${(i * 0.15).toFixed(2)}s;">
         <rect class="wf-node-body" width="${WF_NODE_W}" height="${WF_NODE_H}" rx="12" ry="12"></rect>
         <text class="wf-node-icon" x="14" y="30">${meta.icon}</text>
         <text class="wf-node-title" x="40" y="28">${escapeHtml(title)}</text>
@@ -9703,10 +9916,10 @@ function _wfTutRender() {
 // from the telemetry table in the workflows tab so the user can drill
 // from "this wf has 3 failures" → "which runs failed, what was the
 // node output / error".
-window._wfOpenRunHistoryFor = async function(wfId) {
+window._wfOpenRunHistoryFor = async function (wfId) {
   if (!wfId) return;
   if (!__wf.current || __wf.current.id !== wfId) {
-    try { await _wfOpen(wfId); } catch (_) {}
+    try { await _wfOpen(wfId); } catch (_) { }
   }
   if (!__wf.current || __wf.current.id !== wfId) {
     toast(t('워크플로우를 불러올 수 없습니다'), 'err'); return;
@@ -9728,12 +9941,12 @@ async function _wfShowRuns() {
   for (const x of allRuns) {
     statusCounts[x.status] = (statusCounts[x.status] || 0) + 1;
   }
-  const statusIcon = { ok:'✅', err:'❌', running:'⏳' };
+  const statusIcon = { ok: '✅', err: '❌', running: '⏳' };
   // 프로바이더 색상 매핑
-  const _provColors = { claude:'#d97757', openai:'#10b981', anthropic:'#d97757', ollama:'#7dd3fc', google:'#fbbf24', gemini:'#fbbf24' };
+  const _provColors = { claude: '#d97757', openai: '#10b981', anthropic: '#d97757', ollama: '#7dd3fc', google: '#fbbf24', gemini: '#fbbf24' };
   function _provColor(name) {
-    const n = (name||'').toLowerCase();
-    for (const [k,v] of Object.entries(_provColors)) { if (n.includes(k)) return v; }
+    const n = (name || '').toLowerCase();
+    for (const [k, v] of Object.entries(_provColors)) { if (n.includes(k)) return v; }
     return 'var(--text-dim)';
   }
   function _runProviderSummary(nr) {
@@ -9741,10 +9954,10 @@ async function _wfShowRuns() {
     const counts = {};
     Object.values(nr).forEach(r => {
       const p = r.provider || r.providerId || '';
-      if (p) counts[p] = (counts[p]||0) + 1;
+      if (p) counts[p] = (counts[p] || 0) + 1;
     });
     if (!Object.keys(counts).length) return '';
-    return Object.entries(counts).map(([p,c]) =>
+    return Object.entries(counts).map(([p, c]) =>
       `<span class="chip text-[10px]" style="border-color:${_provColor(p)};color:${_provColor(p)};">${escapeHtml(p)} ×${c}</span>`
     ).join(' ');
   }
@@ -9757,7 +9970,7 @@ async function _wfShowRuns() {
     const rs = Math.round(s % 60);
     if (m < 60) return m + 'm ' + (rs ? rs + 's' : '');
     const h = Math.floor(m / 60);
-    return h + 'h ' + (m%60) + 'm';
+    return h + 'h ' + (m % 60) + 'm';
   }
   // v2.19.0 — 각 run 에 재실행 + 직전 run 과 diff 버튼 추가
   const rows = runs.length ? runs.map((x, idx) => {
@@ -9767,7 +9980,7 @@ async function _wfShowRuns() {
     <div class="wf-list-item">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0 flex-1 cursor-pointer" onclick="_wfOpenRun('${x.id}')">
-          <div class="text-sm">${statusIcon[x.status]||'•'} <span class="text-[10px] text-[var(--text-dim)]">${x.id}</span></div>
+          <div class="text-sm">${statusIcon[x.status] || '•'} <span class="text-[10px] text-[var(--text-dim)]">${x.id}</span></div>
           <div class="text-[11px] text-[var(--text-dim)] mt-1">
             ${fmtRel(x.startedAt)} · ${x.nodeCount} ${t('노드')} · ${_fmtDurReadable(x.durationMs)}
           </div>
@@ -9786,20 +9999,20 @@ async function _wfShowRuns() {
   showModal(`
     <div class="p-5">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-base font-semibold">📜 ${t('실행 이력')} — ${escapeHtml(__wf.current.name||'')}</h3>
+        <h3 class="text-base font-semibold">📜 ${t('실행 이력')} — ${escapeHtml(__wf.current.name || '')}</h3>
         <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
       </div>
       ${chartHtml}
       <div class="flex items-center gap-1 flex-wrap mb-2">
         ${(() => {
-          const _chip = (k, label) => {
-            const n = k === 'all' ? allRuns.length : (statusCounts[k] || 0);
-            const active = filterStatus === k;
-            return `<button class="chip text-[10px]" style="${active?'background:var(--accent);color:#fff;':''}"
-              onclick="state.data._wfRunFilter='${k}';closeModal();_wfShowRuns()">${label}${n?` <span class="font-mono ml-1">${n}</span>`:''}</button>`;
-          };
-          return _chip('all', t('전체')) + _chip('ok', '✅ ok') + _chip('err', '❌ err') + _chip('running', '⏳ running');
-        })()}
+      const _chip = (k, label) => {
+        const n = k === 'all' ? allRuns.length : (statusCounts[k] || 0);
+        const active = filterStatus === k;
+        return `<button class="chip text-[10px]" style="${active ? 'background:var(--accent);color:#fff;' : ''}"
+              onclick="state.data._wfRunFilter='${k}';closeModal();_wfShowRuns()">${label}${n ? ` <span class="font-mono ml-1">${n}</span>` : ''}</button>`;
+      };
+      return _chip('all', t('전체')) + _chip('ok', '✅ ok') + _chip('err', '❌ err') + _chip('running', '⏳ running');
+    })()}
         <span class="text-[10px] ml-auto" style="color:var(--text-dim)">${runs.length}/${allRuns.length}</span>
       </div>
       <div class="text-xs text-[var(--text-dim)] mb-2">${t('최근 50건. 클릭하면 상세 결과')}</div>
@@ -9826,28 +10039,28 @@ function _wfBuildRunsChart(runs) {
   const durPath = durVals.map((v, i) => {
     const x = pad + i * xStep;
     const y = H - pad - (v / maxDur) * (H - pad * 2);
-    return `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
   const tokPath = tokVals.map((v, i) => {
     const x = pad + i * xStep;
     const y = H - pad - (v / maxTok) * (H - pad * 2);
-    return `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
   const statusDots = ordered.map((r, i) => {
     const x = pad + i * xStep;
     const color = r.status === 'ok' ? '#22c55e' : r.status === 'err' ? '#ef4444' : '#94a3b8';
-    return `<circle cx="${x.toFixed(1)}" cy="${H-pad+2}" r="2" fill="${color}"/>`;
+    return `<circle cx="${x.toFixed(1)}" cy="${H - pad + 2}" r="2" fill="${color}"/>`;
   }).join('');
   return `
     <div class="card p-2 mb-3">
       <div class="flex items-center justify-between text-[10px] text-[var(--text-dim)] mb-1">
         <span>${t('최근')} ${n} ${t('실행')}</span>
         <span>
-          <span style="color:#d97757">●</span> ${t('지속시간')} max ${(maxDur/1000).toFixed(1)}s
+          <span style="color:#d97757">●</span> ${t('지속시간')} max ${(maxDur / 1000).toFixed(1)}s
           <span style="color:#7dd3fc;margin-left:8px">●</span> ${t('토큰')} max ${maxTok.toLocaleString()}
         </span>
       </div>
-      <svg viewBox="0 0 ${W} ${H+6}" style="width:100%;height:${H+6}px;display:block;">
+      <svg viewBox="0 0 ${W} ${H + 6}" style="width:100%;height:${H + 6}px;display:block;">
         <path d="${durPath}" fill="none" stroke="#d97757" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
         <path d="${tokPath}" fill="none" stroke="#7dd3fc" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
         ${statusDots}
@@ -9868,12 +10081,12 @@ async function _wfOpenRun(runId) {
 // v2.19.0 — 두 run 비교
 async function _wfDiffRuns(aId, bId) {
   const r = await fetch('/api/workflows/run-diff', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ a: aId, b: bId }),
   }).then(x => x.json());
   if (!r.ok) { toast(r.error || t('비교 실패'), 'err'); return; }
-  const iconFor = (s) => ({ok:'✅', err:'❌', running:'⏳', skipped:'⏭️'})[s] || '—';
-  const fmtDur = (ms) => ms < 1000 ? ms + 'ms' : (ms/1000).toFixed(1) + 's';
+  const iconFor = (s) => ({ ok: '✅', err: '❌', running: '⏳', skipped: '⏭️' })[s] || '—';
+  const fmtDur = (ms) => ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(1) + 's';
   const fmtDelta = (d) => {
     if (!d) return '<span class="text-[var(--text-dim)]">=</span>';
     const sign = d > 0 ? '+' : '';
@@ -9894,29 +10107,29 @@ async function _wfDiffRuns(aId, bId) {
   };
   const rows = (r.nodes || []).map(n => {
     const changed = n.statusChanged || n.onlyA || n.onlyB || n.tokensInDelta || n.tokensOutDelta;
-    const tokDelta = (n.tokensInDelta||0) + (n.tokensOutDelta||0);
+    const tokDelta = (n.tokensInDelta || 0) + (n.tokensOutDelta || 0);
     return `
-      <tr class="${changed?'bg-[var(--bg-hover)]':''}">
+      <tr class="${changed ? 'bg-[var(--bg-hover)]' : ''}">
         <td class="py-1 px-2 font-mono text-[10px]">${escapeHtml(n.nodeId)}</td>
         <td class="py-1 px-2 text-center">${iconFor(n.aStatus)}</td>
-        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDur(n.aDurationMs||0)}</td>
+        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDur(n.aDurationMs || 0)}</td>
         <td class="py-1 px-2 text-center">${iconFor(n.bStatus)}</td>
-        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDur(n.bDurationMs||0)}</td>
+        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDur(n.bDurationMs || 0)}</td>
         <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtDelta(n.durationDelta)}</td>
         <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtTokDelta(tokDelta)}</td>
-        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtCostDelta(n.costDelta||0)}</td>
+        <td class="py-1 px-2 text-right text-[10px] font-mono">${fmtCostDelta(n.costDelta || 0)}</td>
       </tr>
     `;
   }).join('');
   const s = r.summary;
-  const totalTokDelta = (s.tokensInDelta||0) + (s.tokensOutDelta||0);
+  const totalTokDelta = (s.tokensInDelta || 0) + (s.tokensOutDelta || 0);
   const summaryHtml = `
     <div class="flex items-center gap-4 text-[11px] mb-3 pb-2 border-b border-[var(--border)] flex-wrap">
-      <div>A: ${iconFor(s.a.status)} <span class="font-mono">${fmtDur(s.a.duration)}</span> <span class="text-[var(--text-dim)]">· ${(s.a.tokensIn||0)+(s.a.tokensOut||0)} tok · $${(s.a.costUsd||0).toFixed(4)}</span></div>
-      <div>B: ${iconFor(s.b.status)} <span class="font-mono">${fmtDur(s.b.duration)}</span> <span class="text-[var(--text-dim)]">· ${(s.b.tokensIn||0)+(s.b.tokensOut||0)} tok · $${(s.b.costUsd||0).toFixed(4)}</span></div>
+      <div>A: ${iconFor(s.a.status)} <span class="font-mono">${fmtDur(s.a.duration)}</span> <span class="text-[var(--text-dim)]">· ${(s.a.tokensIn || 0) + (s.a.tokensOut || 0)} tok · $${(s.a.costUsd || 0).toFixed(4)}</span></div>
+      <div>B: ${iconFor(s.b.status)} <span class="font-mono">${fmtDur(s.b.duration)}</span> <span class="text-[var(--text-dim)]">· ${(s.b.tokensIn || 0) + (s.b.tokensOut || 0)} tok · $${(s.b.costUsd || 0).toFixed(4)}</span></div>
       <div>Δ ${t('지연')}: ${fmtDelta(s.durationDelta)}</div>
       <div>Δ ${t('토큰')}: ${fmtTokDelta(totalTokDelta)}</div>
-      <div>Δ ${t('비용')}: ${fmtCostDelta(s.costDelta||0)}</div>
+      <div>Δ ${t('비용')}: ${fmtCostDelta(s.costDelta || 0)}</div>
     </div>
   `;
   showModal(`
@@ -9955,7 +10168,7 @@ async function _wfRerunWorkflow() {
   const wfId = __wf.current.id;
   closeModal();
   const r = await fetch('/api/workflows/run', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: wfId }),
   }).then(x => x.json());
   if (r.ok) {
@@ -9986,19 +10199,19 @@ VIEWS.overview = async () => {
   const breakdownHtml = Object.entries(opt.breakdown).map(([k, v]) => {
     const pct = Math.round((v.value / v.max) * 100);
     const color = scoreColor(pct);
-    const label = t({ permissions:'권한 정책', hooks:'훅 자동화', agents:'에이전트', skills:'스킬', plugins:'플러그인', mcp:'MCP', sessionQuality:'세션 품질' }[k] || k);
+    const label = t({ permissions: '권한 정책', hooks: '훅 자동화', agents: '에이전트', skills: '스킬', plugins: '플러그인', mcp: 'MCP', sessionQuality: '세션 품질' }[k] || k);
     const target = v.target || axisToTab[k] || '';
     const hasQ = v.quality !== undefined && v.quality !== null;
     const qPct = hasQ ? Math.round(v.quality * 100) : null;
     const qBadge = hasQ ? (
       qPct >= 70 ? `<span class="chip chip-ok text-[9px]">활용도 ${qPct}%</span>`
-      : qPct >= 30 ? `<span class="chip chip-warn text-[9px]">활용도 ${qPct}%</span>`
-      : `<span class="chip chip-err text-[9px]">활용도 ${qPct}%</span>`
+        : qPct >= 30 ? `<span class="chip chip-warn text-[9px]">활용도 ${qPct}%</span>`
+          : `<span class="chip chip-err text-[9px]">활용도 ${qPct}%</span>`
     ) : '';
     const rawHint = (v.rawValue !== undefined && v.rawValue !== v.value)
       ? `<span class="text-[10px] text-[var(--text-dim)] ml-1" title="단순 카운트 점수">(raw ${v.rawValue})</span>` : '';
     return `
-      <div class="p-3 card hover-lift cursor-pointer flex flex-col" style="min-height:140px" onclick="${target ? `go('${target}')` : ''}" title="${escapeHtml((v.formula||'')+'\n'+(v.suggest||''))}">
+      <div class="p-3 card hover-lift cursor-pointer flex flex-col" style="min-height:140px" onclick="${target ? `go('${target}')` : ''}" title="${escapeHtml((v.formula || '') + '\n' + (v.suggest || ''))}">
         <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <span class="text-sm font-medium">${label} <span class="text-[10px] text-[var(--text-dim)]">→</span></span>
           <div class="flex items-center gap-1">
@@ -10042,13 +10255,13 @@ VIEWS.overview = async () => {
     </div>`;
   }).join('') : `<div class="card p-5 empty text-sm">🎉 셋업이 이미 훌륭합니다. 추천 액션이 없습니다.</div>`;
 
-  const topSessionsHtml = (stats.topSessions || []).slice(0,5).map(s => `
+  const topSessionsHtml = (stats.topSessions || []).slice(0, 5).map(s => `
     <div class="p-2 rounded hover:bg-white/5 cursor-pointer" onclick="openSessionDetail('${s.session_id}')">
       <div class="flex items-center gap-2">
         <span class="chip" style="background:${scoreColor(s.score)}22; border-color:${scoreColor(s.score)}55; color:${scoreColor(s.score)}">★ ${s.score}</span>
         <span class="text-xs flex-1 truncate text-[var(--text-mute)]">${escapeHtml(s.project || '—')}</span>
       </div>
-      <div class="text-sm mt-1 truncate">${escapeHtml((s.first_user_prompt||'').slice(0,90)||'(요청 없음)')}</div>
+      <div class="text-sm mt-1 truncate">${escapeHtml((s.first_user_prompt || '').slice(0, 90) || '(요청 없음)')}</div>
     </div>`).join('') || `<div class="text-sm text-[var(--text-dim)]">기록 없음</div>`;
 
   return `
@@ -10074,11 +10287,11 @@ VIEWS.overview = async () => {
       ${statCard('에이전트 위임', stats.totalAgentCalls, '#67e8f9')}
       ${statCard('활성 프로젝트', briefing.projectCount)}
       ${(briefing.autoResumeActiveCount || 0) > 0
-        ? `<a class="card p-4 cursor-pointer hover-lift" href="#/sessions" title="${t('Auto-Resume 활성 세션 — 클릭하여 세션 목록으로 이동')}" style="background: linear-gradient(135deg, rgba(217,119,87,0.10), rgba(217,119,87,0.02));">
+      ? `<a class="card p-4 cursor-pointer hover-lift" href="#/sessions" title="${t('Auto-Resume 활성 세션 — 클릭하여 세션 목록으로 이동')}" style="background: linear-gradient(135deg, rgba(217,119,87,0.10), rgba(217,119,87,0.02));">
              <div class="text-[10px] uppercase tracking-wider text-[var(--text-dim)] flex items-center gap-1">🔄 ${t('Auto-Resume')}</div>
              <div class="text-2xl font-bold mono mt-1" style="color:#d97757">${briefing.autoResumeActiveCount}</div>
            </a>`
-        : statCard('Auto-Resume', briefing.autoResumeActiveCount || 0)}
+      : statCard('Auto-Resume', briefing.autoResumeActiveCount || 0)}
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
@@ -10107,15 +10320,15 @@ VIEWS.overview = async () => {
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         ${[
-          {kind:'hooks', icon:'🪝', label:'훅 추천', note:'SessionStart / PreToolUse 등'},
-          {kind:'permissions', icon:'🔐', label:'권한 추천', note:'자주 쓰는 명령 allow/deny'},
-          {kind:'output-styles', icon:'🎨', label:'출력 스타일', note:'답변 톤/포맷 프리셋'},
-          {kind:'statusline', icon:'📡', label:'상태라인', note:'하단 statusLine 명령'},
-          {kind:'claudemd', icon:'📜', label:'글로벌 CLAUDE.md', note:'모든 세션에 로드되는 지침'},
-          {kind:'projectAgent', icon:'👥', label:'프로젝트 에이전트', note:'역할 프리셋 16종'},
-          {kind:'mcp', icon:'🔗', label:'MCP 카탈로그', note:'Context7, GitHub 등 원클릭'},
-          {kind:'analytics', icon:'📊', label:'세션 점수 상세', note:'프로젝트별 5축 계산식'},
-        ].map(q => `
+      { kind: 'hooks', icon: '🪝', label: '훅 추천', note: 'SessionStart / PreToolUse 등' },
+      { kind: 'permissions', icon: '🔐', label: '권한 추천', note: '자주 쓰는 명령 allow/deny' },
+      { kind: 'output-styles', icon: '🎨', label: '출력 스타일', note: '답변 톤/포맷 프리셋' },
+      { kind: 'statusline', icon: '📡', label: '상태라인', note: '하단 statusLine 명령' },
+      { kind: 'claudemd', icon: '📜', label: '글로벌 CLAUDE.md', note: '모든 세션에 로드되는 지침' },
+      { kind: 'projectAgent', icon: '👥', label: '프로젝트 에이전트', note: '역할 프리셋 16종' },
+      { kind: 'mcp', icon: '🔗', label: 'MCP 카탈로그', note: 'Context7, GitHub 등 원클릭' },
+      { kind: 'analytics', icon: '📊', label: '세션 점수 상세', note: '프로젝트별 5축 계산식' },
+    ].map(q => `
           <div class="card p-3 hover-lift cursor-pointer" onclick="quickRecommend('${q.kind}')">
             <div class="flex items-center gap-2 mb-1">
               <span class="text-xl">${q.icon}</span>
@@ -10142,7 +10355,7 @@ async function quickRecommend(kind) {
   if (kind === 'projectAgent') return go('projectAgents');
   if (kind === 'mcp') return go('mcp');
   if (kind === 'analytics') return go('analytics');
-  if (['hooks','permissions','output-styles','statusline'].includes(kind)) return startFeatureRecommend(kind);
+  if (['hooks', 'permissions', 'output-styles', 'statusline'].includes(kind)) return startFeatureRecommend(kind);
 }
 
 // AI 종합 평가 탭
@@ -10151,7 +10364,7 @@ VIEWS.aiEval = async () => {
   // 캐시된 결과의 언어가 현재 언어와 다르면 새로 평가
   if (r.cached && r.lang && r.lang !== _curLang && _curLang !== 'ko') {
     r = await api('/api/evaluation/ai', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ force: true, lang: _curLang }),
     });
   }
@@ -10176,14 +10389,14 @@ VIEWS.aiEval = async () => {
   const det = r.deterministic || {};
   const cost = r.costInfo || {};
   const ageMin = r.ts ? Math.round((Date.now() - r.ts) / 60000) : 0;
-  const impactColor = { high:'#fca5a5', medium:'#fcd34d', low:'#86efac' };
-  const effortColor = { high:'#fca5a5', medium:'#fcd34d', low:'#86efac' };
+  const impactColor = { high: '#fca5a5', medium: '#fcd34d', low: '#86efac' };
+  const effortColor = { high: '#fca5a5', medium: '#fcd34d', low: '#86efac' };
 
   return `
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">🤖 AI 종합 평가</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">Claude 가 전체 셋업을 보고 우선순위 진단 · ${ageMin}분 전 ${r.cached?'(캐시됨)':''} · 비용 $${(cost.costUsd||0).toFixed(4)}</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">Claude 가 전체 셋업을 보고 우선순위 진단 · ${ageMin}분 전 ${r.cached ? '(캐시됨)' : ''} · 비용 $${(cost.costUsd || 0).toFixed(4)}</p>
       </div>
       <div class="flex gap-2">
         <button class="btn-primary btn text-xs" onclick="refreshAiEval()">🔄 새로 평가받기 (30~120초)</button>
@@ -10195,7 +10408,7 @@ VIEWS.aiEval = async () => {
       <div class="card p-5">
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">결정론적 점수 (휴리스틱 + 품질 가중치)</div>
         <div class="flex items-baseline gap-2">
-          <div class="text-5xl font-bold mono" style="color:${scoreColor(det.overall||0)}">${det.overall||0}</div>
+          <div class="text-5xl font-bold mono" style="color:${scoreColor(det.overall || 0)}">${det.overall || 0}</div>
           <div class="text-sm text-[var(--text-mute)]">/100</div>
         </div>
         <div class="text-[11px] text-[var(--text-mute)] mt-2">7축 평균 — 자원 보유 × 30일 활용도</div>
@@ -10203,10 +10416,10 @@ VIEWS.aiEval = async () => {
       <div class="card p-5" style="background: rgba(217,119,87,0.05);">
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">🤖 AI 종합 점수</div>
         <div class="flex items-baseline gap-2">
-          <div class="text-5xl font-bold mono" style="color:${scoreColor(ev.overall||0)}">${ev.overall||0}</div>
+          <div class="text-5xl font-bold mono" style="color:${scoreColor(ev.overall || 0)}">${ev.overall || 0}</div>
           <div class="text-sm text-[var(--text-mute)]">/100</div>
         </div>
-        <div class="text-sm text-[var(--text)] mt-2 line-clamp-2">${escapeHtml(ev.verdict||'')}</div>
+        <div class="text-sm text-[var(--text)] mt-2 line-clamp-2">${escapeHtml(ev.verdict || '')}</div>
       </div>
     </div>
 
@@ -10214,36 +10427,36 @@ VIEWS.aiEval = async () => {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
       <div class="card p-5">
         <div class="font-semibold text-sm mb-3" style="color:#86efac">✅ 강점</div>
-        ${(ev.strengths||[]).map(s => `<div class="text-sm py-1 flex gap-2"><span>•</span><span>${escapeHtml(s)}</span></div>`).join('') || '<div class="text-xs text-[var(--text-dim)]">—</div>'}
+        ${(ev.strengths || []).map(s => `<div class="text-sm py-1 flex gap-2"><span>•</span><span>${escapeHtml(s)}</span></div>`).join('') || '<div class="text-xs text-[var(--text-dim)]">—</div>'}
       </div>
       <div class="card p-5">
         <div class="font-semibold text-sm mb-3" style="color:#fca5a5">⚠️ 약점</div>
-        ${(ev.weaknesses||[]).map(s => `<div class="text-sm py-1 flex gap-2"><span>•</span><span>${escapeHtml(s)}</span></div>`).join('') || '<div class="text-xs text-[var(--text-dim)]">—</div>'}
+        ${(ev.weaknesses || []).map(s => `<div class="text-sm py-1 flex gap-2"><span>•</span><span>${escapeHtml(s)}</span></div>`).join('') || '<div class="text-xs text-[var(--text-dim)]">—</div>'}
       </div>
     </div>
 
     <!-- 우선순위 액션 -->
     <div class="mb-5">
       <h3 class="font-semibold text-sm mb-3">🎯 개선 우선순위 (impact / effort)</h3>
-      ${(ev.priorities||[]).map(p => `
+      ${(ev.priorities || []).map(p => `
         <div class="card p-4 mb-2">
           <div class="flex items-start gap-3">
-            <div class="text-2xl font-bold mono" style="color:#d97757">#${p.rank||'?'}</div>
+            <div class="text-2xl font-bold mono" style="color:#d97757">#${p.rank || '?'}</div>
             <div class="flex-1 min-w-0">
               <div class="font-semibold flex items-center gap-2 flex-wrap">
-                ${escapeHtml(p.title||'')}
-                <span class="chip text-[9px]" style="color:${impactColor[p.impact]||'#fff'}">impact: ${escapeHtml(p.impact||'?')}</span>
-                <span class="chip text-[9px]" style="color:${effortColor[p.effort]||'#fff'}">effort: ${escapeHtml(p.effort||'?')}</span>
+                ${escapeHtml(p.title || '')}
+                <span class="chip text-[9px]" style="color:${impactColor[p.impact] || '#fff'}">impact: ${escapeHtml(p.impact || '?')}</span>
+                <span class="chip text-[9px]" style="color:${effortColor[p.effort] || '#fff'}">effort: ${escapeHtml(p.effort || '?')}</span>
               </div>
-              <div class="text-xs text-[var(--text-mute)] mt-2">${escapeHtml(p.rationale||'')}</div>
-              <div class="text-sm mt-2 p-2 rounded bg-white/5">📌 ${escapeHtml(p.action||'')}</div>
+              <div class="text-xs text-[var(--text-mute)] mt-2">${escapeHtml(p.rationale || '')}</div>
+              <div class="text-sm mt-2 p-2 rounded bg-white/5">📌 ${escapeHtml(p.action || '')}</div>
             </div>
           </div>
         </div>`).join('') || '<div class="card empty text-xs">우선순위 없음</div>'}
     </div>
 
     <!-- 패턴 인사이트 -->
-    ${(ev.patternInsights||[]).length ? `
+    ${(ev.patternInsights || []).length ? `
     <div class="card p-5 mb-5">
       <div class="font-semibold text-sm mb-3">💡 사용 패턴 인사이트</div>
       ${ev.patternInsights.map(s => `<div class="text-sm py-1 flex gap-2"><span>•</span><span>${escapeHtml(s)}</span></div>`).join('')}
@@ -10251,7 +10464,7 @@ VIEWS.aiEval = async () => {
 
     <details class="card p-3 text-xs">
       <summary class="cursor-pointer text-[var(--text-dim)]">🔍 원본 응답 / 메타</summary>
-      <pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded mt-2 max-h-[320px] overflow-y-auto">${escapeHtml(JSON.stringify({ev, cost: r.costInfo, raw: (r.raw||'').slice(0, 1500)}, null, 2))}</pre>
+      <pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded mt-2 max-h-[320px] overflow-y-auto">${escapeHtml(JSON.stringify({ ev, cost: r.costInfo, raw: (r.raw || '').slice(0, 1500) }, null, 2))}</pre>
     </details>
   `;
 };
@@ -10259,7 +10472,7 @@ async function refreshAiEval() {
   showModalLoading(t('Claude 에게 종합 평가 요청 중 (30~120초)…'));
   try {
     const r = await api('/api/evaluation/ai', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ force: true, lang: _curLang }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true, lang: _curLang }),
     });
     closeModal();
     if (r.error) { toast(errMsg(r), 'err'); return; }
@@ -10270,12 +10483,12 @@ async function refreshAiEval() {
 
 // 추천 리스트 형태(plugin/mcp) — 사용자 패턴 기반
 async function aiRecommendList(kind) {
-  const labelMap = { plugins:'플러그인', mcp:'MCP' };
+  const labelMap = { plugins: '플러그인', mcp: 'MCP' };
   const label = labelMap[kind] || kind;
   showModalLoading(t('Claude 에게 추천 요청 중 (30~90초)…'));
   try {
     const r = await api('/api/feature/recommend', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ kind, lang: _curLang }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, lang: _curLang }),
     });
     if (r.error) { closeModal(); toast(errMsg(r), 'err'); return; }
     // proposed 안에서 recommendations 추출
@@ -10290,7 +10503,7 @@ async function aiRecommendList(kind) {
 
 function renderAiRecListModal(kind, label, recs, raw) {
   const cost = raw.costInfo || {};
-  const costBadge = `<span class="text-[10px] text-[var(--text-dim)]">비용 $${(cost.costUsd||0).toFixed(4)} · ${Math.round((cost.durationMs||0)/1000)}초</span>`;
+  const costBadge = `<span class="text-[10px] text-[var(--text-dim)]">비용 $${(cost.costUsd || 0).toFixed(4)} · ${Math.round((cost.durationMs || 0) / 1000)}초</span>`;
   const cardHtml = (rec, idx) => {
     const why = escapeHtml(rec.why || rec.reason || '');
     const prio = rec.priority ? `<span class="chip chip-accent text-[9px]">우선순위 ${rec.priority}</span>` : '';
@@ -10305,7 +10518,7 @@ function renderAiRecListModal(kind, label, recs, raw) {
           <div class="flex items-start justify-between gap-3 mb-2">
             <div class="min-w-0 flex-1">
               <div class="font-semibold text-sm flex items-center gap-2 flex-wrap">
-                <span>${idx+1}. ${escapeHtml(target)}</span> ${prio} ${mkt} ${mUrl}
+                <span>${idx + 1}. ${escapeHtml(target)}</span> ${prio} ${mkt} ${mUrl}
               </div>
               <div class="text-xs text-[var(--text-mute)] mt-2">${why}</div>
             </div>
@@ -10320,7 +10533,7 @@ function renderAiRecListModal(kind, label, recs, raw) {
           <div class="flex items-start justify-between gap-3 mb-2">
             <div class="min-w-0 flex-1">
               <div class="font-semibold text-sm flex items-center gap-2 flex-wrap">
-                <span>${idx+1}. ${escapeHtml(rec.mcpId || rec.id || '')}</span> ${prio}
+                <span>${idx + 1}. ${escapeHtml(rec.mcpId || rec.id || '')}</span> ${prio}
               </div>
               <div class="text-xs text-[var(--text-mute)] mt-2">${why}</div>
               ${cli}
@@ -10344,7 +10557,7 @@ function renderAiRecListModal(kind, label, recs, raw) {
       ${recs.map(cardHtml).join('')}
       <details class="mt-4 text-[11px]">
         <summary class="cursor-pointer text-[var(--text-dim)]">📋 원본 응답</summary>
-        <pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded mt-2 max-h-[260px] overflow-y-auto">${escapeHtml(JSON.stringify(raw.proposed||raw, null, 2))}</pre>
+        <pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded mt-2 max-h-[260px] overflow-y-auto">${escapeHtml(JSON.stringify(raw.proposed || raw, null, 2))}</pre>
       </details>
     </div>`);
 }
@@ -10353,19 +10566,19 @@ async function applyPluginRec(rec) {
   const action = rec.action || (rec.pluginKey ? 'enable' : 'install');
   if (action === 'enable' && rec.pluginKey) {
     const r = await api('/api/plugins/toggle', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: rec.pluginKey, enable: true }),
     });
-    toast(r.ok ? `'${rec.pluginKey}' 활성화됨` : (r.error||'실패'), r.ok?'ok':'err');
+    toast(r.ok ? `'${rec.pluginKey}' 활성화됨` : (r.error || '실패'), r.ok ? 'ok' : 'err');
   } else if (action === 'install') {
     if (rec.marketplaceUrl) {
       // 마켓플레이스 추가 후 안내
-      const mkt = rec.marketplace || rec.marketplaceUrl.split('/').pop().replace('.git','');
+      const mkt = rec.marketplace || rec.marketplaceUrl.split('/').pop().replace('.git', '');
       const r = await api('/api/marketplaces/add', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: mkt, url: rec.marketplaceUrl }),
       });
-      toast(r.ok ? `마켓플레이스 추가됨 — 플러그인 탭에서 활성화하세요` : (r.error||'실패'), r.ok?'ok':'err');
+      toast(r.ok ? `마켓플레이스 추가됨 — 플러그인 탭에서 활성화하세요` : (r.error || '실패'), r.ok ? 'ok' : 'err');
     } else {
       toast('marketplaceUrl 누락 — 수동으로 마켓 추가 필요', 'warn');
     }
@@ -10377,19 +10590,19 @@ async function applyMcpRec(rec) {
   if (!id) { toast('mcpId 누락', 'err'); return; }
   const asName = id;
   const r = await api('/api/mcp/install', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id, as: asName }),
   });
-  toast(r.ok ? `'${id}' MCP 설치됨` : (r.error||'실패'), r.ok?'ok':'err');
+  toast(r.ok ? `'${id}' MCP 설치됨` : (r.error || '실패'), r.ok ? 'ok' : 'err');
 }
 
 async function startFeatureRecommend(kind) {
-  const labelMap = { hooks:'훅', permissions:'권한', 'output-styles':'출력 스타일', statusline:'상태라인' };
+  const labelMap = { hooks: '훅', permissions: '권한', 'output-styles': '출력 스타일', statusline: '상태라인' };
   const label = labelMap[kind] || kind;
   showModalLoading(t('Claude 에게 추천 요청 중 (30~90초)…'));
   try {
     const r = await api('/api/feature/recommend', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ kind, lang: _curLang }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, lang: _curLang }),
     });
     if (r.error) { closeModal(); toast(errMsg(r), 'err'); return; }
     closeModal();
@@ -10398,23 +10611,23 @@ async function startFeatureRecommend(kind) {
 }
 
 function openFeatureApplyModal(kind, r) {
-  const labelMap = { hooks:'훅', permissions:'권한', 'output-styles':'출력 스타일', statusline:'상태라인' };
+  const labelMap = { hooks: '훅', permissions: '권한', 'output-styles': '출력 스타일', statusline: '상태라인' };
   const label = labelMap[kind] || kind;
   const currentStr = JSON.stringify(r.current || {}, null, 2);
   const proposedStr = JSON.stringify(r.proposed || {}, null, 2);
   const cost = r.costInfo || {};
   const saveFn = async (newRawStr) => {
     let parsed; try { parsed = JSON.parse(newRawStr); }
-    catch (e) { return { ok:false, error: 'JSON: '+e.message }; }
+    catch (e) { return { ok: false, error: 'JSON: ' + e.message }; }
     // 병합 전략
     const s = await api('/api/settings');
     if (kind === 'hooks') {
-      s.hooks = { ...(s.hooks||{}), ...(parsed.hooks || parsed) };
+      s.hooks = { ...(s.hooks || {}), ...(parsed.hooks || parsed) };
     } else if (kind === 'permissions') {
       const p = parsed.permissions || parsed;
-      const cur = s.permissions || { allow:[], deny:[] };
-      const allow = Array.from(new Set([...(cur.allow||[]), ...(p.allow||[])]));
-      const deny = Array.from(new Set([...(cur.deny||[]), ...(p.deny||[])]));
+      const cur = s.permissions || { allow: [], deny: [] };
+      const allow = Array.from(new Set([...(cur.allow || []), ...(p.allow || [])]));
+      const deny = Array.from(new Set([...(cur.deny || []), ...(p.deny || [])]));
       s.permissions = { ...cur, allow, deny };
     } else if (kind === 'statusline') {
       s.statusLine = parsed.statusLine || parsed;
@@ -10423,15 +10636,15 @@ function openFeatureApplyModal(kind, r) {
       const id = parsed.id || 'ai-recommended';
       const raw = parsed.raw || '';
       return api('/api/output-styles/save', {
-        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, raw }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, raw }),
       });
     }
-    return api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(s) });
+    return api('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) });
   };
   openDiffApplyModal({
     title: `AI 추천: ${label}`,
     relpath: kind === 'output-styles' ? '~/.claude/output-styles/<name>.md' : '~/.claude/settings.json',
-    reason: `비용 $${(cost.costUsd||0).toFixed(4)} · ${Math.round((cost.durationMs||0)/1000)}초. ${r.applyHint||''}`,
+    reason: `비용 $${(cost.costUsd || 0).toFixed(4)} · ${Math.round((cost.durationMs || 0) / 1000)}초. ${r.applyHint || ''}`,
     cwd: '',
     currentRaw: currentStr,
     proposedRaw: proposedStr,
@@ -10450,7 +10663,7 @@ function statCard(label, value, color, hint) {
   return `
     <div class="card p-4 hover-lift">
       <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t(label)}</div>
-      <div class="text-3xl font-bold mono mt-1" style="${color?`color:${color}`:''}" ${isNum ? `data-count="${num}"` : ''}>${isNum ? '0' : (value ?? '—')}</div>
+      <div class="text-3xl font-bold mono mt-1" style="${color ? `color:${color}` : ''}" ${isNum ? `data-count="${num}"` : ''}>${isNum ? '0' : (value ?? '—')}</div>
       ${hint ? `<div class="text-[10px] text-[var(--text-mute)] mt-1">${escapeHtml(hint)}</div>` : ''}
     </div>`;
 }
@@ -10468,7 +10681,7 @@ function drawTimeline(data) {
       labels,
       datasets: [
         { label: t('평균 스코어'), data: scores, borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.12)', tension: 0.4, yAxisID: 'y', fill: true },
-        { label: t('도구 호출'), data: tools, borderColor: '#67e8f9', backgroundColor: 'rgba(103,232,249,0.08)', tension: 0.4, yAxisID: 'y1', borderDash: [4,3] },
+        { label: t('도구 호출'), data: tools, borderColor: '#67e8f9', backgroundColor: 'rgba(103,232,249,0.08)', tension: 0.4, yAxisID: 'y1', borderDash: [4, 3] },
         { label: t('오류'), data: errors, borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.2)', tension: 0.4, yAxisID: 'y1' },
       ],
     },
@@ -10494,7 +10707,7 @@ VIEWS.analytics = async () => {
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">통계 & 스코어</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">SQLite에 인덱스된 세션 데이터 기반 분석. <span class="text-[var(--text-dim)]">평균 점수는 도구 호출 ≥${stats.minToolsForScore||11}회 세션 (${stats.scoredSessions}/${stats.totalSessions}) 만 집계 — 짧은 세션 노이즈 제거</span></p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">SQLite에 인덱스된 세션 데이터 기반 분석. <span class="text-[var(--text-dim)]">평균 점수는 도구 호출 ≥${stats.minToolsForScore || 11}회 세션 (${stats.scoredSessions}/${stats.totalSessions}) 만 집계 — 짧은 세션 노이즈 제거</span></p>
       </div>
       <div class="flex gap-2">
         <button class="btn" onclick="reindex(true)">🔄 전체 재인덱스</button>
@@ -10503,8 +10716,8 @@ VIEWS.analytics = async () => {
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-      ${statCard('총 세션', stats.totalSessions, '', `점수 집계 ${stats.scoredSessions} · 짧은 세션 ${stats.totalSessions-stats.scoredSessions} 제외`)}
-      ${statCard('평균 스코어', stats.avgScore, scoreColor(stats.avgScore), `도구≥${stats.minToolsForScore||11}회 세션 평균`)}
+      ${statCard('총 세션', stats.totalSessions, '', `점수 집계 ${stats.scoredSessions} · 짧은 세션 ${stats.totalSessions - stats.scoredSessions} 제외`)}
+      ${statCard('평균 스코어', stats.avgScore, scoreColor(stats.avgScore), `도구≥${stats.minToolsForScore || 11}회 세션 평균`)}
       ${statCard('도구 총 호출', stats.totalTools)}
       ${statCard('오류', stats.totalErrors, '#f87171')}
     </div>
@@ -10528,12 +10741,12 @@ VIEWS.analytics = async () => {
       <table class="data">
         <thead><tr><th>프로젝트</th><th>경로</th><th class="text-right">세션</th><th class="text-right">평균 스코어</th><th class="text-right">도구 사용</th></tr></thead>
         <tbody>
-          ${(stats.projectDistribution||[]).map(p => `
-            <tr class="link-row" onclick='openScoreDetail(${JSON.stringify({cwd: p.cwd||"", projectDir: p.project_dir||""})})'>
+          ${(stats.projectDistribution || []).map(p => `
+            <tr class="link-row" onclick='openScoreDetail(${JSON.stringify({ cwd: p.cwd || "", projectDir: p.project_dir || "" })})'>
               <td class="font-semibold">${escapeHtml(p.name || '—')}</td>
               <td class="mono text-[10px] text-[var(--text-mute)] truncate" style="max-width:280px;">${escapeHtml(p.cwd || p.project_dir || '—')}</td>
               <td class="text-right">${p.sessions}</td>
-              <td class="text-right" style="color:${scoreColor(p.avg_score)}">${Math.round(p.avg_score||0)}</td>
+              <td class="text-right" style="color:${scoreColor(p.avg_score)}">${Math.round(p.avg_score || 0)}</td>
               <td class="text-right">${p.tools || 0}</td>
             </tr>`).join('')}
         </tbody>
@@ -10549,13 +10762,18 @@ AFTER.analytics = () => {
       type: 'bar',
       data: {
         labels: s.toolDistribution.map(t => t.tool),
-        datasets: [{ data: s.toolDistribution.map(t => t.n),
-          backgroundColor: s.toolDistribution.map((_, i) => `hsl(${260 + i*14}, 70%, 65%)`),
-          borderRadius: 8 }],
+        datasets: [{
+          data: s.toolDistribution.map(t => t.n),
+          backgroundColor: s.toolDistribution.map((_, i) => `hsl(${260 + i * 14}, 70%, 65%)`),
+          borderRadius: 8
+        }],
       },
-      options: { indexAxis: 'y', plugins: { legend: { display: false } },
-        scales: { x: { ticks: { color: document.body.classList.contains('theme-light') ? '#666' : '#9aa0aa' }, grid: { color: document.body.classList.contains('theme-light') ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)' } },
-                  y: { ticks: { color: '#e7e7ea' }, grid: { display: false } } },
+      options: {
+        indexAxis: 'y', plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: document.body.classList.contains('theme-light') ? '#666' : '#9aa0aa' }, grid: { color: document.body.classList.contains('theme-light') ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)' } },
+          y: { ticks: { color: '#e7e7ea' }, grid: { display: false } }
+        },
       },
     });
   }
@@ -10565,9 +10783,11 @@ AFTER.analytics = () => {
       type: 'doughnut',
       data: {
         labels: s.subagentDistribution.map(t => t.name),
-        datasets: [{ data: s.subagentDistribution.map(t => t.n),
-          backgroundColor: s.subagentDistribution.map((_, i) => `hsl(${180 + i*30}, 70%, 60%)`),
-          borderWidth: 0 }],
+        datasets: [{
+          data: s.subagentDistribution.map(t => t.n),
+          backgroundColor: s.subagentDistribution.map((_, i) => `hsl(${180 + i * 30}, 70%, 60%)`),
+          borderWidth: 0
+        }],
       },
       options: { plugins: { legend: { position: 'right', labels: { color: '#e7e7ea', boxWidth: 12, font: { size: 11 } } } } },
     });
@@ -10588,15 +10808,15 @@ function _sessRowHtml(s, arActiveIds) {
           ${s.score}
         </div>
       </td>
-      <td class="max-w-[340px] truncate">${escapeHtml((s.first_user_prompt||'(요청 없음)').slice(0,120))}</td>
-      <td class="text-xs" title="${escapeHtml(s.projectPath||'')}">
+      <td class="max-w-[340px] truncate">${escapeHtml((s.first_user_prompt || '(요청 없음)').slice(0, 120))}</td>
+      <td class="text-xs" title="${escapeHtml(s.projectPath || '')}">
         <div class="font-semibold">${escapeHtml(s.project || '—')}${arActiveIds && arActiveIds.has(s.session_id) ? ` <span class="chip chip-accent text-[9px]" title="${t('Auto-Resume 주입 중')}">🔄 AR</span>` : ''}</div>
         <div class="mono text-[10px] text-[var(--text-dim)] truncate" style="max-width:240px;">${escapeHtml(s.projectPath || '')}</div>
       </td>
       <td class="text-right">${s.message_count}</td>
       <td class="text-right">${s.tool_use_count}</td>
       <td class="text-right">${s.agent_call_count ? `<span class="chip chip-accent">${s.agent_call_count}</span>` : '0'}</td>
-      <td class="text-right mono text-xs" style="color:#d97757">${fmtTokens(s.total_tokens||0)}</td>
+      <td class="text-right mono text-xs" style="color:#d97757">${fmtTokens(s.total_tokens || 0)}</td>
       <td class="text-right">${s.error_count ? `<span class="chip chip-err">${s.error_count}</span>` : '0'}</td>
       <td class="text-right mono text-xs">${fmtDur(s.duration_ms)}</td>
       <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(s.started_at)}</td>
@@ -10623,7 +10843,7 @@ VIEWS.sessions = async () => {
     const p = s.project || '—';
     projects[p] = (projects[p] || 0) + 1;
   }
-  const topProjects = Object.entries(projects).sort((a,b) => b[1]-a[1]).slice(0, 6);
+  const topProjects = Object.entries(projects).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const filtered = allSessions.filter(s => {
     if (q.project && (s.project || '—') !== q.project) return false;
     if (q.minScore && (s.score || 0) < q.minScore) return false;
@@ -10650,11 +10870,11 @@ VIEWS.sessions = async () => {
         <input id="sessQ" class="input max-w-[300px]" placeholder="요청/프로젝트/세션ID 검색…" value="${escapeHtml(q.q)}" />
         <a class="btn text-xs" href="${DOCS_BASE}interactive-mode" target="_blank" rel="noopener noreferrer">📖</a>
         <select id="sessSort" class="input max-w-[150px]">
-          <option value="recent" ${q.sort==='recent'?'selected':''}>최신순</option>
-          <option value="score" ${q.sort==='score'?'selected':''}>스코어순</option>
-          <option value="tools" ${q.sort==='tools'?'selected':''}>도구 사용순</option>
-          <option value="tokens" ${q.sort==='tokens'?'selected':''}>토큰 사용순</option>
-          <option value="duration" ${q.sort==='duration'?'selected':''}>지속시간순</option>
+          <option value="recent" ${q.sort === 'recent' ? 'selected' : ''}>최신순</option>
+          <option value="score" ${q.sort === 'score' ? 'selected' : ''}>스코어순</option>
+          <option value="tools" ${q.sort === 'tools' ? 'selected' : ''}>도구 사용순</option>
+          <option value="tokens" ${q.sort === 'tokens' ? 'selected' : ''}>토큰 사용순</option>
+          <option value="duration" ${q.sort === 'duration' ? 'selected' : ''}>지속시간순</option>
         </select>
       </div>
     </div>
@@ -10684,7 +10904,7 @@ VIEWS.sessions = async () => {
           ${searchHits.length === 0 ? `<tr><td colspan="5" class="empty">${t('검색 결과 없음')}</td></tr>` : searchHits.map(h => `
             <tr style="cursor:pointer" onclick="openSessionDetail('${escapeHtml(h.sessionId)}')">
               <td class="text-right mono">${h.score}</td>
-              <td><span class="chip ${h.role==='user'?'':'chip-accent'}">${escapeHtml(h.role || '')}</span></td>
+              <td><span class="chip ${h.role === 'user' ? '' : 'chip-accent'}">${escapeHtml(h.role || '')}</span></td>
               <td class="text-xs"><div class="line-clamp-2">${escapeHtml(h.snippet || '')}</div></td>
               <td class="hidden md:table-cell text-xs text-[var(--text-mute)]">${escapeHtml((h.cwd || '').split('/').pop() || '—')}</td>
               <td class="text-right text-xs hidden sm:table-cell">${fmtRel(h.started_at || h.ts || 0)}</td>
@@ -10696,11 +10916,11 @@ VIEWS.sessions = async () => {
     ` : `
     <div class="card p-3 mb-4 flex flex-wrap items-center gap-2">
       <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mr-1">${t('프로젝트')}</span>
-      <button class="chip ${!q.project?'chip-accent':''}" onclick="_sessSet('project','')">${t('전체')} ${allSessions.length}</button>
-      ${topProjects.map(([p,n]) => `<button class="chip ${p===q.project?'chip-accent':''}" onclick="_sessSet('project', ${JSON.stringify(p).replace(/"/g,'&quot;')})">${escapeHtml(p)} ${n}</button>`).join('')}
+      <button class="chip ${!q.project ? 'chip-accent' : ''}" onclick="_sessSet('project','')">${t('전체')} ${allSessions.length}</button>
+      ${topProjects.map(([p, n]) => `<button class="chip ${p === q.project ? 'chip-accent' : ''}" onclick="_sessSet('project', ${JSON.stringify(p).replace(/"/g, '&quot;')})">${escapeHtml(p)} ${n}</button>`).join('')}
       <span class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mx-1 ml-3">${t('스코어')}</span>
-      ${[0, 40, 60, 80].map(n => `<button class="chip ${q.minScore===n?'chip-accent':''}" onclick="_sessSet('minScore', ${n})">${n===0?t('전체'):'≥'+n}</button>`).join('')}
-      <label class="chip cursor-pointer ${q.errorsOnly?'chip-err':''}" onclick="_sessSet('errorsOnly', !state.data.sessionsFilter.errorsOnly)">${q.errorsOnly?'✓':''} ${t('오류만')}</label>
+      ${[0, 40, 60, 80].map(n => `<button class="chip ${q.minScore === n ? 'chip-accent' : ''}" onclick="_sessSet('minScore', ${n})">${n === 0 ? t('전체') : '≥' + n}</button>`).join('')}
+      <label class="chip cursor-pointer ${q.errorsOnly ? 'chip-err' : ''}" onclick="_sessSet('errorsOnly', !state.data.sessionsFilter.errorsOnly)">${q.errorsOnly ? '✓' : ''} ${t('오류만')}</label>
     </div>
 
     <div class="card overflow-hidden">
@@ -10843,38 +11063,38 @@ async function openSessionDetail(sessionId) {
 
 function fmtTokens(n) {
   if (!n) return '0';
-  if (n >= 1e9) return (n/1e9).toFixed(2)+'B';
-  if (n >= 1e6) return (n/1e6).toFixed(2)+'M';
-  if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
   return String(n);
 }
 function renderSessionDetail(d, tok, tl) {
   const s = d.session;
   const tools = d.tools || [];
   const msgs = d.messages || [];
-  tok = tok || { totals:{}, byTool:[], byAgent:[] };
-  tl = tl || { nodes:[], edges:[] };
+  tok = tok || { totals: {}, byTool: [], byAgent: [] };
+  tl = tl || { nodes: [], edges: [] };
   const toolCounts = {};
-  tools.forEach(t => { toolCounts[t.tool] = (toolCounts[t.tool]||0) + 1; });
+  tools.forEach(t => { toolCounts[t.tool] = (toolCounts[t.tool] || 0) + 1; });
   const breakdown = s.score_breakdown || {};
-  const breakdownHtml = Object.entries(breakdown).map(([k,v]) => `
+  const breakdownHtml = Object.entries(breakdown).map(([k, v]) => `
     <div class="flex justify-between py-1 text-xs">
       <span class="text-[var(--text-mute)]">${k}</span>
-      <span class="mono font-bold" style="color:${scoreColor(v*4)}">+${v}</span>
+      <span class="mono font-bold" style="color:${scoreColor(v * 4)}">+${v}</span>
     </div>`).join('');
 
   const toolsHtml = tools.slice(0, 120).map(t => `
     <div class="flex items-center gap-2 p-2 hover:bg-white/5 rounded">
-      <span class="chip ${t.had_error?'chip-err':''}">${escapeHtml(t.tool)}</span>
+      <span class="chip ${t.had_error ? 'chip-err' : ''}">${escapeHtml(t.tool)}</span>
       ${t.subagent_type ? `<span class="chip chip-accent">→ ${escapeHtml(t.subagent_type)}</span>` : ''}
       <span class="text-xs flex-1 truncate text-[var(--text-mute)] mono">${escapeHtml(t.input_summary || '')}</span>
       <span class="text-[10px] text-[var(--text-dim)]">${fmtMs(t.ts)}</span>
     </div>`).join('');
 
   const msgsHtml = msgs.slice(-40).map(m => `
-    <div class="p-2 border-l-2 ${m.role==='user'?'border-[var(--cyan)]':'border-[var(--accent)]'} pl-3 mb-2">
+    <div class="p-2 border-l-2 ${m.role === 'user' ? 'border-[var(--cyan)]' : 'border-[var(--accent)]'} pl-3 mb-2">
       <div class="text-[10px] uppercase tracking-widest text-[var(--text-dim)] mb-1">${m.role} · ${fmtRel(m.ts)}</div>
-      <div class="text-xs whitespace-pre-wrap line-clamp-6">${escapeHtml(m.preview||'')}</div>
+      <div class="text-xs whitespace-pre-wrap line-clamp-6">${escapeHtml(m.preview || '')}</div>
     </div>`).join('');
 
   showModal(`
@@ -10893,7 +11113,7 @@ function renderSessionDetail(d, tok, tl) {
           <span class="chip">🛠 ${s.tool_use_count}</span>
           <span class="chip chip-accent">🤝 ${s.agent_call_count}</span>
           <span class="chip">⏱ ${fmtDur(s.duration_ms)}</span>
-          <span class="chip">${escapeHtml(s.model||'—')}</span>
+          <span class="chip">${escapeHtml(s.model || '—')}</span>
           ${s.error_count ? `<span class="chip chip-err">❌ ${s.error_count}</span>` : ''}
         </div>
       </div>
@@ -10910,12 +11130,12 @@ function renderSessionDetail(d, tok, tl) {
       <!-- 1행: 토큰 요약 + 5축 점수 -->
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
         ${[
-          ['전체 토큰', fmtTokens(tok.totals.total), '#d97757'],
-          ['입력', fmtTokens(tok.totals.input), '#86efac'],
-          ['출력', fmtTokens(tok.totals.output), '#7dd3fc'],
-          ['캐시 read', fmtTokens(tok.totals.cacheRead), '#a78bfa'],
-          ['캐시 create', fmtTokens(tok.totals.cacheCreate), '#fcd34d'],
-        ].map(([l,v,c]) => `
+      ['전체 토큰', fmtTokens(tok.totals.total), '#d97757'],
+      ['입력', fmtTokens(tok.totals.input), '#86efac'],
+      ['출력', fmtTokens(tok.totals.output), '#7dd3fc'],
+      ['캐시 read', fmtTokens(tok.totals.cacheRead), '#a78bfa'],
+      ['캐시 create', fmtTokens(tok.totals.cacheCreate), '#fcd34d'],
+    ].map(([l, v, c]) => `
           <div class="card p-3">
             <div class="text-[10px] uppercase text-[var(--text-dim)]">${l}</div>
             <div class="text-2xl font-bold mono mt-1" style="color:${c}">${v}</div>
@@ -10927,35 +11147,35 @@ function renderSessionDetail(d, tok, tl) {
         <div>
           <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">🛠 도구별 토큰 (turn 기준 분배)</div>
           <div class="card p-3 max-h-[260px] overflow-y-auto">
-            ${(tok.byTool||[]).map(r => {
-              const max = (tok.byTool[0]||{}).tokens || 1;
-              const pct = Math.max(2, Math.round((r.tokens||0)/max*100));
-              return `
+            ${(tok.byTool || []).map(r => {
+      const max = (tok.byTool[0] || {}).tokens || 1;
+      const pct = Math.max(2, Math.round((r.tokens || 0) / max * 100));
+      return `
               <div class="mb-2">
                 <div class="flex justify-between text-xs mb-1">
                   <span class="mono">${escapeHtml(r.tool)} <span class="text-[var(--text-dim)]">×${r.calls}</span></span>
-                  <span class="mono font-bold" style="color:#d97757">${fmtTokens(r.tokens||0)}</span>
+                  <span class="mono font-bold" style="color:#d97757">${fmtTokens(r.tokens || 0)}</span>
                 </div>
                 <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#d97757;"></div></div>
               </div>`;
-            }).join('') || '<div class="empty text-xs">데이터 없음</div>'}
+    }).join('') || '<div class="empty text-xs">데이터 없음</div>'}
           </div>
         </div>
         <div>
           <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">🤝 서브에이전트별 토큰</div>
           <div class="card p-3 max-h-[260px] overflow-y-auto">
-            ${(tok.byAgent||[]).map(r => {
-              const max = (tok.byAgent[0]||{}).tokens || 1;
-              const pct = Math.max(2, Math.round((r.tokens||0)/max*100));
-              return `
+            ${(tok.byAgent || []).map(r => {
+      const max = (tok.byAgent[0] || {}).tokens || 1;
+      const pct = Math.max(2, Math.round((r.tokens || 0) / max * 100));
+      return `
               <div class="mb-2">
                 <div class="flex justify-between text-xs mb-1">
                   <span class="mono">${escapeHtml(r.agent)} <span class="text-[var(--text-dim)]">×${r.calls}</span></span>
-                  <span class="mono font-bold" style="color:#a78bfa">${fmtTokens(r.tokens||0)}</span>
+                  <span class="mono font-bold" style="color:#a78bfa">${fmtTokens(r.tokens || 0)}</span>
                 </div>
                 <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#a78bfa;"></div></div>
               </div>`;
-            }).join('') || '<div class="empty text-xs">서브에이전트 위임 없음</div>'}
+    }).join('') || '<div class="empty text-xs">서브에이전트 위임 없음</div>'}
           </div>
         </div>
       </div>
@@ -10978,9 +11198,9 @@ function renderSessionDetail(d, tok, tl) {
           <div class="card p-3">${breakdownHtml}</div>
           <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2 mt-3">서브에이전트</div>
           <div class="card p-3 text-xs">
-            ${Object.entries(s.subagent_types || {}).map(([k,v]) =>
-              `<span class="chip chip-accent mr-1 mb-1">${escapeHtml(k)} ×${v}</span>`
-            ).join('') || '<span class="text-[var(--text-dim)]">호출 없음</span>'}
+            ${Object.entries(s.subagent_types || {}).map(([k, v]) =>
+      `<span class="chip chip-accent mr-1 mb-1">${escapeHtml(k)} ×${v}</span>`
+    ).join('') || '<span class="text-[var(--text-dim)]">호출 없음</span>'}
           </div>
         </div>
         <div class="lg:col-span-2">
@@ -11003,12 +11223,12 @@ function renderSessionDetail(d, tok, tl) {
 // shows live status.
 // ────────────────────────────────────────────────────────────────
 const _AR_STATE_LABEL = {
-  watching:  { ko: '대기 중 (idle 미충족)', cls: '' },
-  retrying:  { ko: '실행 중 (claude --resume)', cls: 'chip-accent' },
-  sleeping:  { ko: '쿨다운 중 (다음 시도 예약)', cls: 'chip-warn' },
+  watching: { ko: '대기 중 (idle 미충족)', cls: '' },
+  retrying: { ko: '실행 중 (claude --resume)', cls: 'chip-accent' },
+  sleeping: { ko: '쿨다운 중 (다음 시도 예약)', cls: 'chip-warn' },
   succeeded: { ko: '재개 성공', cls: 'chip-ok' },
-  stopped:   { ko: '중단됨', cls: '' },
-  error:     { ko: '오류', cls: 'chip-err' },
+  stopped: { ko: '중단됨', cls: '' },
+  error: { ko: '오류', cls: 'chip-err' },
 };
 
 async function _arLoad(sessionId) {
@@ -11025,11 +11245,11 @@ async function _arLoad(sessionId) {
 }
 
 const _AR_REASON_CHIP = {
-  rate_limit:    { ko: '레이트 한도', cls: 'chip-warn' },
-  context_full:  { ko: '컨텍스트 한도 초과', cls: 'chip-err' },
-  auth_expired:  { ko: '인증 만료', cls: 'chip-err' },
-  clean:         { ko: '정상 종료', cls: 'chip-ok' },
-  unknown:       { ko: '알 수 없음', cls: '' },
+  rate_limit: { ko: '레이트 한도', cls: 'chip-warn' },
+  context_full: { ko: '컨텍스트 한도 초과', cls: 'chip-err' },
+  auth_expired: { ko: '인증 만료', cls: 'chip-err' },
+  clean: { ko: '정상 종료', cls: 'chip-ok' },
+  unknown: { ko: '알 수 없음', cls: '' },
 };
 
 function _arRender(panel, entry) {
@@ -11038,10 +11258,10 @@ function _arRender(panel, entry) {
   const cwd = panel.dataset.cwd || '';
   const card = panel.querySelector('.card');
   if (!entry || !entry.enabled) {
-    const prevPrompt   = entry && entry.prompt ? entry.prompt : '';
-    const prevPoll     = entry && entry.pollInterval ? entry.pollInterval : 300;
-    const prevIdle     = entry && entry.idleSeconds ? entry.idleSeconds : 90;
-    const prevMax      = entry && entry.maxAttempts ? entry.maxAttempts : 12;
+    const prevPrompt = entry && entry.prompt ? entry.prompt : '';
+    const prevPoll = entry && entry.pollInterval ? entry.pollInterval : 300;
+    const prevIdle = entry && entry.idleSeconds ? entry.idleSeconds : 90;
+    const prevMax = entry && entry.maxAttempts ? entry.maxAttempts : 12;
     // QQ222 — time-based deadline. Default 24h horizon. If a previous
     // entry had an explicit deadlineMs, recover the remaining hours so
     // re-binding doesn't reset the user's target.
@@ -11051,8 +11271,8 @@ function _arRender(panel, entry) {
       ? Math.max(1, Math.round((prevDeadlineMs - _nowMs) / 3600000))
       : 24;
     const prevContinue = entry && entry.useContinue ? 'checked' : '';
-    const prevHooks    = entry && entry.installHooks ? 'checked' : '';
-    const stoppedNote  = entry && entry.stopReason
+    const prevHooks = entry && entry.installHooks ? 'checked' : '';
+    const stoppedNote = entry && entry.stopReason
       ? `<div class="text-[10px] mb-2" style="color:#fca5a5">${t('이전 중단 사유')}: ${escapeHtml(entry.stopReason)}</div>`
       : '';
     card.innerHTML = `
@@ -11141,8 +11361,8 @@ function _arRender(panel, entry) {
       ${reasonChip}
       <span class="chip">${t('시도')} ${entry.attempts}/${maxA}</span>
       ${entry.state === 'waiting' && nextRel > 0
-        ? `<span class="chip chip-warn">${t('다음 시도까지')} ${nextRel}s${nextClock ? ' (' + nextClock + ')' : ''}</span>`
-        : ''}
+      ? `<span class="chip chip-warn">${t('다음 시도까지')} ${nextRel}s${nextClock ? ' (' + nextClock + ')' : ''}</span>`
+      : ''}
       ${resetClock ? `<span class="chip">${t('리셋')} ${resetClock}</span>` : ''}
     </div>
     <div class="h-1.5 bg-white/5 rounded overflow-hidden mb-3">
@@ -11156,15 +11376,15 @@ function _arRender(panel, entry) {
       ${entry.deadlineMs ? `
         <div class="col-span-2"><span class="uppercase">${t('마감')}:</span>
           ${(() => {
-            try {
-              const dl = new Date(entry.deadlineMs);
-              const remMin = Math.max(0, Math.round((entry.deadlineMs - Date.now()) / 60000));
-              const remStr = remMin >= 60
-                ? `${Math.floor(remMin / 60)}h ${remMin % 60}m`
-                : `${remMin}m`;
-              return `${dl.toLocaleString()} <span style="color:var(--text-mute)">(${t('남음')}: ${remStr})</span>`;
-            } catch { return ''; }
-          })()}
+        try {
+          const dl = new Date(entry.deadlineMs);
+          const remMin = Math.max(0, Math.round((entry.deadlineMs - Date.now()) / 60000));
+          const remStr = remMin >= 60
+            ? `${Math.floor(remMin / 60)}h ${remMin % 60}m`
+            : `${remMin}m`;
+          return `${dl.toLocaleString()} <span style="color:var(--text-mute)">(${t('남음')}: ${remStr})</span>`;
+        } catch { return ''; }
+      })()}
         </div>` : ''}
     </div>
     <details class="mb-2">
@@ -11196,28 +11416,28 @@ function _arRender(panel, entry) {
 
 async function _arInstallHooksOnly(cwd, sid) {
   try {
-    const r = await api('/api/auto_resume/install_hooks', { method:'POST', body: JSON.stringify({ cwd }) });
+    const r = await api('/api/auto_resume/install_hooks', { method: 'POST', body: JSON.stringify({ cwd }) });
     if (r.ok) { toast(t('Hook 설치 완료'), 'ok'); _arLoad(sid); }
-    else      { toast(r.error || t('실패'), 'err'); }
+    else { toast(r.error || t('실패'), 'err'); }
   } catch (e) { toast(e.message, 'err'); }
 }
 
 async function _arUninstallHooks(cwd, sid) {
   try {
-    const r = await api('/api/auto_resume/uninstall_hooks', { method:'POST', body: JSON.stringify({ cwd }) });
+    const r = await api('/api/auto_resume/uninstall_hooks', { method: 'POST', body: JSON.stringify({ cwd }) });
     if (r.ok) { toast(t('Hook 제거 완료'), 'ok'); _arLoad(sid); }
-    else      { toast(r.error || t('실패'), 'err'); }
+    else { toast(r.error || t('실패'), 'err'); }
   } catch (e) { toast(e.message, 'err'); }
 }
 window._arInstallHooksOnly = _arInstallHooksOnly;
-window._arUninstallHooks   = _arUninstallHooks;
+window._arUninstallHooks = _arUninstallHooks;
 
 // QQ222 — keep the "hours from now" and "datetime-local" inputs in sync.
 // `source` tells us which field the user just edited so we update the
 // other without ping-ponging the cursor position.
 window._arDeadlineSync = function (source) {
   const hoursEl = document.getElementById('arDeadlineHours');
-  const dtEl    = document.getElementById('arDeadlineDt');
+  const dtEl = document.getElementById('arDeadlineDt');
   if (!hoursEl || !dtEl) return;
   const now = Date.now();
   if (source === 'hours') {
@@ -11226,7 +11446,7 @@ window._arDeadlineSync = function (source) {
     const target = new Date(now + hrs * 3600000);
     // datetime-local wants YYYY-MM-DDTHH:MM in *local* time, no timezone.
     const pad = (n) => String(n).padStart(2, '0');
-    dtEl.value = `${target.getFullYear()}-${pad(target.getMonth()+1)}-${pad(target.getDate())}T${pad(target.getHours())}:${pad(target.getMinutes())}`;
+    dtEl.value = `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}T${pad(target.getHours())}:${pad(target.getMinutes())}`;
   } else if (source === 'dt') {
     if (!dtEl.value) { hoursEl.value = ''; return; }
     const target = new Date(dtEl.value).getTime();
@@ -11252,18 +11472,18 @@ document.addEventListener('change', (e) => {
 });
 
 async function _arSubmit(sessionId, cwd) {
-  const promptEl   = document.getElementById('arPrompt');
-  const pollEl     = document.getElementById('arPoll');
-  const idleEl     = document.getElementById('arIdle');
-  const maxEl      = document.getElementById('arMax');
+  const promptEl = document.getElementById('arPrompt');
+  const pollEl = document.getElementById('arPoll');
+  const idleEl = document.getElementById('arIdle');
+  const maxEl = document.getElementById('arMax');
   const useLegacyMaxEl = document.getElementById('arUseLegacyMax');
-  const hoursEl    = document.getElementById('arDeadlineHours');
-  const dtEl       = document.getElementById('arDeadlineDt');
-  const contEl     = document.getElementById('arUseContinue');
-  const hooksEl    = document.getElementById('arInstallHooks');
-  const allowEl    = document.getElementById('arAllowUnbound');
-  const slackEl    = document.getElementById('arSlackUrl');
-  const discordEl  = document.getElementById('arDiscordUrl');
+  const hoursEl = document.getElementById('arDeadlineHours');
+  const dtEl = document.getElementById('arDeadlineDt');
+  const contEl = document.getElementById('arUseContinue');
+  const hooksEl = document.getElementById('arInstallHooks');
+  const allowEl = document.getElementById('arAllowUnbound');
+  const slackEl = document.getElementById('arSlackUrl');
+  const discordEl = document.getElementById('arDiscordUrl');
   // QQ222 — pick deadline from whichever input has a fresher value.
   // datetime-local wins when set (more explicit); fall back to hours.
   let deadlineMs = 0;
@@ -11291,7 +11511,7 @@ async function _arSubmit(sessionId, cwd) {
     installHooks: !!(hooksEl && hooksEl.checked),
     allowUnboundSession: !!(allowEl && allowEl.checked),
     notify: {
-      slack:   slackEl ? (slackEl.value || '').trim() : '',
+      slack: slackEl ? (slackEl.value || '').trim() : '',
       discord: discordEl ? (discordEl.value || '').trim() : '',
     },
   };
@@ -11360,7 +11580,7 @@ function _arRememberNext(entry) {
 
 window._arSubmit = _arSubmit;
 window._arCancel = _arCancel;
-window._arLoad   = _arLoad;
+window._arLoad = _arLoad;
 
 async function drawSessionTimeline(tl) {
   const el = document.getElementById('sessionTimelineGraph');
@@ -11370,27 +11590,27 @@ async function drawSessionTimeline(tl) {
   }
   if (typeof vis === 'undefined') return;
   const colorByKind = {
-    session: { background:'#d97757', border:'#fb923c', font:'#fff' },
-    prompt:  { background:'#7dd3fc', border:'#38bdf8', font:'#0c4a6e' },
-    agent:   { background:'#a78bfa', border:'#8b5cf6', font:'#fff' },
-    tool:    { background:'#27272a', border:'#52525b', font:'#d4d4d8' },
+    session: { background: '#d97757', border: '#fb923c', font: '#fff' },
+    prompt: { background: '#7dd3fc', border: '#38bdf8', font: '#0c4a6e' },
+    agent: { background: '#a78bfa', border: '#8b5cf6', font: '#fff' },
+    tool: { background: '#27272a', border: '#52525b', font: '#d4d4d8' },
   };
-  const shapeByKind = { session:'square', prompt:'diamond', agent:'hexagon', tool:'dot' };
+  const shapeByKind = { session: 'square', prompt: 'diamond', agent: 'hexagon', tool: 'dot' };
   const nodes = tl.nodes.map(n => ({
     id: n.id,
     label: n.label,
     shape: shapeByKind[n.kind] || 'dot',
     color: colorByKind[n.kind] || colorByKind.tool,
-    font: { color:(colorByKind[n.kind]||colorByKind.tool).font, size: n.kind==='session'?13:11 },
-    title: `${n.kind}\n${n.label}\n${n.meta && n.meta.tokens ? 'tokens: '+fmtTokens(n.meta.tokens) : ''}`,
+    font: { color: (colorByKind[n.kind] || colorByKind.tool).font, size: n.kind === 'session' ? 13 : 11 },
+    title: `${n.kind}\n${n.label}\n${n.meta && n.meta.tokens ? 'tokens: ' + fmtTokens(n.meta.tokens) : ''}`,
     size: n.kind === 'session' ? 22 : (n.kind === 'agent' ? 18 : (n.kind === 'prompt' ? 16 : 8)),
   }));
-  const edges = tl.edges.map(e => ({ from: e.src, to: e.dst, arrows:'to', color:{color:'#3f3f46'} }));
+  const edges = tl.edges.map(e => ({ from: e.src, to: e.dst, arrows: 'to', color: { color: '#3f3f46' } }));
   const network = new vis.Network(el, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, {
-    layout: { hierarchical: { direction:'LR', sortMethod:'directed', nodeSpacing: 70, levelSeparation: 110 } },
+    layout: { hierarchical: { direction: 'LR', sortMethod: 'directed', nodeSpacing: 70, levelSeparation: 110 } },
     physics: false,
-    interaction: { hover:true, zoomView:false, dragView:true, dragNodes:false },
-    edges: { smooth: { type:'cubicBezier', forceDirection:'horizontal', roundness:0.4 } },
+    interaction: { hover: true, zoomView: false, dragView: true, dragNodes: false },
+    edges: { smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 } },
   });
 }
 
@@ -11402,7 +11622,7 @@ VIEWS.agents = async () => {
     cachedApi('/api/agents', 20000),
     api('/api/agents/graph?days=60'),
     api('/api/subagent/model-choices'),
-    api('/api/hyper-agents/list').catch(() => ({items:[]})),
+    api('/api/hyper-agents/list').catch(() => ({ items: [] })),
   ]);
   // Map agent id -> enabled bool, used by renderAgentCard for the ⚡ chip color.
   window.__hyperAgentsMap = {};
@@ -11414,7 +11634,7 @@ VIEWS.agents = async () => {
   const counts = list.counts || {};
   const q = (state.data.agentFilter || '').toLowerCase();
   const onlyEnabled = !!state.data.agentOnlyEnabled;
-  let filtered = q ? agents.filter(a => (a.name+a.description+a.id+(a.source||'')).toLowerCase().includes(q)) : agents.slice();
+  let filtered = q ? agents.filter(a => (a.name + a.description + a.id + (a.source || '')).toLowerCase().includes(q)) : agents.slice();
   if (onlyEnabled) filtered = filtered.filter(a => a.scope !== 'plugin' || a.pluginEnabled);
 
   const groups = { global: [], builtin: [], plugin: [] };
@@ -11436,37 +11656,37 @@ VIEWS.agents = async () => {
     const invoke = a.invokeId || a.id || '';
     const safeId = escapeHtml(a.id);
     const scopeBadge = (() => {
-      if (a.scope === 'global')  return '<span class="chip chip-ok text-[9px]">✓ 사용자 설정</span>';
+      if (a.scope === 'global') return '<span class="chip chip-ok text-[9px]">✓ 사용자 설정</span>';
       if (a.scope === 'builtin') return '<span class="chip text-[9px]">⚡ 빌트인</span>';
       if (a.scope === 'plugin') {
         if (a.pluginEnabled) return '<span class="chip text-[9px]" style="background:rgba(217,119,87,0.12);">🔌 플러그인 제공</span>';
         return `<button class="chip chip-warn text-[9px] cursor-pointer hover:brightness-125"
-                onclick="event.stopPropagation();togglePluginFromAgent('${escapeHtml(a.pluginKey||'')}', true)">비활성 플러그인 ▶ 활성화</button>`;
+                onclick="event.stopPropagation();togglePluginFromAgent('${escapeHtml(a.pluginKey || '')}', true)">비활성 플러그인 ▶ 활성화</button>`;
       }
       return '';
     })();
     const actionButtons = (() => {
       if (a.scope === 'global') {
         const hyperOn = (window.__hyperAgentsMap || {})[a.id];
-        const hyperBtn = `<button class="chip text-[9px] cursor-pointer ${hyperOn?'chip-accent':''}"
+        const hyperBtn = `<button class="chip text-[9px] cursor-pointer ${hyperOn ? 'chip-accent' : ''}"
                 onclick='event.stopPropagation();openHyperAgent("${safeId}")'
                 title="${t('Hyper Agent — 자동 정교화 토글/설정')}"
-                style="${hyperOn?'background:rgba(244,114,182,0.28);color:#fff;':'background:rgba(244,114,182,0.12);'}">⚡ ${hyperOn?'ON':'Hyper'}</button>`;
+                style="${hyperOn ? 'background:rgba(244,114,182,0.28);color:#fff;' : 'background:rgba(244,114,182,0.12);'}">⚡ ${hyperOn ? 'ON' : 'Hyper'}</button>`;
         return hyperBtn + `<button class="btn text-[9px]" onclick='event.stopPropagation();deleteGlobalAgent("${safeId}")' style="color:#fca5a5">삭제</button>`;
       }
       if (a.scope === 'plugin' && a.pluginEnabled) {
         return `<button class="chip text-[9px] cursor-pointer"
-                onclick="event.stopPropagation();togglePluginFromAgent('${escapeHtml(a.pluginKey||'')}', false)" style="color:#fcd34d">비활성화</button>`;
+                onclick="event.stopPropagation();togglePluginFromAgent('${escapeHtml(a.pluginKey || '')}', false)" style="color:#fcd34d">비활성화</button>`;
       }
       return '';
     })();
     const modelControl = readOnly
-      ? `<span class="chip text-[10px]" style="background:${modelBg(a.model)};">🔒 ${escapeHtml(a.model||'inherit')}</span>`
+      ? `<span class="chip text-[10px]" style="background:${modelBg(a.model)};">🔒 ${escapeHtml(a.model || 'inherit')}</span>`
       : `<select class="input text-[10px] py-1 flex-1"
                 style="background:${modelBg(a.model)};"
                 onclick="event.stopPropagation();"
                 onchange="event.stopPropagation();setSubagentModel('${selectorScope}','${safeId}', this.value)">
-           ${(window.__subModelChoices || []).map(m => `<option value="${escapeHtml(m.id)}" ${a.model===m.id?'selected':''}>${escapeHtml(m.label)}</option>`).join('')}
+           ${(window.__subModelChoices || []).map(m => `<option value="${escapeHtml(m.id)}" ${a.model === m.id ? 'selected' : ''}>${escapeHtml(m.label)}</option>`).join('')}
          </select>`;
     return `
       <div class="card p-4 hover-lift cursor-pointer flex flex-col" onclick="viewAgent('${safeId}')">
@@ -11477,11 +11697,11 @@ VIEWS.agents = async () => {
           ${actionButtons}
         </div>
         <!-- 2행: 호출 id (마켓프리픽스 포함) -->
-        <div class="text-[10px] mono text-[var(--text-dim)] truncate mb-2" title="${escapeHtml(a.source||a.id||'')}">${escapeHtml(invoke)}</div>
+        <div class="text-[10px] mono text-[var(--text-dim)] truncate mb-2" title="${escapeHtml(a.source || a.id || '')}">${escapeHtml(invoke)}</div>
         <!-- 3행: 설명 (현재 UI 언어 기준) -->
         <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3.2em;">${escapeHtml(_localDesc(a) || '—')}</div>
         <!-- 4행: 도구 -->
-        <div class="mb-2 flex-1">${(a.tools||[]).slice(0,6).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
+        <div class="mb-2 flex-1">${(a.tools || []).slice(0, 6).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
         <!-- 5행: 모델 (별도 줄, 풀폭) -->
         <div class="flex items-center gap-2 pt-2 border-t border-[var(--border)]">
           <span class="text-[10px] text-[var(--text-dim)] whitespace-nowrap">모델</span>
@@ -11495,7 +11715,7 @@ VIEWS.agents = async () => {
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">에이전트 & 상호작용 그래프</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1"><b>활성(사용자 설정 ${counts.global||0} + 빌트인 ${counts.builtin||0}) = ${(counts.global||0)+(counts.builtin||0)}개</b> · 플러그인 제공 ${counts.pluginEnabled||0}/${counts.plugin||0} (별도)</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1"><b>활성(사용자 설정 ${counts.global || 0} + 빌트인 ${counts.builtin || 0}) = ${(counts.global || 0) + (counts.builtin || 0)}개</b> · 플러그인 제공 ${counts.pluginEnabled || 0}/${counts.plugin || 0} (별도)</p>
         <div class="text-xs mt-1 flex gap-2 flex-wrap">
           ${_localizedDescStatus(agents)}
           <span class="text-[10px] text-[var(--text-dim)]">💡 플러그인이 <b>비활성</b>이면 에이전트 카드는 보이지만 Claude Code에서 호출되지 않습니다.</span>
@@ -11524,7 +11744,7 @@ VIEWS.agents = async () => {
       </div>
       <div class="card p-4 overflow-y-auto" style="max-height: 560px;">
         <div class="text-xs uppercase text-[var(--text-dim)] mb-3">가장 많이 호출된 에이전트</div>
-        ${Object.entries(aggregateAgentCalls(graph)).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([n,c]) => `
+        ${Object.entries(aggregateAgentCalls(graph)).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([n, c]) => `
           <div class="flex justify-between py-1.5 border-b border-[var(--border)]">
             <span class="text-xs">${escapeHtml(n)}</span>
             <span class="mono text-xs font-bold gradient-text">${c}</span>
@@ -11549,14 +11769,14 @@ VIEWS.agents = async () => {
     <div class="mb-4 flex items-center gap-2 flex-wrap">
       <input id="agentQ" class="input max-w-[280px]" placeholder="에이전트 검색…" value="${escapeHtml(q)}" />
       <label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
-        <input type="checkbox" id="agentOnlyEnabled" ${state.data.agentOnlyEnabled?'checked':''}/> 활성 플러그인만
+        <input type="checkbox" id="agentOnlyEnabled" ${state.data.agentOnlyEnabled ? 'checked' : ''}/> 활성 플러그인만
       </label>
       <span class="text-xs text-[var(--text-dim)]">${filtered.length} / ${agents.length} 표시</span>
     </div>
 
-    ${scopeOrder.map(sc => (groups[sc]||[]).length ? `
+    ${scopeOrder.map(sc => (groups[sc] || []).length ? `
       <div class="mb-5">
-        <h3 class="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-2">${scopeLabel[sc]||sc} · ${groups[sc].length}</h3>
+        <h3 class="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-2">${scopeLabel[sc] || sc} · ${groups[sc].length}</h3>
         <div class="grid-list">
           ${groups[sc].map(renderAgentCard).join('')}
         </div>
@@ -11694,7 +11914,7 @@ function _renderTeamEditorModal(initial, allAgents) {
 }
 
 async function _saveTeamFromModal() {
-  const id   = (document.getElementById('teamId') || {}).value || '';
+  const id = (document.getElementById('teamId') || {}).value || '';
   const name = (document.getElementById('teamName') || {}).value.trim();
   const desc = (document.getElementById('teamDesc') || {}).value || '';
   if (!name) { toast(t('팀 이름이 필요합니다'), 'err'); return; }
@@ -11704,7 +11924,7 @@ async function _saveTeamFromModal() {
   if (!agents.length) { toast(t('최소 한 명의 에이전트가 필요합니다'), 'err'); return; }
   try {
     const r = await api('/api/agent-teams/save', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: id || undefined, name, description: desc, agents }),
     });
     if (r.ok) {
@@ -11721,18 +11941,18 @@ async function _deleteTeam(teamId) {
   if (!confirm(t('이 팀을 삭제할까요? (멤버 에이전트는 그대로 유지됩니다)'))) return;
   try {
     const r = await api('/api/agent-teams/delete', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: teamId }),
     });
     if (r.ok) { toast(t('삭제 완료'), 'ok'); _loadTeams(); }
-    else      toast(t('삭제 실패: ') + (r.error || ''), 'err');
+    else toast(t('삭제 실패: ') + (r.error || ''), 'err');
   } catch (e) { toast(t('삭제 실패: ') + e.message, 'err'); }
 }
 
 async function _spawnTeam(teamId) {
   try {
     const r = await api('/api/agent-teams/spawn', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: teamId }),
     });
     if (!r.ok) { toast(t('Spawn 실패: ') + (r.error || ''), 'err'); return; }
@@ -11769,9 +11989,9 @@ async function _spawnTeam(teamId) {
 
 function aggregateAgentCalls(graph) {
   const counts = {};
-  (graph.edges||[]).forEach(e => {
+  (graph.edges || []).forEach(e => {
     if (!String(e.dst).startsWith('tool:')) {
-      counts[e.dst] = (counts[e.dst]||0) + e.weight;
+      counts[e.dst] = (counts[e.dst] || 0) + e.weight;
     }
   });
   return counts;
@@ -11786,7 +12006,7 @@ async function drawAgentGraph(g) {
 function _drawAgentGraphImpl(g) {
   const container = document.getElementById('agentNetwork');
   if (!container || !window.vis) return;
-  const nodes = new vis.DataSet((g.nodes||[]).map(n => ({
+  const nodes = new vis.DataSet((g.nodes || []).map(n => ({
     id: n.id, label: n.label || n.id,
     shape: n.kind === 'core' ? 'hexagon' : (n.kind === 'tool' ? 'box' : 'dot'),
     size: n.kind === 'core' ? 34 : (n.kind === 'tool' ? 14 : 22),
@@ -11794,15 +12014,15 @@ function _drawAgentGraphImpl(g) {
     color: n.kind === 'core'
       ? { background: '#a78bfa', border: '#f472b6', highlight: { background: '#f472b6', border: '#fb923c' } }
       : n.kind === 'tool'
-      ? { background: 'rgba(103,232,249,0.18)', border: '#67e8f9', highlight: { background: '#67e8f9', border: '#ffffff' } }
-      : { background: 'rgba(244,114,182,0.14)', border: '#f472b6', highlight: { background: '#f472b6', border: '#ffffff' } },
+        ? { background: 'rgba(103,232,249,0.18)', border: '#67e8f9', highlight: { background: '#67e8f9', border: '#ffffff' } }
+        : { background: 'rgba(244,114,182,0.14)', border: '#f472b6', highlight: { background: '#f472b6', border: '#ffffff' } },
     font: { color: '#e7e7ea', size: n.kind === 'core' ? 13 : 11 },
   })));
-  const edges = new vis.DataSet((g.edges||[]).map(e => ({
+  const edges = new vis.DataSet((g.edges || []).map(e => ({
     from: e.src, to: e.dst, value: e.weight,
     color: { color: 'rgba(167,139,250,0.35)', highlight: '#f472b6', opacity: 0.6 },
     arrows: 'to', smooth: { type: 'continuous' },
-    title: `${e.src} → ${String(e.dst).replace(/^tool:/,'')} : ${e.weight}회`,
+    title: `${e.src} → ${String(e.dst).replace(/^tool:/, '')} : ${e.weight}회`,
   })));
   // v2.33.6 — stabilization 가벼운 설정 + adaptiveTimestep 으로 20+ 노드에서도 1초 이내 정착
   const net = new vis.Network(container, { nodes, edges }, {
@@ -11820,9 +12040,9 @@ function _drawAgentGraphImpl(g) {
   });
   container.style.cursor = 'pointer';
   net.once('stabilizationIterationsDone', () => {
-    try { net.setOptions({ physics: { enabled: false } }); net.fit({ animation: false }); } catch {}
+    try { net.setOptions({ physics: { enabled: false } }); net.fit({ animation: false }); } catch { }
   });
-  const nodeIdx = new Map((g.nodes||[]).map(n => [n.id, n]));
+  const nodeIdx = new Map((g.nodes || []).map(n => [n.id, n]));
   const handleNode = (nid) => {
     const node = nodeIdx.get(nid);
     if (!node) {
@@ -11834,9 +12054,9 @@ function _drawAgentGraphImpl(g) {
       }
       return;
     }
-    if (node.kind === 'tool')      showToolDetailModal(String(nid).replace(/^tool:/, ''), g);
+    if (node.kind === 'tool') showToolDetailModal(String(nid).replace(/^tool:/, ''), g);
     else if (node.kind === 'agent') viewAgent(String(nid));
-    else if (node.kind === 'core')  showCoreModal(g);
+    else if (node.kind === 'core') showCoreModal(g);
   };
   net.on('click', params => {
     if (params.nodes && params.nodes.length) handleNode(params.nodes[0]);
@@ -11850,8 +12070,8 @@ function _drawAgentGraphImpl(g) {
 }
 
 function showToolDetailModal(toolName, g) {
-  const incoming = (g.edges||[]).filter(e => e.dst === `tool:${toolName}`);
-  const total = incoming.reduce((a,b)=>a+b.weight, 0);
+  const incoming = (g.edges || []).filter(e => e.dst === `tool:${toolName}`);
+  const total = incoming.reduce((a, b) => a + b.weight, 0);
   showModal(`
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
       <div>
@@ -11863,7 +12083,7 @@ function showToolDetailModal(toolName, g) {
     </div>
     <div class="p-5 overflow-y-auto">
       <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">사용한 에이전트</div>
-      ${incoming.sort((a,b)=>b.weight-a.weight).map(e => `
+      ${incoming.sort((a, b) => b.weight - a.weight).map(e => `
         <div class="flex justify-between py-2 border-b border-[var(--border)] cursor-pointer hover:bg-white/5 px-2 rounded"
              onclick="closeModal();viewAgent('${escapeHtml(e.src)}')">
           <span class="text-sm">${escapeHtml(e.src)}</span>
@@ -11874,8 +12094,8 @@ function showToolDetailModal(toolName, g) {
 }
 
 function showCoreModal(g) {
-  const outgoing = (g.edges||[]).filter(e => e.src === 'claude');
-  const total = outgoing.reduce((a,b)=>a+b.weight, 0);
+  const outgoing = (g.edges || []).filter(e => e.src === 'claude');
+  const total = outgoing.reduce((a, b) => a + b.weight, 0);
   showModal(`
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
       <div>
@@ -11887,7 +12107,7 @@ function showCoreModal(g) {
     </div>
     <div class="p-5 overflow-y-auto">
       <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">위임한 에이전트</div>
-      ${outgoing.sort((a,b)=>b.weight-a.weight).map(e => `
+      ${outgoing.sort((a, b) => b.weight - a.weight).map(e => `
         <div class="flex justify-between py-2 border-b border-[var(--border)] cursor-pointer hover:bg-white/5 px-2 rounded"
              onclick="closeModal();viewAgent('${escapeHtml(e.dst)}')">
           <span class="text-sm">${escapeHtml(e.dst)}</span>
@@ -11900,11 +12120,11 @@ function showCoreModal(g) {
 async function togglePluginFromAgent(pluginKey, enable) {
   if (!pluginKey) { toast('pluginKey 없음', 'err'); return; }
   const r = await api('/api/plugins/toggle', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: pluginKey, enable }),
   });
   if (r.ok) {
-    toast(`'${pluginKey}' ${enable?'활성화됨':'비활성화됨'}`, 'ok');
+    toast(`'${pluginKey}' ${enable ? '활성화됨' : '비활성화됨'}`, 'ok');
     renderView();
   } else toast(errMsg(r), 'err');
 }
@@ -11917,7 +12137,7 @@ async function deleteGlobalAgent(id) {
   });
   if (!ok) return;
   const r = await api('/api/agents/delete', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id }),
   });
   if (r.ok) { toast('삭제됨', 'ok'); renderView(); }
@@ -11944,8 +12164,8 @@ function openCreateAgent() {
           <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">model</div>
           <select id="nagModel" class="input">
             ${(window.__subModelChoices || [
-              {id:'inherit', label:'inherit'}, {id:'haiku', label:'Haiku'}, {id:'sonnet', label:'Sonnet'}, {id:'opus', label:'Opus'}
-            ]).map(m => `<option value="${escapeHtml(m.id)}" ${m.id==='inherit'?'selected':''}>${escapeHtml(m.label)}</option>`).join('')}
+      { id: 'inherit', label: 'inherit' }, { id: 'haiku', label: 'Haiku' }, { id: 'sonnet', label: 'Sonnet' }, { id: 'opus', label: 'Opus' }
+    ]).map(m => `<option value="${escapeHtml(m.id)}" ${m.id === 'inherit' ? 'selected' : ''}>${escapeHtml(m.label)}</option>`).join('')}
           </select>
         </div>
         <div>
@@ -11967,11 +12187,11 @@ function openCreateAgent() {
     const name = document.getElementById('nagName').value.trim();
     const description = document.getElementById('nagDesc').value.trim();
     const model = document.getElementById('nagModel').value;
-    const tools = document.getElementById('nagTools').value.split(',').map(x=>x.trim()).filter(Boolean);
+    const tools = document.getElementById('nagTools').value.split(',').map(x => x.trim()).filter(Boolean);
     const content = document.getElementById('nagContent').value;
     if (!name) { toast('이름 필수', 'warn'); return; }
     const r = await api('/api/agents/create', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, description, model, tools, content }),
     });
     if (r.ok) { toast(`'${r.name}' 생성됨`, 'ok'); closeModal(); renderView(); }
@@ -11988,16 +12208,16 @@ async function viewAgent(id) {
         <div>
           <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">🔒 빌트인 에이전트</div>
           <h2 class="text-lg font-bold">${escapeHtml(a.name)}</h2>
-          <div class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(a.description||'')}</div>
+          <div class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(a.description || '')}</div>
         </div>
         <button class="btn-ghost btn" onclick="closeModal()">✕</button>
       </div>
       <div class="p-5 overflow-y-auto">
         <div class="text-sm text-[var(--text-mute)] mb-3">${escapeHtml(a.content)}</div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">사용 가능 도구</div>
-        <div>${(a.tools||[]).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('') || '—'}</div>
+        <div>${(a.tools || []).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('') || '—'}</div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mt-4 mb-2">모델</div>
-        <div class="mono text-sm">${escapeHtml(a.model||'inherit')}</div>
+        <div class="mono text-sm">${escapeHtml(a.model || 'inherit')}</div>
       </div>
     `);
     return;
@@ -12020,16 +12240,16 @@ async function openHyperAgent(name, cwd) {
   if (cwd) {
     // Project scope — cwd doesn't fit in URL → POST endpoints
     metaP = api('/api/hyper-agents/get', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, cwd})
-    }).catch(e => ({error: String(e)}));
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, cwd })
+    }).catch(e => ({ error: String(e) }));
     histP = api('/api/hyper-agents/history', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, cwd})
-    }).catch(() => ({history:[]}));
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, cwd })
+    }).catch(() => ({ history: [] }));
   } else {
-    metaP = api('/api/hyper-agents/get/' + safe).catch(e => ({error: String(e)}));
-    histP = api('/api/hyper-agents/history/' + safe).catch(() => ({history:[]}));
+    metaP = api('/api/hyper-agents/get/' + safe).catch(e => ({ error: String(e) }));
+    histP = api('/api/hyper-agents/history/' + safe).catch(() => ({ history: [] }));
   }
   const [meta, hist] = await Promise.all([metaP, histP]);
   if (meta.error) { toast(t('Hyper Agent 로드 실패: ') + meta.error, 'err'); return; }
@@ -12044,10 +12264,10 @@ function _hyperEsc(s) { return escapeHtml(s == null ? '' : String(s)); }
 function _hyperModalHTML(name, ag, history, cwd) {
   const targets = ag.refineTargets || ['systemPrompt'];
   const hasTarget = (k) => targets.includes(k) ? 'checked' : '';
-  const triggerOpts = ['manual','after_session','interval','any','cron'].map(opt =>
-    `<option value="${opt}" ${ag.trigger===opt?'selected':''}>${_hyperEsc(opt)}</option>`).join('');
+  const triggerOpts = ['manual', 'after_session', 'interval', 'any', 'cron'].map(opt =>
+    `<option value="${opt}" ${ag.trigger === opt ? 'selected' : ''}>${_hyperEsc(opt)}</option>`).join('');
   const providerOpts = (window.__subModelChoices || []).map(m =>
-    `<option value="claude:${_hyperEsc(m.id)}" ${ag.refineProvider==='claude:'+m.id?'selected':''}>claude:${_hyperEsc(m.id)}</option>`).join('');
+    `<option value="claude:${_hyperEsc(m.id)}" ${ag.refineProvider === 'claude:' + m.id ? 'selected' : ''}>claude:${_hyperEsc(m.id)}</option>`).join('');
 
   return `
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between" style="background:linear-gradient(135deg, rgba(244,114,182,0.1), rgba(167,139,250,0.06));">
@@ -12065,7 +12285,7 @@ function _hyperModalHTML(name, ag, history, cwd) {
             <div class="font-semibold text-sm">${t('자동 정교화 활성화')}</div>
             <div class="text-[11px] text-[var(--text-dim)] mt-1">${t('OFF 상태에서도 "지금 다듬기" 버튼은 사용 가능합니다.')}</div>
           </div>
-          <div id="hyperToggle" class="qs-toggle ${ag.enabled?'on':''}" data-enabled="${ag.enabled?'1':'0'}" role="switch" aria-checked="${!!ag.enabled}" tabindex="0"></div>
+          <div id="hyperToggle" class="qs-toggle ${ag.enabled ? 'on' : ''}" data-enabled="${ag.enabled ? '1' : '0'}" role="switch" aria-checked="${!!ag.enabled}" tabindex="0"></div>
         </div>
       </div>
 
@@ -12098,7 +12318,7 @@ function _hyperModalHTML(name, ag, history, cwd) {
         </label>
         <label class="block">
           <div class="text-xs font-semibold mb-1">${t('Refine 프로바이더')}</div>
-          <select id="hyperProvider" class="input w-full">${providerOpts}<option value="claude:opus" ${ag.refineProvider==='claude:opus'?'selected':''}>claude:opus</option></select>
+          <select id="hyperProvider" class="input w-full">${providerOpts}<option value="claude:opus" ${ag.refineProvider === 'claude:opus' ? 'selected' : ''}>claude:opus</option></select>
           <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('메타 LLM (Opus 권장)')}</div>
         </label>
       </div>
@@ -12106,17 +12326,17 @@ function _hyperModalHTML(name, ag, history, cwd) {
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
         <label class="block">
           <div class="text-xs font-semibold mb-1">${t('최소 세션 간격')}</div>
-          <input id="hyperMinSessions" type="number" class="input w-full" value="${ag.minSessionsBetween||5}" min="0" max="1000"/>
+          <input id="hyperMinSessions" type="number" class="input w-full" value="${ag.minSessionsBetween || 5}" min="0" max="1000"/>
           <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('after_session 트리거 디바운스')}</div>
         </label>
         <label class="block">
           <div class="text-xs font-semibold mb-1">${t('예산 (USD)')}</div>
-          <input id="hyperBudget" type="number" step="0.5" class="input w-full" value="${ag.budgetUSD||5}" min="0"/>
+          <input id="hyperBudget" type="number" step="0.5" class="input w-full" value="${ag.budgetUSD || 5}" min="0"/>
           <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('총 누적 비용 한도 (도달 시 정지)')}</div>
         </label>
         <div class="block">
           <div class="text-xs font-semibold mb-1">${t('누적 사용 / 정교화')}</div>
-          <div class="text-sm mono" id="hyperSpent">$${(ag.spentUSD||0).toFixed(4)} · ${ag.totalRefinements||0}회</div>
+          <div class="text-sm mono" id="hyperSpent">$${(ag.spentUSD || 0).toFixed(4)} · ${ag.totalRefinements || 0}회</div>
         </div>
       </div>
 
@@ -12179,18 +12399,18 @@ function _hyperHistoryRow(name, h, cwd) {
 
 function _hyperToggleDiff(btn) {
   const card = btn.closest('.card');
-  const pre  = card.querySelector('.hyper-diff');
+  const pre = card.querySelector('.hyper-diff');
   if (!pre) return;
   if (pre.style.display === 'none') {
     let diff = {};
-    try { diff = JSON.parse(card.getAttribute('data-diff') || '{}'); } catch {}
+    try { diff = JSON.parse(card.getAttribute('data-diff') || '{}'); } catch { }
     const out = [];
     for (const k of Object.keys(diff)) {
       out.push('## ' + k);
       out.push('--- before ---');
       out.push(typeof diff[k].before === 'string' ? diff[k].before : JSON.stringify(diff[k].before, null, 2));
       out.push('+++ after +++');
-      out.push(typeof diff[k].after  === 'string' ? diff[k].after  : JSON.stringify(diff[k].after, null, 2));
+      out.push(typeof diff[k].after === 'string' ? diff[k].after : JSON.stringify(diff[k].after, null, 2));
       out.push('');
     }
     pre.textContent = out.join('\n');
@@ -12203,16 +12423,16 @@ function _hyperToggleDiff(btn) {
 function _hyperCollectPatch() {
   const targets = [];
   if (document.getElementById('hyperTgt_systemPrompt').checked) targets.push('systemPrompt');
-  if (document.getElementById('hyperTgt_tools').checked)        targets.push('tools');
-  if (document.getElementById('hyperTgt_description').checked)  targets.push('description');
+  if (document.getElementById('hyperTgt_tools').checked) targets.push('tools');
+  if (document.getElementById('hyperTgt_description').checked) targets.push('description');
   return {
-    enabled:            document.getElementById('hyperToggle').dataset.enabled === '1',
-    objective:          document.getElementById('hyperObjective').value,
-    refineTargets:      targets.length ? targets : ['systemPrompt'],
-    trigger:            document.getElementById('hyperTrigger').value,
-    refineProvider:     document.getElementById('hyperProvider').value,
+    enabled: document.getElementById('hyperToggle').dataset.enabled === '1',
+    objective: document.getElementById('hyperObjective').value,
+    refineTargets: targets.length ? targets : ['systemPrompt'],
+    trigger: document.getElementById('hyperTrigger').value,
+    refineProvider: document.getElementById('hyperProvider').value,
     minSessionsBetween: parseInt(document.getElementById('hyperMinSessions').value, 10) || 5,
-    budgetUSD:          parseFloat(document.getElementById('hyperBudget').value) || 5,
+    budgetUSD: parseFloat(document.getElementById('hyperBudget').value) || 5,
   };
 }
 
@@ -12235,7 +12455,7 @@ function _hyperBindControls(name, cwd) {
       const body = { name, patch: _hyperCollectPatch() };
       if (cwd) body.cwd = cwd;
       const r = await api('/api/hyper-agents/configure', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       if (r.ok) {
@@ -12263,13 +12483,13 @@ async function _hyperRefineNow(name, dryRun, cwd) {
     const cfg = { name, patch: _hyperCollectPatch() };
     if (cwd) cfg.cwd = cwd;
     await api('/api/hyper-agents/configure', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
     });
     const refineBody = { name, dryRun };
     if (cwd) refineBody.cwd = cwd;
     const r = await api('/api/hyper-agents/refine-now', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(refineBody),
     });
     if (r.ok) {
@@ -12291,7 +12511,7 @@ async function _hyperRollback(name, ts, cwd) {
     const body = { name, versionTs: ts };
     if (cwd) body.cwd = cwd;
     const r = await api('/api/hyper-agents/rollback', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (r.ok) { toast(t('롤백 완료'), 'ok'); openHyperAgent(name, cwd); }
@@ -12312,14 +12532,14 @@ VIEWS.skills = async () => {
   let skills;
   if (inProject) {
     const r = await api('/api/project/skills/list?cwd=' + encodeURIComponent(cfgCwd));
-    skills = (r.skills || []).map(s => ({...s, scope: 'project', source: 'project', pluginEnabled: false}));
+    skills = (r.skills || []).map(s => ({ ...s, scope: 'project', source: 'project', pluginEnabled: false }));
   } else {
     skills = await cachedApi('/api/skills', 60000);
   }
   state.data.skills = skills;
   const q = (state.data.skillsFilter || '').toLowerCase();
   const onlyEnabled = !!state.data.skillsOnlyEnabled;
-  let filtered = skills.filter(s => !q || (s.name+s.description+s.id+(_localDesc(s)||'')).toLowerCase().includes(q));
+  let filtered = skills.filter(s => !q || (s.name + s.description + s.id + (_localDesc(s) || '')).toLowerCase().includes(q));
   if (onlyEnabled) filtered = filtered.filter(s => s.scope === 'user');
 
   const groups = { user: [], plugin: [], project: [] };
@@ -12333,21 +12553,28 @@ VIEWS.skills = async () => {
   const renderSkillCard = s => {
     const scopeBadge = s.scope === 'plugin'
       ? (s.pluginEnabled
-          ? '<span class="chip text-[9px]" style="background:rgba(217,119,87,0.12);">🔌 ' + t('플러그인 제공') + '</span>'
-          : `<button class="chip chip-warn text-[9px]" onclick="event.stopPropagation();togglePluginFromAgent('${escapeHtml(s.pluginKey||'')}', true)">${t('비활성 플러그인 ▶ 활성화')}</button>`)
+        ? '<span class="chip text-[9px]" style="background:rgba(217,119,87,0.12);">🔌 ' + t('플러그인 제공') + '</span>'
+        : `<button class="chip chip-warn text-[9px]" onclick="event.stopPropagation();togglePluginFromAgent('${escapeHtml(s.pluginKey || '')}', true)">${t('비활성 플러그인 ▶ 활성화')}</button>`)
       : (s.scope === 'project'
-          ? '<span class="chip text-[9px]" style="background:rgba(125,211,252,0.18);">📁 ' + t('프로젝트') + '</span>'
-          : '<span class="chip chip-ok text-[9px]">✓ ' + t('사용자 설정') + '</span>');
+        ? '<span class="chip text-[9px]" style="background:rgba(125,211,252,0.18);">📁 ' + t('프로젝트') + '</span>'
+        : '<span class="chip chip-ok text-[9px]">✓ ' + t('사용자 설정') + '</span>');
     const editFn = s.scope === 'project'
       ? `editProjectSkill('${escapeHtml(s.id)}')`
       : `editSkill('${escapeHtml(s.id)}')`;
+    const deleteFn = s.scope === 'project'
+      ? `deleteProjectSkill('${escapeHtml(s.id)}')`
+      : (s.scope === 'user' ? `deleteSkill('${escapeHtml(s.id)}')` : '');
+    const deleteBtn = deleteFn
+      ? `<button class="btn text-[10px]" title="${t('삭제')}" onclick="event.stopPropagation();${deleteFn}">🗑</button>`
+      : '';
     return `
       <div class="card p-4 hover-lift cursor-pointer" onclick="${editFn}">
         <div class="flex items-center gap-2 mb-1">
           <div class="font-semibold text-sm truncate flex-1">${escapeHtml(s.name)}</div>
           ${scopeBadge}
+          ${deleteBtn}
         </div>
-        <div class="text-[10px] mono text-[var(--text-dim)] mb-2 truncate" title="${escapeHtml(s.source||'')}">${escapeHtml(s.id)}</div>
+        <div class="text-[10px] mono text-[var(--text-dim)] mb-2 truncate" title="${escapeHtml(s.source || '')}">${escapeHtml(s.id)}</div>
         <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(_localDesc(s) || '—')}</div>
         ${s.scope === 'plugin' && !s.pluginEnabled ? '<div class="text-[10px] text-[var(--warn)] mt-2">⚠️ ' + t('이 플러그인은 비활성 — Claude Code 가 호출하지 않습니다.') + '</div>' : ''}
       </div>`;
@@ -12364,22 +12591,22 @@ VIEWS.skills = async () => {
     : `<b>${t('활성(사용자 설정)')} ${userN}${t('개')}</b> · ${t('플러그인 제공')} ${pluginEnabledN}/${pluginN} (${t('별도')}) · ${_localizedDescStatusText(skills)}`;
 
   return `
-    ${_renderConfigScopeToggle({scope: cfgScope, cwd: cfgCwd, projects, label: t('스킬 스코프')})}
+    ${_renderConfigScopeToggle({ scope: cfgScope, cwd: cfgCwd, projects, label: t('스킬 스코프') })}
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">${t('스킬')}</h1>
         <p class="text-sm text-[var(--text-mute)] mt-1">${subtitle}</p>
       </div>
       <div class="flex gap-2">
-        <input id="skillQ" class="input max-w-[260px]" placeholder="${t('스킬 검색…')}" value="${escapeHtml(state.data.skillsFilter||'')}" />
+        <input id="skillQ" class="input max-w-[260px]" placeholder="${t('스킬 검색…')}" value="${escapeHtml(state.data.skillsFilter || '')}" />
         ${inProject ? '' : `<label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
-          <input type="checkbox" id="skillOnlyEnabled" ${onlyEnabled?'checked':''}/> ${t('사용자 설정만')}
+          <input type="checkbox" id="skillOnlyEnabled" ${onlyEnabled ? 'checked' : ''}/> ${t('사용자 설정만')}
         </label>`}
         ${inProject ? `<button class="btn-primary btn text-xs" onclick="newProjectSkill()">＋ ${t('새 스킬')}</button>` : _localizeBtnHtml('skill', skills)}
         <a class="btn text-xs" href="${DOCS_BASE}skills" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
-    ${groupOrder.map(g => (groups[g]||[]).length ? `
+    ${groupOrder.map(g => (groups[g] || []).length ? `
       <div class="mb-5">
         <h3 class="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-2">${groupLabel[g]} · ${groups[g].length}</h3>
         <div class="grid-list">${groups[g].map(renderSkillCard).join('')}</div>
@@ -12416,7 +12643,7 @@ async function editProjectSkill(id) {
   const cwd = state.data.cfgCwd;
   if (!cwd) { toast(t('프로젝트가 선택되지 않았습니다'), 'err'); return; }
   const s = await api('/api/project/skill?cwd=' + encodeURIComponent(cwd) + '&id=' + encodeURIComponent(id));
-  if (!s.ok) { toast(t('스킬 로드 실패') + ': ' + (s.error||''), 'err'); return; }
+  if (!s.ok) { toast(t('스킬 로드 실패') + ': ' + (s.error || ''), 'err'); return; }
   showEditModal({
     title: '📁 ' + t('프로젝트 스킬 편집') + ' — ' + s.name,
     raw: s.raw,
@@ -12446,15 +12673,43 @@ async function newProjectSkill() {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cwd, id, raw: seed }),
   });
-  if (!r.ok) { toast(t('생성 실패') + ': ' + (r.error||''), 'err'); return; }
+  if (!r.ok) { toast(t('생성 실패') + ': ' + (r.error || ''), 'err'); return; }
   toast(t('생성됨'), 'ok');
   renderView();
+}
+async function deleteSkill(id) {
+  if (!await confirmModal({
+    title: t('스킬 삭제'),
+    message: id + ' — ' + t('이 스킬을 삭제할까요? ~/.claude/skills/<id>/ 디렉터리가 제거됩니다.'),
+    confirmLabel: t('삭제'), danger: true,
+  })) return;
+  const r = await api('/api/skills/delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  toast(r.ok ? t('삭제됨') : (t('실패') + ': ' + (r.error || '')), r.ok ? 'ok' : 'err');
+  if (r.ok) { _apiCache.delete('/api/skills'); renderView(); }
+}
+async function deleteProjectSkill(id) {
+  const cwd = state.data.cfgCwd;
+  if (!cwd) { toast(t('프로젝트가 선택되지 않았습니다'), 'err'); return; }
+  if (!await confirmModal({
+    title: t('프로젝트 스킬 삭제'),
+    message: id + ' — ' + t('이 스킬을 삭제할까요? <cwd>/.claude/skills/<id>/ 디렉터리가 제거됩니다.'),
+    confirmLabel: t('삭제'), danger: true,
+  })) return;
+  const r = await api('/api/project/skill/delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cwd, id }),
+  });
+  toast(r.ok ? t('삭제됨') : (t('실패') + ': ' + (r.error || '')), r.ok ? 'ok' : 'err');
+  if (r.ok) renderView();
 }
 async function editProjectCommand(id) {
   const cwd = state.data.cfgCwd;
   if (!cwd) { toast(t('프로젝트가 선택되지 않았습니다'), 'err'); return; }
   const c = await api('/api/project/command?cwd=' + encodeURIComponent(cwd) + '&id=' + encodeURIComponent(id));
-  if (!c.ok) { toast(t('명령어 로드 실패') + ': ' + (c.error||''), 'err'); return; }
+  if (!c.ok) { toast(t('명령어 로드 실패') + ': ' + (c.error || ''), 'err'); return; }
   showEditModal({
     title: '📁 ' + t('프로젝트 명령어 편집') + ' — /' + (c.name || c.id),
     raw: c.raw,
@@ -12485,7 +12740,7 @@ async function newProjectCommand() {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cwd, id, raw: seed }),
   });
-  if (!r.ok) { toast(t('생성 실패') + ': ' + (r.error||''), 'err'); return; }
+  if (!r.ok) { toast(t('생성 실패') + ': ' + (r.error || ''), 'err'); return; }
   toast(t('생성됨'), 'ok');
   renderView();
 }
@@ -12501,7 +12756,7 @@ async function deleteProjectCommand(id) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cwd, id }),
   });
-  toast(r.ok ? t('삭제됨') : (t('실패') + ': ' + (r.error||'')), r.ok?'ok':'err');
+  toast(r.ok ? t('삭제됨') : (t('실패') + ': ' + (r.error || '')), r.ok ? 'ok' : 'err');
   if (r.ok) renderView();
 }
 
@@ -12530,7 +12785,7 @@ VIEWS.commands = async () => {
 
   const filtered = cmds.filter(c => {
     if (q) {
-      const t = (c.name+' '+c.description+' '+c.id+' '+(_localDesc(c)||'')).toLowerCase();
+      const t = (c.name + ' ' + c.description + ' ' + c.id + ' ' + (_localDesc(c) || '')).toLowerCase();
       if (!t.includes(q)) return false;
     }
     if (selCat && c.category !== selCat) return false;
@@ -12543,62 +12798,62 @@ VIEWS.commands = async () => {
   filtered.forEach(c => { (groups[c.category] = groups[c.category] || []).push(c); });
   const catLabels = {};
   cmds.forEach(c => { catLabels[c.category] = c.categoryLabel; });
-  const catOrder = Object.keys(groups).sort((a,b) => (groups[b].length) - (groups[a].length));
+  const catOrder = Object.keys(groups).sort((a, b) => (groups[b].length) - (groups[a].length));
 
   // 카테고리 칩 (전체 명령어 기준 분포)
   const allCatCounts = {};
-  cmds.forEach(c => { allCatCounts[c.category] = (allCatCounts[c.category]||0) + 1; });
+  cmds.forEach(c => { allCatCounts[c.category] = (allCatCounts[c.category] || 0) + 1; });
   const catChips = Object.entries(allCatCounts)
-    .sort((a,b) => b[1] - a[1])
-    .map(([cid, n]) => `<button class="chip ${cid===selCat?'chip-accent':''}" onclick="setCmdCat('${cid}')">${catLabels[cid]||cid} <span class="ml-1 text-[9px] text-[var(--text-dim)]">${n}</span></button>`)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cid, n]) => `<button class="chip ${cid === selCat ? 'chip-accent' : ''}" onclick="setCmdCat('${cid}')">${catLabels[cid] || cid} <span class="ml-1 text-[9px] text-[var(--text-dim)]">${n}</span></button>`)
     .join('');
 
   return `
-    ${_renderConfigScopeToggle({scope: cfgScope, cwd: cfgCwd, projects, label: t('명령어 스코프')})}
+    ${_renderConfigScopeToggle({ scope: cfgScope, cwd: cfgCwd, projects, label: t('명령어 스코프') })}
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">${t('슬래시 명령어')}</h1>
         <p class="text-sm text-[var(--text-mute)] mt-1">${cmds.length}${t('개 명령어')}${inProject ? '' : ' · ' + Object.keys(allCatCounts).length + t('개 카테고리') + ' · ' + _localizedDescStatusText(cmds)}</p>
       </div>
       <div class="flex gap-2 flex-wrap">
-        <input id="cmdQ" class="input max-w-[260px]" placeholder="${t('검색…')}" value="${escapeHtml(state.data.cmdFilter||'')}" />
+        <input id="cmdQ" class="input max-w-[260px]" placeholder="${t('검색…')}" value="${escapeHtml(state.data.cmdFilter || '')}" />
         ${inProject ? `<button class="btn-primary btn text-xs" onclick="newProjectCommand()">＋ ${t('새 명령어')}</button>` : `<label class="flex items-center gap-1 text-xs text-[var(--text-mute)]">
-          <input type="checkbox" id="cmdOnlyUntr" ${onlyUntranslated?'checked':''}/> ${t('미번역만')}
+          <input type="checkbox" id="cmdOnlyUntr" ${onlyUntranslated ? 'checked' : ''}/> ${t('미번역만')}
         </label>
         ${_localizeBtnHtml('cmd', cmds)}`}
         <a class="btn text-xs" href="${DOCS_BASE}slash-commands" target="_blank" rel="noopener noreferrer">📖</a>
       </div>
     </div>
     ${inProject ? '' : `<div class="card p-3 mb-4 flex flex-wrap gap-2">
-      <button class="chip ${!selCat?'chip-accent':''}" onclick="setCmdCat('')">${t('전체')} ${cmds.length}</button>
+      <button class="chip ${!selCat ? 'chip-accent' : ''}" onclick="setCmdCat('')">${t('전체')} ${cmds.length}</button>
       ${catChips}
     </div>`}
 
     ${catOrder.length ? catOrder.map(cid => `
       <div class="mb-5">
-        <h3 class="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-2">${catLabels[cid]||cid} · ${groups[cid].length}</h3>
+        <h3 class="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-2">${catLabels[cid] || cid} · ${groups[cid].length}</h3>
         <div class="grid-list">
           ${groups[cid].map(c => {
-            // v2.36.0 — Heuristic: ECC commands have plugin scope or path under
-            // ~/.claude/plugins/cache/ecc/. Use this to route Run via Run Center.
-            const isEcc = (c.scope === 'plugin') || /\/plugins\/cache\/ecc\//.test(c.path||'') || /^ecc[:/]/i.test(c.id||'');
-            const cmdName = c.name || c.id;
-            const itemId = isEcc ? `ecc:cmd:${cmdName.replace(/^\//, '')}` : '';
-            const isProj = c.scope === 'project';
-            const editFn = isProj ? `editProjectCommand('${escapeHtml(c.id)}')` : '';
-            return `
-            <div class="card p-4 hover-lift ${isProj?'cursor-pointer':''}" ${isProj?`onclick="${editFn}"`:''}>
+    // v2.36.0 — Heuristic: ECC commands have plugin scope or path under
+    // ~/.claude/plugins/cache/ecc/. Use this to route Run via Run Center.
+    const isEcc = (c.scope === 'plugin') || /\/plugins\/cache\/ecc\//.test(c.path || '') || /^ecc[:/]/i.test(c.id || '');
+    const cmdName = c.name || c.id;
+    const itemId = isEcc ? `ecc:cmd:${cmdName.replace(/^\//, '')}` : '';
+    const isProj = c.scope === 'project';
+    const editFn = isProj ? `editProjectCommand('${escapeHtml(c.id)}')` : '';
+    return `
+            <div class="card p-4 hover-lift ${isProj ? 'cursor-pointer' : ''}" ${isProj ? `onclick="${editFn}"` : ''}>
               <div class="flex items-center gap-2 mb-2 flex-wrap">
-                <span class="chip ${c.scope==='user'?'chip-ok':'chip-accent'}">${c.scope}</span>
+                <span class="chip ${c.scope === 'user' ? 'chip-ok' : 'chip-accent'}">${c.scope}</span>
                 ${isEcc ? '<span class="chip" style="background:rgba(217,119,87,0.18);border-color:rgba(217,119,87,0.45);color:var(--text);">ECC</span>' : ''}
                 <span class="font-semibold text-sm mono">/${escapeHtml(cmdName)}</span>
                 ${isProj
-                  ? `<button class="btn text-[10px] ml-auto" onclick="event.stopPropagation();deleteProjectCommand('${escapeHtml(c.id)}')" style="color:#fca5a5;">${t('삭제')}</button>`
-                  : `<button class="btn text-[10px] ml-auto" onclick="_cmdQuickRun('${escapeHtml(itemId || cmdName)}', ${isEcc ? 'true' : 'false'}, '${escapeHtml(cmdName)}')" title="${t('대시보드에서 바로 실행')}">▶ ${t('실행')}</button>`}
+        ? `<button class="btn text-[10px] ml-auto" onclick="event.stopPropagation();deleteProjectCommand('${escapeHtml(c.id)}')" style="color:#fca5a5;">${t('삭제')}</button>`
+        : `<button class="btn text-[10px] ml-auto" onclick="_cmdQuickRun('${escapeHtml(itemId || cmdName)}', ${isEcc ? 'true' : 'false'}, '${escapeHtml(cmdName)}')" title="${t('대시보드에서 바로 실행')}">▶ ${t('실행')}</button>`}
               </div>
               <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(_localDesc(c) || c.description || '—')}</div>
             </div>`;
-          }).join('')}
+  }).join('')}
         </div>
       </div>`).join('') : `<div class="card empty">${t('명령어 없음')}</div>`}
   `;
@@ -12635,7 +12890,7 @@ async function _cmdQuickRun(itemIdOrName, isEcc, cmdName) {
       description: t('로컬 슬래시 명령 — 대시보드에서 1회성 실행'),
       category: 'general',
       invocation: t('You are dispatching the local slash command') + ' /' + cmdName + '. ' +
-                  t('Treat the user goal as the argument to the command.'),
+        t('Treat the user goal as the argument to the command.'),
       favorite: false,
     };
     __rc.selectedItem = item;
@@ -12655,30 +12910,34 @@ async function _cmdQuickRun(itemIdOrName, isEcc, cmdName) {
       return `${p0.id.replace('-cli', '').replace('-api', '')}:${m0.id || m0.name}`;
     })();
     const draft = {
-      name:        `Cmd · /${cmdName}`,
+      name: `Cmd · /${cmdName}`,
       description: `Quick run of /${cmdName} via Commands tab`,
       nodes: [
-        {id: 'n-rcs', type: 'start',   x: 80,  y: 200, title: 'Start',   data: {}},
-        {id: 'n-rcr', type: 'session', x: 320, y: 200, title: '/' + cmdName,
-         data: {subject: '/' + cmdName, description: t('Run the slash command') + ' /' + cmdName,
-                assignee: _firstReal, inputsMode: 'concat'}},
-        {id: 'n-rco', type: 'output',  x: 560, y: 200, title: 'Output',  data: {exportTo:''}},
+        { id: 'n-rcs', type: 'start', x: 80, y: 200, title: 'Start', data: {} },
+        {
+          id: 'n-rcr', type: 'session', x: 320, y: 200, title: '/' + cmdName,
+          data: {
+            subject: '/' + cmdName, description: t('Run the slash command') + ' /' + cmdName,
+            assignee: _firstReal, inputsMode: 'concat'
+          }
+        },
+        { id: 'n-rco', type: 'output', x: 560, y: 200, title: 'Output', data: { exportTo: '' } },
       ],
       edges: [
-        {id: 'e1', from: 'n-rcs', to: 'n-rcr', fromPort: 'out', toPort: 'in'},
-        {id: 'e2', from: 'n-rcr', to: 'n-rco', fromPort: 'out', toPort: 'in'},
+        { id: 'e1', from: 'n-rcs', to: 'n-rcr', fromPort: 'out', toPort: 'in' },
+        { id: 'e2', from: 'n-rcr', to: 'n-rco', fromPort: 'out', toPort: 'in' },
       ],
-      viewport: {panX:0,panY:0,zoom:1},
-      repeat: {enabled:false, maxIterations:1, intervalSeconds:0},
-      notify: {slack:'', discord:''},
-      policy: {tokenBudgetTotal:0, onBudgetExceeded:'stop', fallbackProvider:''},
+      viewport: { panX: 0, panY: 0, zoom: 1 },
+      repeat: { enabled: false, maxIterations: 1, intervalSeconds: 0 },
+      notify: { slack: '', discord: '' },
+      policy: { tokenBudgetTotal: 0, onBudgetExceeded: 'stop', fallbackProvider: '' },
     };
     const r = await api('/api/workflows/save', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(draft),
     });
     if (r.ok) {
-      try { localStorage.setItem('__wf_open_id', r.id); } catch(_){}
+      try { localStorage.setItem('__wf_open_id', r.id); } catch (_) { }
       go('workflows');
     }
     return;
@@ -12776,7 +13035,7 @@ async function translateAll(kind) {
       const st = document.getElementById('tbStatus');
       logLine(`[배치 ${batch}] Claude CLI 요청…`);
       const r = await api('/api/translate/batch', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind, limit: 50, targetLang: lang }),
       });
       if (r.error) {
@@ -12791,17 +13050,17 @@ async function translateAll(kind) {
       const completed = total - remaining;
       logLine(`  ✅ +${r.translated}건 (누적 ${totalTranslated}) · 남은 ${remaining} · 요청 ${r.requested}`);
       if (bar && total) bar.style.width = Math.round((completed / total) * 100) + '%';
-      if (st) st.textContent = `진행 ${completed}/${total} · 배치 ${batch} · 경과 ${Math.round((Date.now()-started)/1000)}초`;
+      if (st) st.textContent = `진행 ${completed}/${total} · 배치 ${batch} · 경과 ${Math.round((Date.now() - started) / 1000)}초`;
       if (r.done || r.translated === 0) break;
     }
     if (!window.__tbCancel) {
-      logLine(`\n🎉 완료! ${label} ${totalTranslated}개 ${langName} 번역 (${batch}배치, ${Math.round((Date.now()-started)/1000)}초)`);
+      logLine(`\n🎉 완료! ${label} ${totalTranslated}개 ${langName} 번역 (${batch}배치, ${Math.round((Date.now() - started) / 1000)}초)`);
       toast(`${label} ${totalTranslated}개 번역 완료`, 'ok');
       setTimeout(() => { closeModal(); renderView(); }, 1500);
     }
   } catch (e) {
     logLine(`❌ ${e.message}`);
-    toast('번역 중 오류: '+e.message, 'err');
+    toast('번역 중 오류: ' + e.message, 'err');
   }
 }
 
@@ -12835,32 +13094,32 @@ VIEWS.promptCache = async () => {
   const usageTbl = last ? `
     <table class="w-full text-[11px] border-collapse">
       <tbody>
-        <tr class="border-b border-[var(--border)]"><td class="py-1 text-[var(--text-dim)]">input_tokens</td><td class="py-1 text-right font-mono">${usage.input_tokens||0}</td></tr>
-        <tr class="border-b border-[var(--border)]"><td class="py-1 text-[var(--text-dim)]">cache_creation_input_tokens</td><td class="py-1 text-right font-mono text-[var(--warn)]">${usage.cache_creation_input_tokens||0}</td></tr>
-        <tr class="border-b border-[var(--border)]"><td class="py-1 text-[var(--text-dim)]">cache_read_input_tokens</td><td class="py-1 text-right font-mono text-[var(--ok)]">${usage.cache_read_input_tokens||0}</td></tr>
-        <tr><td class="py-1 text-[var(--text-dim)]">output_tokens</td><td class="py-1 text-right font-mono">${usage.output_tokens||0}</td></tr>
+        <tr class="border-b border-[var(--border)]"><td class="py-1 text-[var(--text-dim)]">input_tokens</td><td class="py-1 text-right font-mono">${usage.input_tokens || 0}</td></tr>
+        <tr class="border-b border-[var(--border)]"><td class="py-1 text-[var(--text-dim)]">cache_creation_input_tokens</td><td class="py-1 text-right font-mono text-[var(--warn)]">${usage.cache_creation_input_tokens || 0}</td></tr>
+        <tr class="border-b border-[var(--border)]"><td class="py-1 text-[var(--text-dim)]">cache_read_input_tokens</td><td class="py-1 text-right font-mono text-[var(--ok)]">${usage.cache_read_input_tokens || 0}</td></tr>
+        <tr><td class="py-1 text-[var(--text-dim)]">output_tokens</td><td class="py-1 text-right font-mono">${usage.output_tokens || 0}</td></tr>
       </tbody>
     </table>
   ` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 실행한 결과가 없습니다')}</div>`;
 
   const costTbl = last ? `
     <div class="grid grid-cols-2 gap-2 text-[11px]">
-      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('입력 비용')}</span><span class="font-mono">$${(cost.usdInput||0).toFixed(6)}</span></div>
-      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('캐시 쓰기')}</span><span class="font-mono">$${(cost.usdCacheWrite||0).toFixed(6)}</span></div>
-      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('캐시 읽기')}</span><span class="font-mono">$${(cost.usdCacheRead||0).toFixed(6)}</span></div>
-      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('출력 비용')}</span><span class="font-mono">$${(cost.usdOutput||0).toFixed(6)}</span></div>
-      <div class="flex justify-between col-span-2 pt-2 border-t border-[var(--border)]"><span class="font-semibold">${t('합계')}</span><span class="font-mono font-semibold">$${(cost.usdTotal||0).toFixed(6)}</span></div>
-      <div class="flex justify-between col-span-2"><span class="text-[var(--ok)]">${t('캐시 절감 추정')}</span><span class="font-mono text-[var(--ok)]">-$${(cost.usdSaved||0).toFixed(6)}</span></div>
+      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('입력 비용')}</span><span class="font-mono">$${(cost.usdInput || 0).toFixed(6)}</span></div>
+      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('캐시 쓰기')}</span><span class="font-mono">$${(cost.usdCacheWrite || 0).toFixed(6)}</span></div>
+      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('캐시 읽기')}</span><span class="font-mono">$${(cost.usdCacheRead || 0).toFixed(6)}</span></div>
+      <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('출력 비용')}</span><span class="font-mono">$${(cost.usdOutput || 0).toFixed(6)}</span></div>
+      <div class="flex justify-between col-span-2 pt-2 border-t border-[var(--border)]"><span class="font-semibold">${t('합계')}</span><span class="font-mono font-semibold">$${(cost.usdTotal || 0).toFixed(6)}</span></div>
+      <div class="flex justify-between col-span-2"><span class="text-[var(--ok)]">${t('캐시 절감 추정')}</span><span class="font-mono text-[var(--ok)]">-$${(cost.usdSaved || 0).toFixed(6)}</span></div>
     </div>
   ` : '';
 
   const histList = histItems.slice(0, 10).map(h => {
-    const tsStr = new Date((h.ts||0)*1000).toLocaleString();
+    const tsStr = new Date((h.ts || 0) * 1000).toLocaleString();
     const icon = h.status === 'ok' ? '✅' : '❌';
     const cr = h.usage && h.usage.cache_read_input_tokens || 0;
     const cw = h.usage && h.usage.cache_creation_input_tokens || 0;
     return `<div class="text-[11px] py-1 border-b border-[var(--border)] flex justify-between gap-2">
-      <span>${icon} <span class="text-[var(--text-dim)]">${tsStr}</span> · ${h.model||''}</span>
+      <span>${icon} <span class="text-[var(--text-dim)]">${tsStr}</span> · ${h.model || ''}</span>
       <span class="font-mono text-[var(--text-dim)]">cw=${cw} · cr=${cr}</span>
     </div>`;
   }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('이력 없음')}</div>`;
@@ -12883,9 +13142,9 @@ VIEWS.promptCache = async () => {
         <div class="flex items-center gap-2">
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
           <select class="input flex-1" onchange="pcSet('model', this.value)">
-            <option value="claude-opus-4-7" ${pc.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
-            <option value="claude-sonnet-4-6" ${pc.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
-            <option value="claude-haiku-4-5" ${pc.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+            <option value="claude-opus-4-7" ${pc.model === 'claude-opus-4-7' ? 'selected' : ''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${pc.model === 'claude-sonnet-4-6' ? 'selected' : ''}>Sonnet 4.6</option>
+            <option value="claude-haiku-4-5" ${pc.model === 'claude-haiku-4-5' ? 'selected' : ''}>Haiku 4.5</option>
           </select>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('max_tokens')}</label>
           <input type="text" inputmode="numeric" class="input w-24" value="${pc.maxTokens}"
@@ -12962,15 +13221,15 @@ async function pcRun() {
   const pc = state.data.pc || {};
   let system, tools, messages;
   try { system = JSON.parse(pc.system || '[]'); }
-  catch (e) { toast(t('system JSON 오류') + ': ' + e.message, 'err'); if (st) st.textContent=''; return; }
+  catch (e) { toast(t('system JSON 오류') + ': ' + e.message, 'err'); if (st) st.textContent = ''; return; }
   try { tools = JSON.parse(pc.tools || '[]'); }
-  catch (e) { toast(t('tools JSON 오류') + ': ' + e.message, 'err'); if (st) st.textContent=''; return; }
+  catch (e) { toast(t('tools JSON 오류') + ': ' + e.message, 'err'); if (st) st.textContent = ''; return; }
   try { messages = JSON.parse(pc.messages || '[]'); }
-  catch (e) { toast(t('messages JSON 오류') + ': ' + e.message, 'err'); if (st) st.textContent=''; return; }
+  catch (e) { toast(t('messages JSON 오류') + ': ' + e.message, 'err'); if (st) st.textContent = ''; return; }
 
   try {
     const r = await fetch('/api/prompt-cache/test', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: pc.model, maxTokens: pc.maxTokens, system, tools, messages }),
     }).then(x => x.json());
 
@@ -13015,24 +13274,24 @@ VIEWS.thinkingLab = async () => {
   ).join('');
 
   const modelOpts = (ms.models || []).map(m =>
-    `<option value="${m.id}" ${tl.model===m.id?'selected':''} ${m.supported?'':'disabled'}>${m.label}${m.supported?'':' ('+t('비지원')+')'}</option>`
+    `<option value="${m.id}" ${tl.model === m.id ? 'selected' : ''} ${m.supported ? '' : 'disabled'}>${m.label}${m.supported ? '' : ' (' + t('비지원') + ')'}</option>`
   ).join('');
 
   const usage = last && last.usage || {};
 
   const histList = items.slice(0, 10).map(h => {
-    const tsStr = new Date((h.ts||0)*1000).toLocaleString();
+    const tsStr = new Date((h.ts || 0) * 1000).toLocaleString();
     const icon = h.status === 'ok' ? '✅' : '❌';
     return `<div class="text-[11px] py-1 border-b border-[var(--border)] flex justify-between gap-2">
-      <span>${icon} <span class="text-[var(--text-dim)]">${tsStr}</span> · ${h.model||''}</span>
-      <span class="font-mono text-[var(--text-dim)]">budget=${h.budgetTokens||0}</span>
+      <span>${icon} <span class="text-[var(--text-dim)]">${tsStr}</span> · ${h.model || ''}</span>
+      <span class="font-mono text-[var(--text-dim)]">budget=${h.budgetTokens || 0}</span>
     </div>`;
   }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('이력 없음')}</div>`;
 
   const thinkingPanel = last && last.thinking ? `
-    <details class="card p-3" ${tl.thinkingOpen?'open':''}>
+    <details class="card p-3" ${tl.thinkingOpen ? 'open' : ''}>
       <summary class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider cursor-pointer">
-        🧠 ${t('Thinking Block')} (${(last.thinkingBlocks||0)} ${t('블록')})
+        🧠 ${t('Thinking Block')} (${(last.thinkingBlocks || 0)} ${t('블록')})
       </summary>
       <pre class="text-[11px] whitespace-pre-wrap mt-2 max-h-80 overflow-auto text-[var(--text-dim)]">${escapeHtml(last.thinking)}</pre>
     </details>
@@ -13092,10 +13351,10 @@ VIEWS.thinkingLab = async () => {
           <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('토큰 사용량')}</div>
           ${last ? `
             <div class="grid grid-cols-2 gap-2 text-[11px]">
-              <div class="flex justify-between"><span class="text-[var(--text-dim)]">input_tokens</span><span class="font-mono">${usage.input_tokens||0}</span></div>
-              <div class="flex justify-between"><span class="text-[var(--text-dim)]">output_tokens</span><span class="font-mono">${usage.output_tokens||0}</span></div>
-              <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('소요 시간')}</span><span class="font-mono">${last.durationMs||0}ms</span></div>
-              <div class="flex justify-between"><span class="text-[var(--text-dim)]">stop_reason</span><span class="font-mono">${last.stopReason||'-'}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">input_tokens</span><span class="font-mono">${usage.input_tokens || 0}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">output_tokens</span><span class="font-mono">${usage.output_tokens || 0}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('소요 시간')}</span><span class="font-mono">${last.durationMs || 0}ms</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">stop_reason</span><span class="font-mono">${last.stopReason || '-'}</span></div>
             </div>` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 실행한 결과가 없습니다')}</div>`}
         </div>
         <div class="card p-3">
@@ -13140,7 +13399,7 @@ async function tlRun() {
   }
   try {
     const r = await fetch('/api/thinking-lab/test', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(tl),
     }).then(x => x.json());
     if (r.needKey) {
@@ -13190,15 +13449,15 @@ VIEWS.toolUseLab = async () => {
   // messages 배열을 대화 버블 형태로 렌더
   const bubbles = (tu.messages || []).map((m, idx) => {
     const role = m.role;
-    const content = Array.isArray(m.content) ? m.content : [{type:'text', text: String(m.content||'')}];
+    const content = Array.isArray(m.content) ? m.content : [{ type: 'text', text: String(m.content || '') }];
     const parts = content.map((c, ci) => {
       if (c.type === 'text') {
-        return `<div class="text-[12px] whitespace-pre-wrap">${escapeHtml(c.text||'')}</div>`;
+        return `<div class="text-[12px] whitespace-pre-wrap">${escapeHtml(c.text || '')}</div>`;
       }
       if (c.type === 'tool_use') {
         return `<div class="mt-1 p-2 bg-[var(--bg-alt)] border border-[var(--accent)] rounded text-[11px]">
           <div class="text-[var(--accent)] font-mono mb-1">🛠️ tool_use: ${c.name}</div>
-          <pre class="font-mono text-[11px] whitespace-pre-wrap">${escapeHtml(JSON.stringify(c.input||{}, null, 2))}</pre>
+          <pre class="font-mono text-[11px] whitespace-pre-wrap">${escapeHtml(JSON.stringify(c.input || {}, null, 2))}</pre>
           <div class="mt-2">
             <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('tool_result 수동 입력')}</label>
             <textarea id="tr_${idx}_${ci}" class="input text-[11px] font-mono" rows="2" placeholder='{"result":"..."}'></textarea>
@@ -13211,16 +13470,16 @@ VIEWS.toolUseLab = async () => {
           ? c.content.map(x => x.text || JSON.stringify(x)).join('\n')
           : String(c.content || '');
         return `<div class="mt-1 p-2 bg-[var(--bg-alt)] border border-[var(--ok)] rounded text-[11px]">
-          <div class="text-[var(--ok)] font-mono mb-1">✓ tool_result (${c.tool_use_id||''})</div>
+          <div class="text-[var(--ok)] font-mono mb-1">✓ tool_result (${c.tool_use_id || ''})</div>
           <pre class="font-mono text-[11px] whitespace-pre-wrap">${escapeHtml(text)}</pre>
         </div>`;
       }
-      return `<div class="text-[11px] text-[var(--text-dim)]">[${c.type||'?'}]</div>`;
+      return `<div class="text-[11px] text-[var(--text-dim)]">[${c.type || '?'}]</div>`;
     }).join('');
     const badge = role === 'user' ? '👤' : '🤖';
     const align = role === 'user' ? 'justify-end' : 'justify-start';
     return `<div class="flex ${align} mb-2">
-      <div class="max-w-[90%] p-2 rounded ${role==='user'?'bg-[var(--bg-hover)]':'card'}">
+      <div class="max-w-[90%] p-2 rounded ${role === 'user' ? 'bg-[var(--bg-hover)]' : 'card'}">
         <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${badge} ${role}</div>
         ${parts}
       </div>
@@ -13228,7 +13487,7 @@ VIEWS.toolUseLab = async () => {
   }).join('');
 
   const awaitingToolResult = (() => {
-    const last = tu.messages[tu.messages.length-1];
+    const last = tu.messages[tu.messages.length - 1];
     if (!last || last.role !== 'assistant') return false;
     const arr = Array.isArray(last.content) ? last.content : [];
     return arr.some(c => c.type === 'tool_use');
@@ -13247,9 +13506,9 @@ VIEWS.toolUseLab = async () => {
         <div class="flex items-center gap-2 flex-wrap">
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('모델')}</label>
           <select class="input flex-1" onchange="tuSet('model', this.value)">
-            <option value="claude-opus-4-7" ${tu.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
-            <option value="claude-sonnet-4-6" ${tu.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
-            <option value="claude-haiku-4-5" ${tu.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+            <option value="claude-opus-4-7" ${tu.model === 'claude-opus-4-7' ? 'selected' : ''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${tu.model === 'claude-sonnet-4-6' ? 'selected' : ''}>Sonnet 4.6</option>
+            <option value="claude-haiku-4-5" ${tu.model === 'claude-haiku-4-5' ? 'selected' : ''}>Haiku 4.5</option>
           </select>
         </div>
 
@@ -13267,7 +13526,7 @@ VIEWS.toolUseLab = async () => {
         </div>
 
         <div class="flex items-center gap-2">
-          <button class="btn btn-primary" onclick="tuSendUser()" ${awaitingToolResult?'disabled':''}>▶ ${t('전송')}</button>
+          <button class="btn btn-primary" onclick="tuSendUser()" ${awaitingToolResult ? 'disabled' : ''}>▶ ${t('전송')}</button>
           <button class="btn" onclick="tuReset()">${t('새 대화')}</button>
           <span id="tuStatus" class="text-[11px] text-[var(--text-dim)]"></span>
         </div>
@@ -13320,7 +13579,7 @@ async function tuCallTurn(tools) {
   if (st) st.textContent = t('호출 중…');
   try {
     const r = await fetch('/api/tool-use-lab/turn', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: tu.model, maxTokens: tu.maxTokens, tools, messages: tu.messages }),
     }).then(x => x.json());
     if (r.needKey) {
@@ -13334,7 +13593,7 @@ async function tuCallTurn(tools) {
       return;
     }
     state.data.tu.messages.push({ role: 'assistant', content: r.assistantContent || [] });
-    if (st) st.textContent = `${r.durationMs||0}ms · ${r.stopReason||''}`;
+    if (st) st.textContent = `${r.durationMs || 0}ms · ${r.stopReason || ''}`;
     renderView();
   } catch (e) {
     toast(t('네트워크 오류') + ': ' + e.message, 'err');
@@ -13390,22 +13649,22 @@ VIEWS.batchJobs = async () => {
     const created = b.created_at ? new Date(b.created_at).toLocaleString() : '';
     const counts = b.request_counts || {};
     const selected = bj.selectedBatchId === b.id;
-    return `<div class="py-2 border-b border-[var(--border)] ${selected?'bg-[var(--bg-hover)]':''}">
+    return `<div class="py-2 border-b border-[var(--border)] ${selected ? 'bg-[var(--bg-hover)]' : ''}">
       <div class="flex justify-between items-center gap-2">
         <span class="font-mono text-[11px]">${b.id}</span>
         <span class="chip chip-sm">${status}</span>
       </div>
-      <div class="text-[10px] text-[var(--text-dim)] mt-1">${created} · processed ${counts.processing||0}+${counts.succeeded||0}/${(counts.processing||0)+(counts.succeeded||0)+(counts.errored||0)+(counts.canceled||0)+(counts.expired||0)||'?'}</div>
+      <div class="text-[10px] text-[var(--text-dim)] mt-1">${created} · processed ${counts.processing || 0}+${counts.succeeded || 0}/${(counts.processing || 0) + (counts.succeeded || 0) + (counts.errored || 0) + (counts.canceled || 0) + (counts.expired || 0) || '?'}</div>
       <div class="mt-1 flex gap-1">
         <button class="btn btn-sm" onclick="bjSelect('${b.id}')">${t('결과 보기')}</button>
-        ${status==='in_progress' || status==='processing' ? `<button class="btn btn-sm" onclick="bjCancel('${b.id}')">${t('취소')}</button>` : ''}
+        ${status === 'in_progress' || status === 'processing' ? `<button class="btn btn-sm" onclick="bjCancel('${b.id}')">${t('취소')}</button>` : ''}
       </div>
     </div>`;
   }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('배치 없음')}</div>`;
 
   const resultsPanel = bj.lastResults ? `
-    <div class="text-[11px] text-[var(--text-dim)] mb-1">${t('결과')} ${bj.lastResults.count||0} ${t('건')} · ${bj.selectedBatchId}</div>
-    <pre class="text-[10px] max-h-80 overflow-auto font-mono whitespace-pre-wrap">${escapeHtml(JSON.stringify(bj.lastResults.items||[], null, 2).slice(0, 8000))}</pre>
+    <div class="text-[11px] text-[var(--text-dim)] mb-1">${t('결과')} ${bj.lastResults.count || 0} ${t('건')} · ${bj.selectedBatchId}</div>
+    <pre class="text-[10px] max-h-80 overflow-auto font-mono whitespace-pre-wrap">${escapeHtml(JSON.stringify(bj.lastResults.items || [], null, 2).slice(0, 8000))}</pre>
   ` : `<div class="text-[11px] text-[var(--text-dim)]">${t('배치를 선택해서 결과를 보세요')}</div>`;
 
   return `
@@ -13417,12 +13676,12 @@ VIEWS.batchJobs = async () => {
       ${needKey ? `<div class="mt-2 text-[11px] text-[var(--warn)]">⚠️ ${t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요')}</div>` : ''}
     </div>
 
-    <div class="card p-3 mb-4 flex items-center gap-3 flex-wrap" style="border-left:3px solid ${budget.enabled?'var(--accent)':'var(--border)'};">
-      <div class="text-[11px] ${budget.enabled?'':'text-[var(--text-dim)]'}">
+    <div class="card p-3 mb-4 flex items-center gap-3 flex-wrap" style="border-left:3px solid ${budget.enabled ? 'var(--accent)' : 'var(--border)'};">
+      <div class="text-[11px] ${budget.enabled ? '' : 'text-[var(--text-dim)]'}">
         <span class="font-semibold">${budget.enabled ? '🚨 ' + t('비용 가드 ON') : '🔒 ' + t('비용 가드 OFF')}</span>
       </div>
       <div class="text-[11px] text-[var(--text-dim)] font-mono">
-        ${t('Batch 당 한도')} · $${(budget.maxPerBatchUsd||0).toFixed(2)} · ${(budget.maxPerBatchTokens||0).toLocaleString()} tokens
+        ${t('Batch 당 한도')} · $${(budget.maxPerBatchUsd || 0).toFixed(2)} · ${(budget.maxPerBatchTokens || 0).toLocaleString()} tokens
       </div>
       <button class="btn btn-sm ml-auto" onclick="bjEditBudget()">⚙️ ${t('임계치 편집')}</button>
     </div>
@@ -13436,9 +13695,9 @@ VIEWS.batchJobs = async () => {
         <div class="flex items-center gap-2">
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
           <select class="input flex-1" onchange="bjSet('model', this.value)">
-            <option value="claude-opus-4-7" ${bj.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
-            <option value="claude-sonnet-4-6" ${bj.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
-            <option value="claude-haiku-4-5" ${bj.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+            <option value="claude-opus-4-7" ${bj.model === 'claude-opus-4-7' ? 'selected' : ''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${bj.model === 'claude-sonnet-4-6' ? 'selected' : ''}>Sonnet 4.6</option>
+            <option value="claude-haiku-4-5" ${bj.model === 'claude-haiku-4-5' ? 'selected' : ''}>Haiku 4.5</option>
           </select>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">max_tokens</label>
           <input type="text" inputmode="numeric" class="input w-24" value="${bj.maxTokens}"
@@ -13504,22 +13763,22 @@ async function bjSubmit() {
   if (st) st.textContent = t('제출 중…');
   try {
     const r = await fetch('/api/batch/create', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: bj.model, maxTokens: bj.maxTokens, prompts }),
     }).then(x => x.json());
-    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; return; }
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent = ''; return; }
     if (r.budgetExceeded) {
       const est = r.estimate || {};
       await confirmModal({
         title: '🚨 ' + t('비용 가드 차단'),
-        message: `${r.error}\n\n예상 비용: $${(est.usd||0).toFixed(4)} (정가 $${(est.usdFull||0).toFixed(4)} × 50% 배치 할인)\n예상 토큰: ${(est.totalTokens||0).toLocaleString()} (입력 ${(est.inputTokens||0).toLocaleString()} + 출력 ${(est.outputTokens||0).toLocaleString()})\n\n${t('임계치 편집 버튼으로 한도를 올리거나 프롬프트 수를 줄이세요.')}`,
+        message: `${r.error}\n\n예상 비용: $${(est.usd || 0).toFixed(4)} (정가 $${(est.usdFull || 0).toFixed(4)} × 50% 배치 할인)\n예상 토큰: ${(est.totalTokens || 0).toLocaleString()} (입력 ${(est.inputTokens || 0).toLocaleString()} + 출력 ${(est.outputTokens || 0).toLocaleString()})\n\n${t('임계치 편집 버튼으로 한도를 올리거나 프롬프트 수를 줄이세요.')}`,
         confirmLabel: t('확인'),
       });
       if (st) st.textContent = '';
       return;
     }
-    if (!r.ok) { toast(r.error || t('제출 실패'), 'err'); if (st) st.textContent=''; return; }
-    toast(t('배치 제출 완료') + ': ' + (r.batchId||''), 'ok');
+    if (!r.ok) { toast(r.error || t('제출 실패'), 'err'); if (st) st.textContent = ''; return; }
+    toast(t('배치 제출 완료') + ': ' + (r.batchId || ''), 'ok');
     if (st) st.textContent = '';
     await bjRefresh();
   } catch (e) {
@@ -13536,7 +13795,7 @@ async function bjEditBudget() {
   const html = `
     <div class="space-y-3 text-[12px]">
       <label class="flex items-center gap-2 cursor-pointer select-none">
-        <input type="checkbox" id="bjBudEnabled" ${cur.enabled?'checked':''}>
+        <input type="checkbox" id="bjBudEnabled" ${cur.enabled ? 'checked' : ''}>
         <span>${t('비용 가드 활성화')}</span>
       </label>
       <div>
@@ -13557,12 +13816,13 @@ async function bjEditBudget() {
     narrow: true,
     buttons: [
       { label: t('취소'), action: 'cancel' },
-      { label: t('저장'), primary: true, action: async () => {
+      {
+        label: t('저장'), primary: true, action: async () => {
           const enabled = document.getElementById('bjBudEnabled').checked;
           const usd = parseFloat(document.getElementById('bjBudUsd').value) || 0;
-          const tokens = parseInt((document.getElementById('bjBudTokens').value||'').replace(/\D/g,'')) || 0;
+          const tokens = parseInt((document.getElementById('bjBudTokens').value || '').replace(/\D/g, '')) || 0;
           const r = await fetch('/api/batch/budget/set', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ enabled, maxPerBatchUsd: usd, maxPerBatchTokens: tokens }),
           }).then(x => x.json());
           if (r.ok) { toast(t('저장 완료'), 'ok'); closeModal(); renderView(); }
@@ -13586,7 +13846,7 @@ async function bjCancel(id) {
   const ok = await confirmModal({ title: t('배치 취소'), message: t('이 배치를 취소할까요?'), confirmLabel: t('취소'), danger: true });
   if (!ok) return;
   const r = await fetch('/api/batch/cancel', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id }),
   }).then(x => x.json());
   if (r.ok) toast(t('취소 요청됨'), 'ok'); else toast(r.error || t('취소 실패'), 'err');
@@ -13612,13 +13872,13 @@ VIEWS.apiFiles = async () => {
   const fileRows = files.slice(0, 30).map(f => {
     const sel = af.selectedFileId === f.id;
     const sz = (f.size_bytes || 0) / 1024;
-    const szStr = sz >= 1024 ? (sz/1024).toFixed(2) + ' MB' : sz.toFixed(1) + ' KB';
-    return `<div class="py-2 border-b border-[var(--border)] ${sel?'bg-[var(--bg-hover)]':''}">
+    const szStr = sz >= 1024 ? (sz / 1024).toFixed(2) + ' MB' : sz.toFixed(1) + ' KB';
+    return `<div class="py-2 border-b border-[var(--border)] ${sel ? 'bg-[var(--bg-hover)]' : ''}">
       <div class="flex justify-between items-center gap-2">
-        <span class="font-mono text-[11px] truncate" title="${f.filename||''}">${f.filename||f.id}</span>
+        <span class="font-mono text-[11px] truncate" title="${f.filename || ''}">${f.filename || f.id}</span>
         <span class="text-[10px] text-[var(--text-dim)] font-mono">${szStr}</span>
       </div>
-      <div class="text-[10px] text-[var(--text-dim)] mt-1 truncate">${f.id} · ${f.mime_type||'?'}</div>
+      <div class="text-[10px] text-[var(--text-dim)] mt-1 truncate">${f.id} · ${f.mime_type || '?'}</div>
       <div class="mt-1 flex gap-1">
         <button class="btn btn-sm" onclick="afSelect('${f.id}')">${t('선택')}</button>
         <button class="btn btn-sm btn-danger" onclick="afDelete('${f.id}')">${t('삭제')}</button>
@@ -13648,13 +13908,13 @@ VIEWS.apiFiles = async () => {
           <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('파일로 질문 테스트')}</div>
           <div class="text-[10px] text-[var(--text-dim)] mb-2">${t('선택된 파일')}: <span class="font-mono">${af.selectedFileId || '-'}</span></div>
           <select class="input mb-2" onchange="afSet('model', this.value)">
-            <option value="claude-opus-4-7" ${af.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
-            <option value="claude-sonnet-4-6" ${af.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
-            <option value="claude-haiku-4-5" ${af.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+            <option value="claude-opus-4-7" ${af.model === 'claude-opus-4-7' ? 'selected' : ''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${af.model === 'claude-sonnet-4-6' ? 'selected' : ''}>Sonnet 4.6</option>
+            <option value="claude-haiku-4-5" ${af.model === 'claude-haiku-4-5' ? 'selected' : ''}>Haiku 4.5</option>
           </select>
           <textarea class="input text-[12px]" rows="3" oninput="afSet('prompt', this.value)" placeholder="${t('이 문서의 핵심을 3줄로 요약해줘')}">${escapeHtml(af.prompt || '')}</textarea>
           <div class="mt-2 flex items-center gap-2">
-            <button class="btn btn-primary" onclick="afAsk()" ${af.selectedFileId?'':'disabled'}>▶ ${t('질문 실행')}</button>
+            <button class="btn btn-primary" onclick="afAsk()" ${af.selectedFileId ? '' : 'disabled'}>▶ ${t('질문 실행')}</button>
             <span id="afAskStatus" class="text-[11px] text-[var(--text-dim)]"></span>
           </div>
           ${af.lastOutput ? `<pre class="text-[11px] whitespace-pre-wrap mt-3 max-h-64 overflow-auto">${escapeHtml(af.lastOutput.output || af.lastOutput.error || '')}</pre>` : ''}
@@ -13687,7 +13947,7 @@ async function afDelete(id) {
   const ok = await confirmModal({ title: t('파일 삭제'), message: t('이 파일을 삭제할까요?'), confirmLabel: t('삭제'), danger: true });
   if (!ok) return;
   const r = await fetch('/api/api-files/delete', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id }),
   }).then(x => x.json());
   if (r.ok) toast(t('삭제 완료'), 'ok'); else toast(r.error || t('삭제 실패'), 'err');
@@ -13699,7 +13959,7 @@ async function afUpload() {
   const f = inp && inp.files && inp.files[0];
   if (!f) return;
   if (f.size > 30 * 1024 * 1024) { toast(t('최대 30MB'), 'err'); return; }
-  if (st) st.textContent = t('업로드 중…') + ' (' + Math.round(f.size/1024) + ' KB)';
+  if (st) st.textContent = t('업로드 중…') + ' (' + Math.round(f.size / 1024) + ' KB)';
   const buf = await f.arrayBuffer();
   // base64 인코딩
   const bytes = new Uint8Array(buf);
@@ -13708,15 +13968,15 @@ async function afUpload() {
   const b64 = btoa(bin);
   try {
     const r = await fetch('/api/api-files/upload', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: f.name, mime: f.type || 'application/octet-stream', base64: b64 }),
     }).then(x => x.json());
-    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; return; }
-    if (!r.ok) { toast(r.error || t('업로드 실패'), 'err'); if (st) st.textContent = '❌ ' + (r.error||''); return; }
-    toast(t('업로드 완료') + ': ' + (r.fileId||''), 'ok');
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent = ''; return; }
+    if (!r.ok) { toast(r.error || t('업로드 실패'), 'err'); if (st) st.textContent = '❌ ' + (r.error || ''); return; }
+    toast(t('업로드 완료') + ': ' + (r.fileId || ''), 'ok');
     state.data.af = state.data.af || {};
     state.data.af.selectedFileId = r.fileId;
-    if (st) st.textContent = '✅ ' + (r.fileId||'');
+    if (st) st.textContent = '✅ ' + (r.fileId || '');
     renderView();
   } catch (e) {
     toast(t('네트워크 오류') + ': ' + e.message, 'err');
@@ -13726,17 +13986,17 @@ async function afUpload() {
 async function afAsk() {
   const af = state.data.af || {};
   if (!af.selectedFileId) { toast(t('먼저 파일을 선택하세요'), 'err'); return; }
-  if (!(af.prompt||'').trim()) { toast(t('질문을 입력하세요'), 'err'); return; }
+  if (!(af.prompt || '').trim()) { toast(t('질문을 입력하세요'), 'err'); return; }
   const st = document.getElementById('afAskStatus');
   if (st) st.textContent = t('호출 중…');
   try {
     const r = await fetch('/api/api-files/test', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: af.model, prompt: af.prompt, fileId: af.selectedFileId }),
     }).then(x => x.json());
-    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; return; }
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent = ''; return; }
     state.data.af.lastOutput = r.ok ? { output: r.output, durationMs: r.durationMs } : { error: r.error || t('실행 실패') };
-    if (st) st.textContent = r.ok ? `${r.durationMs||0}ms` : '❌';
+    if (st) st.textContent = r.ok ? `${r.durationMs || 0}ms` : '❌';
     renderView();
   } catch (e) {
     toast(t('네트워크 오류') + ': ' + e.message, 'err');
@@ -13762,7 +14022,7 @@ VIEWS.visionLab = async () => {
 
   const preview = vl.previewUrl ? (
     vl.mediaType === 'application/pdf'
-      ? `<div class="text-[11px] text-[var(--text-dim)]">📄 PDF: ${vl.filename} (${Math.round((vl.base64.length*3/4)/1024)} KB)</div>`
+      ? `<div class="text-[11px] text-[var(--text-dim)]">📄 PDF: ${vl.filename} (${Math.round((vl.base64.length * 3 / 4) / 1024)} KB)</div>`
       : `<img src="${vl.previewUrl}" alt="preview" class="max-h-48 rounded border border-[var(--border)]">`
   ) : `<div class="text-[11px] text-[var(--text-dim)]">${t('이미지 또는 PDF 를 선택하세요')}</div>`;
 
@@ -13771,7 +14031,7 @@ VIEWS.visionLab = async () => {
       ? `<span class="text-[var(--ok)]">✓</span> ${r.model} · ${r.durationMs}ms`
       : `<span class="text-[var(--danger)]">✗</span> ${r.model}`;
     const body = r.ok ? (r.output || '(empty)') : (r.error || 'error');
-    const usage = r.usage ? `<div class="text-[10px] text-[var(--text-dim)] mt-1">in=${r.usage.input_tokens||0} · out=${r.usage.output_tokens||0}</div>` : '';
+    const usage = r.usage ? `<div class="text-[10px] text-[var(--text-dim)] mt-1">in=${r.usage.input_tokens || 0} · out=${r.usage.output_tokens || 0}</div>` : '';
     return `<div class="card p-3">
       <div class="text-[11px] font-mono mb-1">${head}</div>
       <pre class="text-[11px] whitespace-pre-wrap max-h-64 overflow-auto">${escapeHtml(body)}</pre>
@@ -13816,7 +14076,7 @@ VIEWS.visionLab = async () => {
           ${vl.results ? `
             <div class="text-[11px]">
               <div>${t('총 소요')}: <span class="font-mono">${vl.results.totalDurationMs}ms</span></div>
-              <div>${t('모델 수')}: ${(vl.results.results||[]).length}</div>
+              <div>${t('모델 수')}: ${(vl.results.results || []).length}</div>
             </div>` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 결과가 없습니다')}</div>`}
         </div>
       </div>
@@ -13849,24 +14109,24 @@ async function vlLoadFile(ev) {
   if (mt.startsWith('image/')) {
     previewUrl = 'data:' + mt + ';base64,' + b64;
   }
-  state.data.vl = { ...(state.data.vl||{}), mediaType: mt, base64: b64, filename: f.name, previewUrl, results: null };
+  state.data.vl = { ...(state.data.vl || {}), mediaType: mt, base64: b64, filename: f.name, previewUrl, results: null };
   renderView();
 }
 async function vlRun() {
   const vl = state.data.vl || {};
   if (!vl.base64) { toast(t('파일을 먼저 선택하세요'), 'err'); return; }
-  if (!(vl.question||'').trim()) { toast(t('질문을 입력하세요'), 'err'); return; }
+  if (!(vl.question || '').trim()) { toast(t('질문을 입력하세요'), 'err'); return; }
   vlSet('running', true);
   const st = document.getElementById('vlStatus');
   if (st) st.textContent = t('3 모델 병렬 호출 중…');
   try {
     const r = await fetch('/api/vision-lab/compare', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mediaType: vl.mediaType, base64: vl.base64, question: vl.question }),
     }).then(x => x.json());
     vlSet('running', false);
-    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; renderView(); return; }
-    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (st) st.textContent=''; renderView(); return; }
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent = ''; renderView(); return; }
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (st) st.textContent = ''; renderView(); return; }
     vlSet('results', r);
     if (st) st.textContent = `${r.totalDurationMs}ms`;
     renderView();
@@ -13897,13 +14157,13 @@ VIEWS.modelBench = async () => {
   const cur = sets.find(s => s.id === mb.setId) || sets[0];
 
   const setBtns = sets.map(s =>
-    `<button class="chip ${mb.setId===s.id?'chip-accent':''}" onclick="mbSelectSet('${s.id}')">${t(s.label)}</button>`
+    `<button class="chip ${mb.setId === s.id ? 'chip-accent' : ''}" onclick="mbSelectSet('${s.id}')">${t(s.label)}</button>`
   ).join('');
 
   const modelChecks = models.map(m => {
     const checked = mb.modelIds.includes(m.id);
     return `<label class="flex items-center gap-2 text-[11px] cursor-pointer select-none">
-      <input type="checkbox" ${checked?'checked':''} onchange="mbToggleModel('${m.id}')">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="mbToggleModel('${m.id}')">
       <span>${m.label}</span>
     </label>`;
   }).join('');
@@ -13914,7 +14174,7 @@ VIEWS.modelBench = async () => {
       <td class="py-1 text-right">${s.count}</td>
       <td class="py-1 text-right">${s.avgMs}ms</td>
       <td class="py-1 text-right">${s.avgOut}</td>
-      <td class="py-1 text-right font-mono">$${(s.totalCost||0).toFixed(6)}</td>
+      <td class="py-1 text-right font-mono">$${(s.totalCost || 0).toFixed(6)}</td>
     </tr>`;
   }).join('') : '';
 
@@ -13922,11 +14182,11 @@ VIEWS.modelBench = async () => {
     const icon = r.ok ? '✅' : '❌';
     const body = r.ok ? (r.output || '').slice(0, 140) : (r.error || '');
     return `<tr class="border-b border-[var(--border)] align-top">
-      <td class="py-2 pr-2 text-[11px] font-mono whitespace-nowrap">${icon} ${r.model||''}</td>
-      <td class="py-2 pr-2 text-[11px]">${escapeHtml(r.prompt||'').slice(0, 60)}</td>
+      <td class="py-2 pr-2 text-[11px] font-mono whitespace-nowrap">${icon} ${r.model || ''}</td>
+      <td class="py-2 pr-2 text-[11px]">${escapeHtml(r.prompt || '').slice(0, 60)}</td>
       <td class="py-2 pr-2 text-[11px] whitespace-pre-wrap">${escapeHtml(body)}</td>
-      <td class="py-2 pr-2 text-[11px] text-right font-mono">${r.durationMs||0}ms</td>
-      <td class="py-2 text-[11px] text-right font-mono">${r.ok ? '$' + (r.usdCost||0).toFixed(6) : '-'}</td>
+      <td class="py-2 pr-2 text-[11px] text-right font-mono">${r.durationMs || 0}ms</td>
+      <td class="py-2 text-[11px] text-right font-mono">${r.ok ? '$' + (r.usdCost || 0).toFixed(6) : '-'}</td>
     </tr>`;
   }).join('') : '';
 
@@ -13944,9 +14204,9 @@ VIEWS.modelBench = async () => {
           <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('프롬프트 셋')}</div>
           <div class="flex gap-1 flex-wrap mb-2">${setBtns}</div>
           <div class="card p-3 text-[11px]">
-            <div class="font-semibold mb-1">${t(cur?.label||'')}</div>
-            <div class="text-[var(--text-dim)] mb-2">${t(cur?.description||'')}</div>
-            <ol class="list-decimal pl-4 space-y-1">${(cur?.prompts||[]).map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ol>
+            <div class="font-semibold mb-1">${t(cur?.label || '')}</div>
+            <div class="text-[var(--text-dim)] mb-2">${t(cur?.description || '')}</div>
+            <ol class="list-decimal pl-4 space-y-1">${(cur?.prompts || []).map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ol>
           </div>
         </div>
 
@@ -13962,10 +14222,10 @@ VIEWS.modelBench = async () => {
         </div>
 
         <div class="flex items-center gap-2">
-          <button class="btn btn-primary" onclick="mbRun()" ${mb.running?'disabled':''}>
+          <button class="btn btn-primary" onclick="mbRun()" ${mb.running ? 'disabled' : ''}>
             ▶ ${mb.running ? t('실행 중…') : t('벤치마크 실행')}
           </button>
-          <button class="btn" onclick="mbDownload()" ${mb.results?'':'disabled'}>⬇ ${t('JSON 다운로드')}</button>
+          <button class="btn" onclick="mbDownload()" ${mb.results ? '' : 'disabled'}>⬇ ${t('JSON 다운로드')}</button>
           <span id="mbStatus" class="text-[11px] text-[var(--text-dim)]"></span>
         </div>
       </div>
@@ -13992,7 +14252,7 @@ VIEWS.modelBench = async () => {
 
     ${mb.results ? `
       <div class="card p-3">
-        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('개별 응답')} (${(mb.results.results||[]).length})</div>
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('개별 응답')} (${(mb.results.results || []).length})</div>
         <div class="max-h-96 overflow-auto">
           <table class="w-full border-collapse">
             <thead><tr class="border-b border-[var(--border)]">
@@ -14045,12 +14305,12 @@ async function mbRun() {
   if (st) st.textContent = t('실행 중…');
   try {
     const r = await fetch('/api/model-bench/run', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompts: s.prompts, models: mb.modelIds, maxTokens: mb.maxTokens }),
     }).then(x => x.json());
     mbSet('running', false);
-    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent=''; renderView(); return; }
-    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (st) st.textContent=''; renderView(); return; }
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (st) st.textContent = ''; renderView(); return; }
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (st) st.textContent = ''; renderView(); return; }
     mbSet('results', r);
     if (st) st.textContent = `${r.totalDurationMs}ms`;
     renderView();
@@ -14064,7 +14324,7 @@ async function mbRun() {
 function mbDownload() {
   const mb = state.data.mb;
   if (!mb || !mb.results) return;
-  const blob = new Blob([JSON.stringify(mb.results, null, 2)], {type:'application/json'});
+  const blob = new Blob([JSON.stringify(mb.results, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = `model-bench-${Date.now()}.json`; a.click();
@@ -14083,33 +14343,33 @@ VIEWS.promptLibrary = async () => {
 
   const q = (pl.q || '').toLowerCase();
   const filtered = items.filter(it => {
-    if (pl.tag && !(it.tags||[]).includes(pl.tag)) return false;
+    if (pl.tag && !(it.tags || []).includes(pl.tag)) return false;
     if (q) {
-      const hay = (it.title + ' ' + it.body + ' ' + (it.tags||[]).join(' ')).toLowerCase();
+      const hay = (it.title + ' ' + it.body + ' ' + (it.tags || []).join(' ')).toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
   });
 
   const tagChips = allTags.map(tg => `
-    <button class="chip ${pl.tag===tg?'chip-accent':''}" onclick="plSet('tag', '${pl.tag===tg?'':tg}'); renderView()">#${escapeHtml(tg)}</button>
+    <button class="chip ${pl.tag === tg ? 'chip-accent' : ''}" onclick="plSet('tag', '${pl.tag === tg ? '' : tg}'); renderView()">#${escapeHtml(tg)}</button>
   `).join('');
 
   const editing = pl.editing;
   const editorPanel = editing ? `
     <div class="card p-3" style="border-left:3px solid var(--accent);">
       <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${editing.id ? t('수정') : t('새 프롬프트')}</div>
-      <input class="input mb-2" placeholder="${t('제목')}" value="${escapeHtml(editing.title||'')}" oninput="plSetEdit('title', this.value)">
-      <textarea class="input font-mono text-[11px] mb-2" rows="6" placeholder="${t('본문')}" oninput="plSetEdit('body', this.value)">${escapeHtml(editing.body||'')}</textarea>
-      <input class="input mb-2" placeholder="${t('태그 (쉼표 구분)')}" value="${escapeHtml((editing.tags||[]).join(', '))}" oninput="plSetEdit('tagsRaw', this.value)">
-      <input class="input mb-1" placeholder="${t('pl_keywords_placeholder', '트리거 키워드 (쉼표 구분, 예: ultrathink, deepsearch)')}" value="${escapeHtml((editing.keywords||[]).join(', '))}" oninput="plSetEdit('keywordsRaw', this.value)">
+      <input class="input mb-2" placeholder="${t('제목')}" value="${escapeHtml(editing.title || '')}" oninput="plSetEdit('title', this.value)">
+      <textarea class="input font-mono text-[11px] mb-2" rows="6" placeholder="${t('본문')}" oninput="plSetEdit('body', this.value)">${escapeHtml(editing.body || '')}</textarea>
+      <input class="input mb-2" placeholder="${t('태그 (쉼표 구분)')}" value="${escapeHtml((editing.tags || []).join(', '))}" oninput="plSetEdit('tagsRaw', this.value)">
+      <input class="input mb-1" placeholder="${t('pl_keywords_placeholder', '트리거 키워드 (쉼표 구분, 예: ultrathink, deepsearch)')}" value="${escapeHtml((editing.keywords || []).join(', '))}" oninput="plSetEdit('keywordsRaw', this.value)">
       <div class="text-[10px] mb-2" style="color:var(--text-dim)">${t('pl_keywords_hint', '워크플로우 session 노드 입력에 이 키워드가 포함되면 본 프롬프트가 시스템 프롬프트에 자동 주입됩니다.')}</div>
       <div class="flex gap-2 items-center">
         <select class="input" onchange="plSetEdit('model', this.value)">
           <option value="">${t('모델 미지정')}</option>
-          <option value="claude-opus-4-7" ${editing.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
-          <option value="claude-sonnet-4-6" ${editing.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
-          <option value="claude-haiku-4-5" ${editing.model==='claude-haiku-4-5'?'selected':''}>Haiku 4.5</option>
+          <option value="claude-opus-4-7" ${editing.model === 'claude-opus-4-7' ? 'selected' : ''}>Opus 4.7</option>
+          <option value="claude-sonnet-4-6" ${editing.model === 'claude-sonnet-4-6' ? 'selected' : ''}>Sonnet 4.6</option>
+          <option value="claude-haiku-4-5" ${editing.model === 'claude-haiku-4-5' ? 'selected' : ''}>Haiku 4.5</option>
         </select>
         <button class="btn btn-primary" onclick="plSave()">💾 ${t('저장')}</button>
         <button class="btn" onclick="plSet('editing', null); renderView()">${t('취소')}</button>
@@ -14131,9 +14391,9 @@ VIEWS.promptLibrary = async () => {
           <button class="btn btn-sm btn-danger" onclick="plDelete('${it.id}')" title="${t('삭제')}">🗑️</button>
         </div>
       </div>
-      <pre class="text-[11px] whitespace-pre-wrap max-h-32 overflow-auto text-[var(--text-mute)]">${escapeHtml(it.body||'').slice(0,800)}${(it.body||'').length>800?'…':''}</pre>
+      <pre class="text-[11px] whitespace-pre-wrap max-h-32 overflow-auto text-[var(--text-mute)]">${escapeHtml(it.body || '').slice(0, 800)}${(it.body || '').length > 800 ? '…' : ''}</pre>
       <div class="flex items-center gap-1 flex-wrap">
-        ${(it.tags||[]).map(tg => `<span class="chip" style="font-size:10px;">#${escapeHtml(tg)}</span>`).join('')}
+        ${(it.tags || []).map(tg => `<span class="chip" style="font-size:10px;">#${escapeHtml(tg)}</span>`).join('')}
         ${it.model ? `<span class="chip chip-sm" style="font-size:10px; background:rgba(217,119,87,0.1);">${escapeHtml(it.model)}</span>` : ''}
       </div>
     </div>
@@ -14149,7 +14409,7 @@ VIEWS.promptLibrary = async () => {
 
     <div class="flex items-center gap-2 mb-4 flex-wrap">
       <input class="input flex-1" style="min-width:240px;" placeholder="${t('제목/본문/태그 검색')}"
-             value="${escapeHtml(pl.q||'')}" oninput="plSet('q', this.value); plDebouncedRender()">
+             value="${escapeHtml(pl.q || '')}" oninput="plSet('q', this.value); plDebouncedRender()">
       ${pl.tag ? `<button class="btn btn-sm" onclick="plSet('tag',''); renderView()">✕ #${escapeHtml(pl.tag)}</button>` : ''}
       <span class="text-[11px] text-[var(--text-dim)]">${filtered.length}/${items.length}</span>
     </div>
@@ -14183,23 +14443,23 @@ async function plEdit(pid) {
   if (!it) return;
   plSet('editing', {
     id: it.id, title: it.title, body: it.body,
-    tags: it.tags || [], tagsRaw: (it.tags||[]).join(', '),
-    keywords: it.keywords || [], keywordsRaw: (it.keywords||[]).join(', '),
+    tags: it.tags || [], tagsRaw: (it.tags || []).join(', '),
+    keywords: it.keywords || [], keywordsRaw: (it.keywords || []).join(', '),
     model: it.model || '',
   });
   renderView();
 }
 async function plSave() {
   const e = state.data.pl.editing || {};
-  if (!(e.title||'').trim()) { toast(t('제목을 입력하세요'), 'err'); return; }
-  if (!(e.body||'').trim()) { toast(t('본문을 입력하세요'), 'err'); return; }
-  const tags = (e.tagsRaw != null ? String(e.tagsRaw) : (e.tags||[]).join(','))
-    .split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
-  const keywords = (e.keywordsRaw != null ? String(e.keywordsRaw) : (e.keywords||[]).join(','))
-    .split(/[,\n]/).map(x=>x.trim()).filter(Boolean);
+  if (!(e.title || '').trim()) { toast(t('제목을 입력하세요'), 'err'); return; }
+  if (!(e.body || '').trim()) { toast(t('본문을 입력하세요'), 'err'); return; }
+  const tags = (e.tagsRaw != null ? String(e.tagsRaw) : (e.tags || []).join(','))
+    .split(/[,\n]/).map(x => x.trim()).filter(Boolean);
+  const keywords = (e.keywordsRaw != null ? String(e.keywordsRaw) : (e.keywords || []).join(','))
+    .split(/[,\n]/).map(x => x.trim()).filter(Boolean);
   const body = { id: e.id || null, title: e.title, body: e.body, tags, keywords, model: e.model || null };
   const r = await fetch('/api/prompt-library/save', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then(x => x.json());
   if (r.ok) {
@@ -14214,7 +14474,7 @@ async function plDelete(pid) {
   const ok = await confirmModal({ title: t('삭제'), message: t('이 프롬프트를 삭제할까요?'), confirmLabel: t('삭제'), danger: true });
   if (!ok) return;
   const r = await fetch('/api/prompt-library/delete', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: pid }),
   }).then(x => x.json());
   if (r.ok) { toast(t('삭제 완료'), 'ok'); renderView(); }
@@ -14222,7 +14482,7 @@ async function plDelete(pid) {
 }
 async function plDuplicate(pid) {
   const r = await fetch('/api/prompt-library/duplicate', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: pid }),
   }).then(x => x.json());
   if (r.ok) { toast(t('복제 완료'), 'ok'); renderView(); }
@@ -14241,11 +14501,11 @@ async function plCopy(pid) {
 }
 async function plToWorkflow(pid) {
   const r = await fetch('/api/prompt-library/to-workflow', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: pid }),
   }).then(x => x.json());
   if (r.ok) {
-    toast(t('워크플로우 생성') + ': ' + escapeHtml(r.workflowName||''), 'ok');
+    toast(t('워크플로우 생성') + ': ' + escapeHtml(r.workflowName || ''), 'ok');
     setTimeout(() => go('workflows'), 800);
   } else {
     toast(r.error || t('생성 실패'), 'err');
@@ -14275,14 +14535,14 @@ VIEWS.embeddingLab = async () => {
   const providerCards = providers.map(p => {
     const sel = el.selections.find(s => s.providerId === p.id);
     const checked = !!sel;
-    return `<label class="card p-2 flex items-start gap-2 cursor-pointer text-[11px]" style="${checked?'border-color:rgba(217,119,87,0.5);background:rgba(217,119,87,0.06);':''} ${p.available?'':'opacity-60'}">
-      <input type="checkbox" ${checked?'checked':''} onchange="elToggleProvider('${p.id}')" style="margin-top:2px;">
+    return `<label class="card p-2 flex items-start gap-2 cursor-pointer text-[11px]" style="${checked ? 'border-color:rgba(217,119,87,0.5);background:rgba(217,119,87,0.06);' : ''} ${p.available ? '' : 'opacity-60'}">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="elToggleProvider('${p.id}')" style="margin-top:2px;">
       <div style="flex:1;">
         <div class="font-semibold">${p.icon} ${escapeHtml(p.label)}</div>
         <div class="text-[10px] text-[var(--text-dim)] mt-0.5">${p.available ? (sel ? escapeHtml(sel.model) : escapeHtml(p.defaultModel)) : t('키 미설정')}</div>
         ${checked ? `
           <select class="input mt-1" style="font-size:10px;padding:2px 4px;" onchange="elSetModel('${p.id}', this.value); event.stopPropagation()">
-            ${p.modelOptions.map(m => `<option value="${m}" ${sel.model===m?'selected':''}>${m}</option>`).join('')}
+            ${p.modelOptions.map(m => `<option value="${m}" ${sel.model === m ? 'selected' : ''}>${m}</option>`).join('')}
           </select>` : ''}
       </div>
     </label>`;
@@ -14294,9 +14554,9 @@ VIEWS.embeddingLab = async () => {
 
   const docInputs = el.docs.map((d, i) => `
     <div class="flex items-center gap-1 mb-1">
-      <span class="text-[10px] text-[var(--text-dim)] font-mono w-6 text-right">${i+1}</span>
-      <input class="input flex-1 text-[12px]" value="${escapeHtml(d||'')}" oninput="elSetDoc(${i}, this.value)" placeholder="${t('문서 텍스트')}">
-      <button class="btn btn-sm" onclick="elRemoveDoc(${i})" ${el.docs.length<=1?'disabled':''}>✕</button>
+      <span class="text-[10px] text-[var(--text-dim)] font-mono w-6 text-right">${i + 1}</span>
+      <input class="input flex-1 text-[12px]" value="${escapeHtml(d || '')}" oninput="elSetDoc(${i}, this.value)" placeholder="${t('문서 텍스트')}">
+      <button class="btn btn-sm" onclick="elRemoveDoc(${i})" ${el.docs.length <= 1 ? 'disabled' : ''}>✕</button>
     </div>
   `).join('');
 
@@ -14323,21 +14583,21 @@ VIEWS.embeddingLab = async () => {
             <tr class="border-b border-[var(--border)]">
               <th class="text-left py-1 px-2">#</th>
               <th class="text-left py-1 px-2">${t('문서')}</th>
-              ${ranksByProvider.map(r => `<th class="text-center py-1 px-2 font-mono">${escapeHtml(r.id)}<br><span class="text-[9px] text-[var(--text-dim)]">${r.ok ? (r.dims+'d · '+r.duration+'ms') : '❌'}</span></th>`).join('')}
+              ${ranksByProvider.map(r => `<th class="text-center py-1 px-2 font-mono">${escapeHtml(r.id)}<br><span class="text-[9px] text-[var(--text-dim)]">${r.ok ? (r.dims + 'd · ' + r.duration + 'ms') : '❌'}</span></th>`).join('')}
               <th class="text-center py-1 px-2">${t('rank 차이')}</th>
             </tr>
           </thead>
           <tbody>
             ${docs.map((d, di) => `
-              <tr class="border-b border-[var(--border)] ${rankSpans[di]>=2?'bg-[var(--bg-hover)]':''}">
-                <td class="py-1 px-2 font-mono text-[var(--text-dim)]">${di+1}</td>
-                <td class="py-1 px-2" style="max-width:320px;">${escapeHtml(d).slice(0,120)}${d.length>120?'…':''}</td>
+              <tr class="border-b border-[var(--border)] ${rankSpans[di] >= 2 ? 'bg-[var(--bg-hover)]' : ''}">
+                <td class="py-1 px-2 font-mono text-[var(--text-dim)]">${di + 1}</td>
+                <td class="py-1 px-2" style="max-width:320px;">${escapeHtml(d).slice(0, 120)}${d.length > 120 ? '…' : ''}</td>
                 ${ranksByProvider.map(r => r.ok ? `
-                  <td class="py-1 px-2 text-center font-mono ${r.ranks[di]===1?'text-[var(--ok)] font-bold':''}">
+                  <td class="py-1 px-2 text-center font-mono ${r.ranks[di] === 1 ? 'text-[var(--ok)] font-bold' : ''}">
                     <span class="text-[10px]">#${r.ranks[di]}</span>
-                    <span class="text-[9px] text-[var(--text-dim)] block">${(r.sims[di]||0).toFixed(3)}</span>
+                    <span class="text-[9px] text-[var(--text-dim)] block">${(r.sims[di] || 0).toFixed(3)}</span>
                   </td>` : `<td class="py-1 px-2 text-center text-[var(--text-dim)]">-</td>`).join('')}
-                <td class="py-1 px-2 text-center font-mono ${rankSpans[di]>=2?'text-[var(--warn)] font-bold':'text-[var(--text-dim)]'}">±${rankSpans[di]}</td>
+                <td class="py-1 px-2 text-center font-mono ${rankSpans[di] >= 2 ? 'text-[var(--warn)] font-bold' : 'text-[var(--text-dim)]'}">±${rankSpans[di]}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -14345,11 +14605,11 @@ VIEWS.embeddingLab = async () => {
       </div>
       <div class="text-[10px] text-[var(--text-dim)] mt-2">${t('rank 차이 ≥ 2 인 문서는 하이라이트. 프로바이더간 의견이 크게 갈리는 항목.')}</div>
       ${ranksByProvider.filter(r => !r.ok).map(r => `
-        <div class="text-[11px] text-[var(--danger)] mt-1">❌ ${escapeHtml(r.id)}: ${escapeHtml(r.error||'failed')}</div>
+        <div class="text-[11px] text-[var(--danger)] mt-1">❌ ${escapeHtml(r.id)}: ${escapeHtml(r.error || 'failed')}</div>
       `).join('')}
     `;
   } else if (last && !last.ok) {
-    resultCards = `<div class="text-[11px] text-[var(--danger)]">${escapeHtml(last.error||'failed')}</div>`;
+    resultCards = `<div class="text-[11px] text-[var(--danger)]">${escapeHtml(last.error || 'failed')}</div>`;
   } else {
     resultCards = `<div class="text-[11px] text-[var(--text-dim)]">${t('프로바이더 + 문서를 채우고 비교를 눌러주세요.')}</div>`;
   }
@@ -14371,12 +14631,12 @@ VIEWS.embeddingLab = async () => {
       <div class="space-y-3">
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('쿼리')}</label>
-          <input class="input" value="${escapeHtml(el.query||'')}" oninput="elSet('query', this.value)" placeholder="${t('쿼리 문장')}">
+          <input class="input" value="${escapeHtml(el.query || '')}" oninput="elSet('query', this.value)" placeholder="${t('쿼리 문장')}">
         </div>
         <div>
           <div class="flex items-center justify-between mb-1">
             <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('문서 리스트')} (${el.docs.length})</label>
-            <button class="btn btn-sm" onclick="elAddDoc()" ${el.docs.length>=10?'disabled':''}>+ ${t('추가')}</button>
+            <button class="btn btn-sm" onclick="elAddDoc()" ${el.docs.length >= 10 ? 'disabled' : ''}>+ ${t('추가')}</button>
           </div>
           ${docInputs}
           <div class="text-[10px] text-[var(--text-dim)]">${t('최대 10개')}</div>
@@ -14450,20 +14710,20 @@ async function elLoadExample(id) {
 }
 async function elRun() {
   const el = state.data.el || {};
-  const docs = (el.docs || []).filter(d => (d||'').trim());
-  if (!(el.query||'').trim()) { toast(t('쿼리를 입력하세요'), 'err'); return; }
+  const docs = (el.docs || []).filter(d => (d || '').trim());
+  if (!(el.query || '').trim()) { toast(t('쿼리를 입력하세요'), 'err'); return; }
   if (docs.length < 2) { toast(t('문서 2개 이상 필요'), 'err'); return; }
-  if (!(el.selections||[]).length) { toast(t('프로바이더 1개 이상 선택'), 'err'); return; }
+  if (!(el.selections || []).length) { toast(t('프로바이더 1개 이상 선택'), 'err'); return; }
   const st = document.getElementById('elStatus');
   if (st) st.textContent = t('호출 중…');
   try {
     const r = await fetch('/api/embedding-lab/compare', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: el.query, docs, selections: el.selections }),
     }).then(x => x.json());
-    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (st) st.textContent=''; return; }
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (st) st.textContent = ''; return; }
     state.data.el.lastResult = r;
-    if (st) st.textContent = `${r.totalDurationMs||0}ms`;
+    if (st) st.textContent = `${r.totalDurationMs || 0}ms`;
     renderView();
   } catch (e) {
     toast(t('네트워크 오류') + ': ' + e.message, 'err');
@@ -14501,18 +14761,18 @@ VIEWS.agentSdkScaffold = async () => {
       <div class="space-y-3">
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('프로젝트 이름')}</label>
-          <input class="input font-mono" value="${escapeHtml(sc.name||'')}" oninput="scSet('name', this.value)" placeholder="my-claude-agent">
+          <input class="input font-mono" value="${escapeHtml(sc.name || '')}" oninput="scSet('name', this.value)" placeholder="my-claude-agent">
           <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('영숫자/밑줄/하이픈 2~64자')}</div>
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('부모 경로 (홈 내부)')}</label>
-          <input class="input font-mono" value="${escapeHtml(sc.path||'')}" oninput="scSet('path', this.value)" placeholder="~/code">
+          <input class="input font-mono" value="${escapeHtml(sc.path || '')}" oninput="scSet('path', this.value)" placeholder="~/code">
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('언어')}</label>
           <div class="flex gap-2 flex-wrap">
             ${langs.map(l => `
-              <button class="chip ${sc.language===l.id?'chip-accent':''}" onclick="scSet('language','${l.id}'); renderView()">
+              <button class="chip ${sc.language === l.id ? 'chip-accent' : ''}" onclick="scSet('language','${l.id}'); renderView()">
                 ${escapeHtml(l.label)} <span class="text-[9px] text-[var(--text-dim)]">${escapeHtml(l.tool)}</span>
               </button>
             `).join('')}
@@ -14522,8 +14782,8 @@ VIEWS.agentSdkScaffold = async () => {
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-1 block">${t('템플릿')}</label>
           <div class="space-y-2">
             ${templates.map(tp => `
-              <label class="card p-2 flex items-start gap-2 cursor-pointer text-[11px]" style="${sc.template===tp.id?'border-color:rgba(217,119,87,0.5);background:rgba(217,119,87,0.06);':''}">
-                <input type="radio" name="scTpl" ${sc.template===tp.id?'checked':''} onchange="scSet('template','${tp.id}'); renderView()" style="margin-top:2px;">
+              <label class="card p-2 flex items-start gap-2 cursor-pointer text-[11px]" style="${sc.template === tp.id ? 'border-color:rgba(217,119,87,0.5);background:rgba(217,119,87,0.06);' : ''}">
+                <input type="radio" name="scTpl" ${sc.template === tp.id ? 'checked' : ''} onchange="scSet('template','${tp.id}'); renderView()" style="margin-top:2px;">
                 <div style="flex:1;">
                   <div class="font-semibold">${t(tp.label)}</div>
                   <div class="text-[var(--text-dim)] mt-0.5">${t(tp.description)}</div>
@@ -14545,26 +14805,26 @@ VIEWS.agentSdkScaffold = async () => {
             <div class="font-semibold text-[13px] mb-1" style="color:#4ade80;">✅ ${t('생성 완료')}</div>
             <div class="text-[11px] mb-2">
               <span class="text-[var(--text-dim)]">${t('경로')}:</span>
-              <code class="font-mono ml-1">${escapeHtml(last.path||'')}</code>
+              <code class="font-mono ml-1">${escapeHtml(last.path || '')}</code>
             </div>
             <div class="text-[11px] mb-2">
-              <span class="text-[var(--text-dim)]">${t('언어')}:</span> ${escapeHtml(last.language||'')}
-              <span class="ml-3 text-[var(--text-dim)]">${t('템플릿')}:</span> ${escapeHtml(last.template||'')}
+              <span class="text-[var(--text-dim)]">${t('언어')}:</span> ${escapeHtml(last.language || '')}
+              <span class="ml-3 text-[var(--text-dim)]">${t('템플릿')}:</span> ${escapeHtml(last.template || '')}
             </div>
             <div class="text-[11px] mb-2">
               <span class="text-[var(--text-dim)]">${t('Terminal 열림')}:</span>
               ${last.terminalSpawned ? '✅' : '❌ (' + t('AppleScript 실패') + ')'}
             </div>
             <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 mb-1">${t('실행할 명령 (Terminal 에서 Enter)')}</div>
-            <pre class="text-[10px] font-mono whitespace-pre-wrap bg-[var(--bg-alt)] p-2 rounded border border-[var(--border)]">${escapeHtml(last.nextCommand||'')}</pre>
+            <pre class="text-[10px] font-mono whitespace-pre-wrap bg-[var(--bg-alt)] p-2 rounded border border-[var(--border)]">${escapeHtml(last.nextCommand || '')}</pre>
             <div class="mt-3">
-              <button class="btn btn-sm" onclick="openFolderFromPath('${escapeHtml(last.path||'')}')">📂 ${t('폴더 열기')}</button>
+              <button class="btn btn-sm" onclick="openFolderFromPath('${escapeHtml(last.path || '')}')">📂 ${t('폴더 열기')}</button>
             </div>
           </div>
         ` : `
           <div class="card p-3" style="border-left:3px solid #f87171;">
             <div class="font-semibold text-[13px] mb-1" style="color:#f87171;">❌ ${t('생성 실패')}</div>
-            <div class="text-[11px] whitespace-pre-wrap">${escapeHtml(last.error||'')}</div>
+            <div class="text-[11px] whitespace-pre-wrap">${escapeHtml(last.error || '')}</div>
           </div>
         `) : `
           <div class="card p-6 text-center text-[11px] text-[var(--text-dim)]">
@@ -14594,12 +14854,12 @@ function scSet(k, v) { state.data.sc = state.data.sc || {}; state.data.sc[k] = v
 function scReset() { state.data.sc = null; renderView(); }
 async function scCreate() {
   const sc = state.data.sc || {};
-  if (!(sc.name||'').trim()) { toast(t('이름을 입력하세요'), 'err'); return; }
+  if (!(sc.name || '').trim()) { toast(t('이름을 입력하세요'), 'err'); return; }
   const st = document.getElementById('scStatus');
   if (st) st.textContent = t('생성 중…');
   try {
     const r = await fetch('/api/scaffold/create', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(sc),
     }).then(x => x.json());
     state.data.sc.lastResult = r;
@@ -14614,7 +14874,7 @@ async function scCreate() {
 }
 function openFolderFromPath(p) {
   fetch('/api/open-folder', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ folderPath: p }),
   });
 }
@@ -14661,10 +14921,10 @@ VIEWS.citationsLab = async () => {
 
   const answerHtml = segs.map((seg, si) => {
     const pills = (seg.citations || []).map((c) => {
-      const idx = allCits.findIndex(a => a.segIdx === si && a.cited_text === (c.cited_text||''));
-      return `<sup class="wf-cite-pill" style="color:var(--accent);cursor:pointer;font-weight:600;margin-left:2px;" onmouseover="ciHoverCit(${idx})" onmouseout="ciHoverCit(-1)" title="${escapeHtml((c.cited_text||'').slice(0,200))}">[${idx+1}]</sup>`;
+      const idx = allCits.findIndex(a => a.segIdx === si && a.cited_text === (c.cited_text || ''));
+      return `<sup class="wf-cite-pill" style="color:var(--accent);cursor:pointer;font-weight:600;margin-left:2px;" onmouseover="ciHoverCit(${idx})" onmouseout="ciHoverCit(-1)" title="${escapeHtml((c.cited_text || '').slice(0, 200))}">[${idx + 1}]</sup>`;
     }).join('');
-    return `<span>${escapeHtml(seg.text||'').replace(/\n/g,'<br>')}${pills}</span>`;
+    return `<span>${escapeHtml(seg.text || '').replace(/\n/g, '<br>')}${pills}</span>`;
   }).join('');
 
   // 문서 하이라이트: hoveredCitIndex 가 설정되면 해당 span 을 배경색으로
@@ -14673,20 +14933,20 @@ VIEWS.citationsLab = async () => {
   if (ci.hoveredCitIndex >= 0 && allCits[ci.hoveredCitIndex]) {
     const c = allCits[ci.hoveredCitIndex];
     const s = c.start || 0;
-    const e = c.end != null ? c.end : (s + (c.cited_text||'').length);
-    const safe = (x) => escapeHtml(x).replace(/\n/g,'<br>');
+    const e = c.end != null ? c.end : (s + (c.cited_text || '').length);
+    const safe = (x) => escapeHtml(x).replace(/\n/g, '<br>');
     docHtml = safe(doc.slice(0, s)) +
       `<mark style="background:rgba(217,119,87,0.4);border-radius:3px;padding:1px 2px;">${safe(doc.slice(s, e))}</mark>` +
       safe(doc.slice(e));
   } else {
-    docHtml = escapeHtml(doc).replace(/\n/g,'<br>');
+    docHtml = escapeHtml(doc).replace(/\n/g, '<br>');
   }
 
   const histList = ((hist && hist.items) || []).slice(0, 8).map(h => {
-    const ts = new Date((h.ts||0)*1000).toLocaleString();
+    const ts = new Date((h.ts || 0) * 1000).toLocaleString();
     const icon = h.status === 'ok' ? '✅' : '❌';
     return `<div class="text-[11px] py-1 border-b border-[var(--border)]">
-      ${icon} <span class="text-[var(--text-dim)]">${ts}</span> · ${escapeHtml(h.title||'(no title)')}
+      ${icon} <span class="text-[var(--text-dim)]">${ts}</span> · ${escapeHtml(h.title || '(no title)')}
     </div>`;
   }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('이력 없음')}</div>`;
 
@@ -14708,21 +14968,21 @@ VIEWS.citationsLab = async () => {
         <div class="flex items-center gap-2">
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
           <select class="input flex-1" onchange="ciSet('model', this.value)">
-            <option value="claude-opus-4-7" ${ci.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
-            <option value="claude-sonnet-4-6" ${ci.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
+            <option value="claude-opus-4-7" ${ci.model === 'claude-opus-4-7' ? 'selected' : ''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${ci.model === 'claude-sonnet-4-6' ? 'selected' : ''}>Sonnet 4.6</option>
           </select>
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('문서 제목 (선택)')}</label>
-          <input class="input" value="${escapeHtml(ci.title||'')}" oninput="ciSet('title', this.value)" placeholder="About ...">
+          <input class="input" value="${escapeHtml(ci.title || '')}" oninput="ciSet('title', this.value)" placeholder="About ...">
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('문서 본문')}</label>
-          <textarea class="input text-[12px] font-mono" rows="10" oninput="ciSet('document', this.value); renderView()" placeholder="${t('문서 텍스트를 붙여넣으세요')}">${escapeHtml(ci.document||'')}</textarea>
+          <textarea class="input text-[12px] font-mono" rows="10" oninput="ciSet('document', this.value); renderView()" placeholder="${t('문서 텍스트를 붙여넣으세요')}">${escapeHtml(ci.document || '')}</textarea>
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('질문')}</label>
-          <textarea class="input text-[12px]" rows="3" oninput="ciSet('prompt', this.value)" placeholder="${t('문서 기반 질문')}">${escapeHtml(ci.prompt||'')}</textarea>
+          <textarea class="input text-[12px]" rows="3" oninput="ciSet('prompt', this.value)" placeholder="${t('문서 기반 질문')}">${escapeHtml(ci.prompt || '')}</textarea>
         </div>
         <div class="flex items-center gap-2">
           <button class="btn btn-primary" onclick="ciRun()">▶ ${t('실행')}</button>
@@ -14733,7 +14993,7 @@ VIEWS.citationsLab = async () => {
 
       <div class="space-y-3">
         <div class="card p-3">
-          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">💬 ${t('답변')} ${last ? `<span class="ml-2 text-[10px] text-[var(--text-dim)]">${last.durationMs||0}ms · ${(allCits||[]).length} ${t('인용')}</span>` : ''}</div>
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">💬 ${t('답변')} ${last ? `<span class="ml-2 text-[10px] text-[var(--text-dim)]">${last.durationMs || 0}ms · ${(allCits || []).length} ${t('인용')}</span>` : ''}</div>
           <div class="text-[12px] leading-6">${last ? answerHtml : `<span class="text-[var(--text-dim)]">${t('아직 실행한 결과가 없습니다')}</span>`}</div>
         </div>
         <div class="card p-3">
@@ -14769,20 +15029,20 @@ async function ciLoadExample(id) {
 }
 async function ciRun() {
   const ci = state.data.ci || {};
-  if (!(ci.document||'').trim()) { toast(t('문서를 입력하세요'), 'err'); return; }
-  if (!(ci.prompt||'').trim()) { toast(t('질문을 입력하세요'), 'err'); return; }
+  if (!(ci.document || '').trim()) { toast(t('문서를 입력하세요'), 'err'); return; }
+  if (!(ci.prompt || '').trim()) { toast(t('질문을 입력하세요'), 'err'); return; }
   const sEl = document.getElementById('ciStatus');
   if (sEl) sEl.textContent = t('호출 중…');
   try {
     const r = await fetch('/api/citations-lab/test', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ci),
     }).then(x => x.json());
-    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (sEl) sEl.textContent=''; return; }
-    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (sEl) sEl.textContent=''; return; }
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (sEl) sEl.textContent = ''; return; }
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (sEl) sEl.textContent = ''; return; }
     state.data.ci.lastResult = r;
     state.data.ci.hoveredCitIndex = -1;
-    if (sEl) sEl.textContent = `${r.durationMs||0}ms`;
+    if (sEl) sEl.textContent = `${r.durationMs || 0}ms`;
     renderView();
   } catch (e) {
     toast(t('네트워크 오류') + ': ' + e.message, 'err');
@@ -14799,7 +15059,7 @@ function _cdLoadBookmarks() {
   catch { return new Set(); }
 }
 function _cdSaveBookmarks(set) {
-  try { localStorage.setItem('cd-bookmarks', JSON.stringify([...set])); } catch {}
+  try { localStorage.setItem('cd-bookmarks', JSON.stringify([...set])); } catch { }
 }
 function cdToggleBookmark(url) {
   const set = _cdLoadBookmarks();
@@ -14818,17 +15078,17 @@ VIEWS.claudeDocs = async () => {
   let cats = data.categories || [];
   if (cd.onlyBookmarks) {
     cats = cats.map(c => ({ ...c, items: (c.items || []).filter(it => bookmarks.has(it.url)) }))
-               .filter(c => c.items.length > 0);
+      .filter(c => c.items.length > 0);
   }
-  const total = cats.reduce((a, c) => a + (c.items||[]).length, 0);
+  const total = cats.reduce((a, c) => a + (c.items || []).length, 0);
 
   const renderCard = (it) => {
     const starred = bookmarks.has(it.url);
     return `
-    <div class="card p-3 flex flex-col gap-1" style="border-left:3px solid ${starred?'#fbbf24':'var(--accent)'};">
+    <div class="card p-3 flex flex-col gap-1" style="border-left:3px solid ${starred ? '#fbbf24' : 'var(--accent)'};">
       <div class="flex items-start justify-between gap-2">
         <div class="font-semibold text-[13px]" style="color:var(--text);">${escapeHtml(it.title)}</div>
-        <button class="btn-ghost btn text-[13px] px-1.5 py-0" onclick="cdToggleBookmark(${JSON.stringify(it.url).replace(/"/g,'&quot;')})" title="${starred?t('북마크 해제'):t('북마크 추가')}" aria-label="${starred?t('북마크 해제'):t('북마크 추가')}">${starred?'★':'☆'}</button>
+        <button class="btn-ghost btn text-[13px] px-1.5 py-0" onclick="cdToggleBookmark(${JSON.stringify(it.url).replace(/"/g, '&quot;')})" title="${starred ? t('북마크 해제') : t('북마크 추가')}" aria-label="${starred ? t('북마크 해제') : t('북마크 추가')}">${starred ? '★' : '☆'}</button>
       </div>
       <div class="text-[11px] text-[var(--text-mute)] flex-1">${escapeHtml(it.summary)}</div>
       <div class="flex items-center gap-2 mt-1">
@@ -14841,9 +15101,9 @@ VIEWS.claudeDocs = async () => {
 
   const sections = cats.map(cat => `
     <div class="mb-6">
-      <h2 class="text-sm font-semibold mb-2" style="color:var(--text);">${escapeHtml(cat.label)} <span class="text-[10px] text-[var(--text-dim)]">(${(cat.items||[]).length})</span></h2>
+      <h2 class="text-sm font-semibold mb-2" style="color:var(--text);">${escapeHtml(cat.label)} <span class="text-[10px] text-[var(--text-dim)]">(${(cat.items || []).length})</span></h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        ${(cat.items||[]).map(renderCard).join('')}
+        ${(cat.items || []).map(renderCard).join('')}
       </div>
     </div>
   `).join('') || `<div class="card p-6 text-center text-[11px] text-[var(--text-dim)]">${cd.onlyBookmarks ? t('북마크한 문서 없음') : t('검색 결과 없음')}</div>`;
@@ -14860,7 +15120,7 @@ VIEWS.claudeDocs = async () => {
       <input class="input flex-1" placeholder="${t('키워드로 검색 (제목/요약/URL)')}"
              value="${escapeHtml(cd.q || '')}"
              oninput="cdSet('q', this.value); cdRender()">
-      <button class="chip ${cd.onlyBookmarks?'chip-accent':''}" onclick="cdSet('onlyBookmarks', !state.data.cd.onlyBookmarks); renderView()">★ ${t('북마크')} ${bookmarks.size}</button>
+      <button class="chip ${cd.onlyBookmarks ? 'chip-accent' : ''}" onclick="cdSet('onlyBookmarks', !state.data.cd.onlyBookmarks); renderView()">★ ${t('북마크')} ${bookmarks.size}</button>
       <span class="text-[11px] text-[var(--text-dim)]">${total}${t('건')}</span>
       ${cd.q ? `<button class="btn btn-sm" onclick="cdSet('q',''); renderView()">✕ ${t('지우기')}</button>` : ''}
     </div>
@@ -14907,8 +15167,8 @@ VIEWS.serverTools = async () => {
   const toolChecks = tools.map(tool => {
     const checked = st.enabled.includes(tool.id);
     const modelSupported = tool.supportedModels.includes(st.model);
-    return `<label class="flex items-start gap-2 text-[11px] cursor-pointer select-none p-2 rounded border border-[var(--border)] ${modelSupported?'':'opacity-50'}" style="${checked?'background:rgba(217,119,87,0.08);border-color:rgba(217,119,87,0.4);':''}">
-      <input type="checkbox" ${checked?'checked':''} ${modelSupported?'':'disabled'} onchange="stToggleTool('${tool.id}')" style="margin-top:2px;">
+    return `<label class="flex items-start gap-2 text-[11px] cursor-pointer select-none p-2 rounded border border-[var(--border)] ${modelSupported ? '' : 'opacity-50'}" style="${checked ? 'background:rgba(217,119,87,0.08);border-color:rgba(217,119,87,0.4);' : ''}">
+      <input type="checkbox" ${checked ? 'checked' : ''} ${modelSupported ? '' : 'disabled'} onchange="stToggleTool('${tool.id}')" style="margin-top:2px;">
       <div style="flex:1;">
         <div class="font-semibold" style="font-size:12px;">${t(tool.label)}</div>
         <div class="text-[var(--text-dim)] mt-0.5">${t(tool.description)}</div>
@@ -14922,10 +15182,10 @@ VIEWS.serverTools = async () => {
   const blocks = last && (last.output || last.serverToolUses?.length || last.toolResults?.length);
 
   const histList = ((hist && hist.items) || []).slice(0, 8).map(h => {
-    const ts = new Date((h.ts||0)*1000).toLocaleString();
+    const ts = new Date((h.ts || 0) * 1000).toLocaleString();
     const icon = h.status === 'ok' ? '✅' : '❌';
     return `<div class="text-[11px] py-1 border-b border-[var(--border)]">
-      ${icon} <span class="text-[var(--text-dim)]">${ts}</span> · ${(h.enabledTools||[]).join('+')} · ${h.durationMs||0}ms
+      ${icon} <span class="text-[var(--text-dim)]">${ts}</span> · ${(h.enabledTools || []).join('+')} · ${h.durationMs || 0}ms
     </div>`;
   }).join('') || `<div class="text-[11px] text-[var(--text-dim)]">${t('이력 없음')}</div>`;
 
@@ -14947,8 +15207,8 @@ VIEWS.serverTools = async () => {
         <div class="flex items-center gap-2 flex-wrap">
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
           <select class="input flex-1" onchange="stSet('model', this.value); renderView()">
-            <option value="claude-opus-4-7" ${st.model==='claude-opus-4-7'?'selected':''}>Opus 4.7</option>
-            <option value="claude-sonnet-4-6" ${st.model==='claude-sonnet-4-6'?'selected':''}>Sonnet 4.6</option>
+            <option value="claude-opus-4-7" ${st.model === 'claude-opus-4-7' ? 'selected' : ''}>Opus 4.7</option>
+            <option value="claude-sonnet-4-6" ${st.model === 'claude-sonnet-4-6' ? 'selected' : ''}>Sonnet 4.6</option>
           </select>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">max_tokens</label>
           <input type="text" inputmode="numeric" class="input w-24" value="${st.maxTokens}"
@@ -14960,7 +15220,7 @@ VIEWS.serverTools = async () => {
         </div>
         <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('프롬프트')}</label>
-          <textarea class="input text-[12px]" rows="5" oninput="stSet('prompt', this.value)" placeholder="${t('도구를 활용할 질문')}">${escapeHtml(st.prompt||'')}</textarea>
+          <textarea class="input text-[12px]" rows="5" oninput="stSet('prompt', this.value)" placeholder="${t('도구를 활용할 질문')}">${escapeHtml(st.prompt || '')}</textarea>
         </div>
         <div class="flex items-center gap-2">
           <button class="btn btn-primary" onclick="stRun()">▶ ${t('실행')}</button>
@@ -14971,15 +15231,15 @@ VIEWS.serverTools = async () => {
 
       <div class="space-y-3 max-h-[720px] overflow-auto pr-1">
         ${blocks ? `
-          ${(last.serverToolUses||[]).map(u => `
+          ${(last.serverToolUses || []).map(u => `
             <div class="card p-3" style="border-left:3px solid #a78bfa;">
-              <div class="text-[11px] text-[var(--accent)] font-mono mb-1">🛠️ server_tool_use · ${escapeHtml(u.name||'')}</div>
-              <pre class="text-[10px] font-mono whitespace-pre-wrap text-[var(--text-dim)]">${escapeHtml(JSON.stringify(u.input||{}, null, 2))}</pre>
+              <div class="text-[11px] text-[var(--accent)] font-mono mb-1">🛠️ server_tool_use · ${escapeHtml(u.name || '')}</div>
+              <pre class="text-[10px] font-mono whitespace-pre-wrap text-[var(--text-dim)]">${escapeHtml(JSON.stringify(u.input || {}, null, 2))}</pre>
             </div>
           `).join('')}
-          ${(last.toolResults||[]).map(r => `
+          ${(last.toolResults || []).map(r => `
             <div class="card p-3" style="border-left:3px solid #4ade80;">
-              <div class="text-[11px] font-mono mb-1" style="color:#4ade80;">✓ ${escapeHtml(r.kind||'tool_result')}</div>
+              <div class="text-[11px] font-mono mb-1" style="color:#4ade80;">✓ ${escapeHtml(r.kind || 'tool_result')}</div>
               <pre class="text-[10px] font-mono whitespace-pre-wrap max-h-60 overflow-auto">${escapeHtml(typeof r.content === 'string' ? r.content : JSON.stringify(r.content, null, 2)).slice(0, 2000)}</pre>
             </div>
           `).join('')}
@@ -14987,7 +15247,7 @@ VIEWS.serverTools = async () => {
             <div class="card p-3">
               <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">💬 ${t('최종 응답')}</div>
               <pre class="text-[11px] whitespace-pre-wrap">${escapeHtml(last.output)}</pre>
-              ${last.usage ? `<div class="text-[10px] text-[var(--text-dim)] font-mono mt-2">in=${last.usage.input_tokens||0} · out=${last.usage.output_tokens||0} · ${last.durationMs||0}ms</div>` : ''}
+              ${last.usage ? `<div class="text-[10px] text-[var(--text-dim)] font-mono mt-2">in=${last.usage.input_tokens || 0} · out=${last.usage.output_tokens || 0} · ${last.durationMs || 0}ms</div>` : ''}
             </div>
           ` : ''}
         ` : `<div class="card p-6 text-center text-[11px] text-[var(--text-dim)]">${t('아직 실행한 결과가 없습니다')}</div>`}
@@ -15027,20 +15287,20 @@ async function stLoadExample(id) {
 }
 async function stRun() {
   const st = state.data.st || {};
-  if (!(st.prompt||'').trim()) { toast(t('프롬프트를 입력하세요'), 'err'); return; }
-  if (!(st.enabled||[]).length) { toast(t('도구를 1개 이상 활성화하세요'), 'err'); return; }
+  if (!(st.prompt || '').trim()) { toast(t('프롬프트를 입력하세요'), 'err'); return; }
+  if (!(st.enabled || []).length) { toast(t('도구를 1개 이상 활성화하세요'), 'err'); return; }
   const sEl = document.getElementById('stStatus');
   if (sEl) sEl.textContent = t('호출 중…');
   try {
     const r = await fetch('/api/server-tools/run', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(st),
     }).then(x => x.json());
-    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (sEl) sEl.textContent=''; return; }
-    if (r.unsupported) { toast(r.error, 'err'); if (sEl) sEl.textContent=''; return; }
-    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (sEl) sEl.textContent=''; return; }
+    if (r.needKey) { toast(t('ANTHROPIC_API_KEY 미설정 — AI 프로바이더 탭에서 저장하세요'), 'err'); if (sEl) sEl.textContent = ''; return; }
+    if (r.unsupported) { toast(r.error, 'err'); if (sEl) sEl.textContent = ''; return; }
+    if (!r.ok) { toast(r.error || t('실행 실패'), 'err'); if (sEl) sEl.textContent = ''; return; }
     state.data.st.lastResult = r;
-    if (sEl) sEl.textContent = `${r.durationMs||0}ms`;
+    if (sEl) sEl.textContent = `${r.durationMs || 0}ms`;
     renderView();
   } catch (e) {
     toast(t('네트워크 오류') + ': ' + e.message, 'err');
@@ -15068,7 +15328,7 @@ VIEWS.eventForwarder = async () => {
   const rows = forwarders.map((f, i) => `
     <tr class="border-b border-[var(--border)]">
       <td class="py-1 px-2 font-mono text-[11px]">${escapeHtml(f.event)}</td>
-      <td class="py-1 px-2 font-mono text-[10px]" style="color:var(--text-dim)">${escapeHtml(f.matcher||'-')}</td>
+      <td class="py-1 px-2 font-mono text-[10px]" style="color:var(--text-dim)">${escapeHtml(f.matcher || '-')}</td>
       <td class="py-1 px-2 font-mono text-[10px] break-all">${escapeHtml(f.url)}</td>
       <td class="py-1 px-2 text-right">
         <button class="btn text-[10px]" onclick="_fwdRemove('${escapeHtml(f.event)}',${f.groupIdx},${f.subIdx})" style="color:#fca5a5;border-color:rgba(248,113,113,0.3);">🗑</button>
@@ -15190,7 +15450,7 @@ VIEWS.hooks = async () => {
     api('/api/settings'),
     api('/api/hooks'),
   ]);
-  const recentBlocks = __hooksRecentBlocks || {items: [], totalEvents: 0, scanned: 0};
+  const recentBlocks = __hooksRecentBlocks || { items: [], totalEvents: 0, scanned: 0 };
   window.__settingsSnapshot = s;
   const rawHooks = s.hooks || {};
   // 사용자 훅(편집 가능): settings.json 에서 인덱스 보존하며 평탄화
@@ -15223,37 +15483,37 @@ VIEWS.hooks = async () => {
       <div style="flex:1 1 0; min-width:0; max-width:100%; overflow:hidden;">
         <div class="font-semibold text-sm mb-1 mono" style="overflow-wrap:anywhere;">${escapeHtml(_hookDisplayName(x))}</div>
         <div class="flex items-center gap-2 mb-1 flex-wrap"><span class="chip chip-ok text-[9px]" style="white-space:nowrap;">✓ 사용자 설정</span></div>
-        ${x.matcher ? `<div class="mb-1" style="overflow-wrap:anywhere;"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>`:''}
-        ${x.type ? `<div class="mb-1"><span class="text-[var(--text-dim)]">type:</span> <span class="mono">${escapeHtml(x.type)}</span></div>`:''}
-        ${x.command ? `<div class="mb-1"><div class="text-[var(--text-dim)] mb-1">cmd:</div><pre class="mono" style="display:block; box-sizing:border-box; width:100%; max-width:100%; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-height:200px; overflow-y:auto; overflow-x:hidden; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:6px; font-size:11px;">${escapeHtml(x.command)}</pre></div>`:''}
-        ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>`:''}
+        ${x.matcher ? `<div class="mb-1" style="overflow-wrap:anywhere;"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>` : ''}
+        ${x.type ? `<div class="mb-1"><span class="text-[var(--text-dim)]">type:</span> <span class="mono">${escapeHtml(x.type)}</span></div>` : ''}
+        ${x.command ? `<div class="mb-1"><div class="text-[var(--text-dim)] mb-1">cmd:</div><pre class="mono" style="display:block; box-sizing:border-box; width:100%; max-width:100%; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-height:200px; overflow-y:auto; overflow-x:hidden; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:6px; font-size:11px;">${escapeHtml(x.command)}</pre></div>` : ''}
+        ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>` : ''}
       </div>
       <div class="flex flex-col gap-1 flex-shrink-0">
         <button class="btn text-[10px]" onclick="openHookDetail(this.dataset.detail)" data-detail="${jsonAttr(x)}">${t('🔬 상세')}</button>
-        <button class="btn text-[10px]" onclick="openHookEditor(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher||"", type:x.type||"command", command:x.command||"", timeout:x.timeout})}">수정</button>
-        <button class="btn text-[10px]" style="color:#fca5a5" onclick="deleteHook(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr({scope:"user", event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx})}">삭제</button>
+        <button class="btn text-[10px]" onclick="openHookEditor(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr({ scope: "user", event: x.event, groupIdx: x.groupIdx, subIdx: x.subIdx, matcher: x.matcher || "", type: x.type || "command", command: x.command || "", timeout: x.timeout })}">수정</button>
+        <button class="btn text-[10px]" style="color:#fca5a5" onclick="deleteHook(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr({ scope: "user", event: x.event, groupIdx: x.groupIdx, subIdx: x.subIdx })}">삭제</button>
       </div>
     </div>`;
 
   const renderPluginCard = (x) => {
     const badge = x.pluginEnabled
       ? '<span class="chip text-[9px]" style="background:rgba(217,119,87,0.12); white-space:nowrap;">🔌 플러그인 제공</span>'
-      : `<button class="chip chip-warn text-[9px]" style="white-space:nowrap;" onclick="togglePluginFromAgent('${escapeHtml(x.pluginKey||'')}', true)">비활성 플러그인 ▶ 활성화</button>`;
-    const editPayload = jsonAttr({scope:"plugin", pluginKey:x.pluginKey, event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx, matcher:x.matcher||"", type:x.type||"command", command:x.command||"", timeout:x.timeout});
-    const delPayload = jsonAttr({scope:"plugin", pluginKey:x.pluginKey, event:x.event, groupIdx:x.groupIdx, subIdx:x.subIdx});
+      : `<button class="chip chip-warn text-[9px]" style="white-space:nowrap;" onclick="togglePluginFromAgent('${escapeHtml(x.pluginKey || '')}', true)">비활성 플러그인 ▶ 활성화</button>`;
+    const editPayload = jsonAttr({ scope: "plugin", pluginKey: x.pluginKey, event: x.event, groupIdx: x.groupIdx, subIdx: x.subIdx, matcher: x.matcher || "", type: x.type || "command", command: x.command || "", timeout: x.timeout });
+    const delPayload = jsonAttr({ scope: "plugin", pluginKey: x.pluginKey, event: x.event, groupIdx: x.groupIdx, subIdx: x.subIdx });
     return `
     <div class="rounded-lg p-3 text-xs border border-[var(--border)]" style="display:flex; align-items:flex-start; gap:0.75rem; background:rgba(217,119,87,0.06); min-width:0; max-width:100%; overflow:hidden;">
       <div style="flex:1 1 0; min-width:0; max-width:100%; overflow:hidden;">
         <div class="font-semibold text-sm mb-1 mono" style="overflow-wrap:anywhere;">${escapeHtml(_hookDisplayName(x))}</div>
         <div class="flex items-center gap-2 mb-1 flex-wrap">
           ${badge}
-          <span class="text-[10px] mono text-[var(--text-dim)] truncate" style="max-width:200px;">${escapeHtml(x.source||'')}</span>
+          <span class="text-[10px] mono text-[var(--text-dim)] truncate" style="max-width:200px;">${escapeHtml(x.source || '')}</span>
         </div>
-        ${x.description ? `<div class="text-[var(--text)] mb-1" style="overflow-wrap:anywhere;">${escapeHtml(x.description)}</div>`:''}
-        ${x.matcher ? `<div class="mb-1" style="overflow-wrap:anywhere;"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>`:''}
-        ${x.type ? `<div class="mb-1"><span class="text-[var(--text-dim)]">type:</span> <span class="mono">${escapeHtml(x.type)}</span></div>`:''}
-        ${x.command ? `<div class="mb-1"><div class="text-[var(--text-dim)] mb-1">cmd:</div><pre class="mono" style="display:block; box-sizing:border-box; width:100%; max-width:100%; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-height:200px; overflow-y:auto; overflow-x:hidden; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:6px; font-size:11px;">${escapeHtml(x.command)}</pre></div>`:''}
-        ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>`:''}
+        ${x.description ? `<div class="text-[var(--text)] mb-1" style="overflow-wrap:anywhere;">${escapeHtml(x.description)}</div>` : ''}
+        ${x.matcher ? `<div class="mb-1" style="overflow-wrap:anywhere;"><span class="text-[var(--text-dim)]">matcher:</span> <span class="mono">${escapeHtml(x.matcher)}</span></div>` : ''}
+        ${x.type ? `<div class="mb-1"><span class="text-[var(--text-dim)]">type:</span> <span class="mono">${escapeHtml(x.type)}</span></div>` : ''}
+        ${x.command ? `<div class="mb-1"><div class="text-[var(--text-dim)] mb-1">cmd:</div><pre class="mono" style="display:block; box-sizing:border-box; width:100%; max-width:100%; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; max-height:200px; overflow-y:auto; overflow-x:hidden; background:rgba(0,0,0,0.3); padding:6px 8px; border-radius:6px; font-size:11px;">${escapeHtml(x.command)}</pre></div>` : ''}
+        ${x.timeout ? `<div><span class="text-[var(--text-dim)]">timeout:</span> ${x.timeout}ms</div>` : ''}
       </div>
       <div class="flex flex-col gap-1 flex-shrink-0">
         <button class="btn text-[10px]" onclick="openHookDetail(this.dataset.detail)" data-detail="${jsonAttr(x)}">${t('🔬 상세')}</button>
@@ -15269,9 +15529,9 @@ VIEWS.hooks = async () => {
   const _hRiskRe = /\b(Edit|Write|Bash|MultiEdit|NotebookEdit)\b/;
   const isRisky = (h) => h.event === 'PreToolUse' && (h.matcher && _hRiskRe.test(h.matcher));
 
-  const q       = (state.data.hooksFilter || '').toLowerCase().trim();
-  const scopeF  = state.data.hooksScope  || 'all';   // all | user | plugin
-  const eventF  = state.data.hooksEvent  || '';      // '' | <event>
+  const q = (state.data.hooksFilter || '').toLowerCase().trim();
+  const scopeF = state.data.hooksScope || 'all';   // all | user | plugin
+  const eventF = state.data.hooksEvent || '';      // '' | <event>
   const riskOnly = !!state.data.hooksRiskOnly;
 
   const matches = (h) => {
@@ -15284,29 +15544,29 @@ VIEWS.hooks = async () => {
     return hay.includes(q);
   };
 
-  const userFiltered   = userFlat.filter(matches);
+  const userFiltered = userFlat.filter(matches);
   const pluginFiltered = pluginFlat.filter(matches);
-  const totalShown     = userFiltered.length + pluginFiltered.length;
-  const totalAll       = userFlat.length + pluginFlat.length;
+  const totalShown = userFiltered.length + pluginFiltered.length;
+  const totalAll = userFlat.length + pluginFlat.length;
   const riskCount = [...userFlat, ...pluginFlat].filter(isRisky).length;
 
   // wrap user/plugin renderers to add a 🚨 chip + danger background for risky entries.
   const _decorateRisk = (html, h) => isRisky(h)
     ? html.replace('class="rounded-lg', 'data-risk="1" class="rounded-lg')
-          .replace('">', `" style="border-color: rgba(239,68,68,0.45); box-shadow: 0 0 0 1px rgba(239,68,68,0.15);">`)
-          .replace('<div class="flex items-center gap-2 mb-1 flex-wrap">',
-                   `<div class="flex items-center gap-2 mb-1 flex-wrap"><span class="chip chip-warn text-[9px]" style="background:rgba(239,68,68,0.2);color:#fca5a5;white-space:nowrap;" title="${t('PreToolUse + Edit/Write/Bash 매처 — 작업이 막히는 원인일 가능성')}">🚨 ${t('위험')}</span>`)
+      .replace('">', `" style="border-color: rgba(239,68,68,0.45); box-shadow: 0 0 0 1px rgba(239,68,68,0.15);">`)
+      .replace('<div class="flex items-center gap-2 mb-1 flex-wrap">',
+        `<div class="flex items-center gap-2 mb-1 flex-wrap"><span class="chip chip-warn text-[9px]" style="background:rgba(239,68,68,0.2);color:#fca5a5;white-space:nowrap;" title="${t('PreToolUse + Edit/Write/Bash 매처 — 작업이 막히는 원인일 가능성')}">🚨 ${t('위험')}</span>`)
     : html;
 
   const eventChip = (ev) => {
     const c = orderedEvents.includes(ev) ? [...userFlat, ...pluginFlat].filter(h => h.event === ev).length : 0;
     const active = eventF === ev;
-    return `<button class="chip text-[10px] cursor-pointer" style="${active?'background:var(--accent);color:#fff;':''}"
-      onclick="state.data.hooksEvent='${active?'':escapeHtml(ev)}';renderView();">${escapeHtml(ev)} <span class="text-[9px] opacity-70">${c}</span></button>`;
+    return `<button class="chip text-[10px] cursor-pointer" style="${active ? 'background:var(--accent);color:#fff;' : ''}"
+      onclick="state.data.hooksEvent='${active ? '' : escapeHtml(ev)}';renderView();">${escapeHtml(ev)} <span class="text-[9px] opacity-70">${c}</span></button>`;
   };
 
   return `
-    ${_renderConfigScopeToggle({scope: cfgScope, cwd: cfgCwd, projects, label: t('훅 스코프')})}
+    ${_renderConfigScopeToggle({ scope: cfgScope, cwd: cfgCwd, projects, label: t('훅 스코프') })}
     ${inProject && projectHookSummary ? `
       <div class="card p-3 mb-3" style="background:rgba(125,211,252,0.08); border-color:rgba(125,211,252,0.3);">
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] mb-1.5 flex items-center gap-2">
@@ -15314,8 +15574,8 @@ VIEWS.hooks = async () => {
           <span class="text-[10px]" style="text-transform:none;letter-spacing:0;color:var(--text-mute);">${escapeHtml(projectHookSummary.cwd)}/.claude/</span>
         </div>
         <div class="text-xs text-[var(--text-mute)]">
-          <span class="mono">settings.json</span>: <b>${projectHookSummary.projectN}</b>${t('개')}${projectHookSummary.projectExists?'':' '+t('(파일 없음)')}
-          · <span class="mono">settings.local.json</span>: <b>${projectHookSummary.projectLocalN}</b>${t('개')}${projectHookSummary.projectLocalExists?'':' '+t('(파일 없음)')}
+          <span class="mono">settings.json</span>: <b>${projectHookSummary.projectN}</b>${t('개')}${projectHookSummary.projectExists ? '' : ' ' + t('(파일 없음)')}
+          · <span class="mono">settings.local.json</span>: <b>${projectHookSummary.projectLocalN}</b>${t('개')}${projectHookSummary.projectLocalExists ? '' : ' ' + t('(파일 없음)')}
           · <button class="btn text-[10px]" onclick="state.data.cfgScope='project';go('settings');">▶ ${t('Settings 탭에서 편집')}</button>
         </div>
         <div class="text-[10px] mt-1" style="color:var(--text-dim);">${t('아래 목록은 글로벌 + 플러그인 훅. 프로젝트 훅은 settings.json 의 hooks 키로 편집합니다.')}</div>
@@ -15324,10 +15584,10 @@ VIEWS.hooks = async () => {
     <div class="mb-4 flex items-center justify-between gap-2 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">${t('훅 (Hooks)')}</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1"><b>${t('활성(사용자 설정)')} ${counts.user||userFlat.length}${t('개')}</b> · ${t('플러그인 제공')} ${counts.pluginEnabled||0}/${counts.plugin||pluginFlat.length} (${t('별도')}) · ${allEvents.length}${t('개 이벤트')}${riskCount?` · <span style="color:#fca5a5;">🚨 ${t('위험')} ${riskCount}${t('개')}</span>`:''}</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1"><b>${t('활성(사용자 설정)')} ${counts.user || userFlat.length}${t('개')}</b> · ${t('플러그인 제공')} ${counts.pluginEnabled || 0}/${counts.plugin || pluginFlat.length} (${t('별도')}) · ${allEvents.length}${t('개 이벤트')}${riskCount ? ` · <span style="color:#fca5a5;">🚨 ${t('위험')} ${riskCount}${t('개')}</span>` : ''}</p>
       </div>
       <div class="flex gap-2">
-        ${riskCount ? `<button class="btn text-xs" style="background:rgba(239,68,68,0.18);color:#fca5a5;border:1px solid rgba(239,68,68,0.4);" onclick="_panicDisableRiskyHooks()" title="${t('PreToolUse + Edit/Write/Bash 매처를 가진 모든 훅을 한 번에 비활성화 (삭제)')}">🚨 ${t('위험 훅 일괄 비활성화')}</button>`:''}
+        ${riskCount ? `<button class="btn text-xs" style="background:rgba(239,68,68,0.18);color:#fca5a5;border:1px solid rgba(239,68,68,0.4);" onclick="_panicDisableRiskyHooks()" title="${t('PreToolUse + Edit/Write/Bash 매처를 가진 모든 훅을 한 번에 비활성화 (삭제)')}">🚨 ${t('위험 훅 일괄 비활성화')}</button>` : ''}
         <button class="btn text-xs" onclick="startFeatureRecommend('hooks')">🤖 AI 추천</button>
         <button class="btn text-xs" onclick="_openHookPresets()">📚 ${t('프리셋')}</button>
         <button class="btn-primary btn" onclick="openHookEditor()">＋ 새 훅 추가</button>
@@ -15356,12 +15616,12 @@ VIEWS.hooks = async () => {
       <div class="flex items-center gap-2 flex-wrap">
         <input id="hookSearch" class="input flex-1 min-w-[220px]" type="search" placeholder="${t('훅 검색 — 매처 / 명령 / 플러그인 / 설명')}…" value="${escapeHtml(q)}" />
         <div class="flex items-center gap-1">
-          ${['all','user','plugin'].map(sc => `<button class="chip text-[10px] cursor-pointer" style="${scopeF===sc?'background:var(--accent);color:#fff;':''}" onclick="state.data.hooksScope='${sc}';renderView();">${({all:t('전체'),user:t('사용자'),plugin:t('플러그인')})[sc]}</button>`).join('')}
+          ${['all', 'user', 'plugin'].map(sc => `<button class="chip text-[10px] cursor-pointer" style="${scopeF === sc ? 'background:var(--accent);color:#fff;' : ''}" onclick="state.data.hooksScope='${sc}';renderView();">${({ all: t('전체'), user: t('사용자'), plugin: t('플러그인') })[sc]}</button>`).join('')}
         </div>
         <label class="flex items-center gap-1 text-xs cursor-pointer" style="color:#fca5a5;">
-          <input type="checkbox" id="hooksRiskOnly" ${riskOnly?'checked':''}/> 🚨 ${t('위험 훅만')}
+          <input type="checkbox" id="hooksRiskOnly" ${riskOnly ? 'checked' : ''}/> 🚨 ${t('위험 훅만')}
         </label>
-        ${(q||eventF||scopeF!=='all'||riskOnly)?`<button class="btn text-[10px]" onclick="state.data.hooksFilter='';state.data.hooksEvent='';state.data.hooksScope='all';state.data.hooksRiskOnly=false;renderView();">✕ ${t('필터 초기화')}</button>`:''}
+        ${(q || eventF || scopeF !== 'all' || riskOnly) ? `<button class="btn text-[10px]" onclick="state.data.hooksFilter='';state.data.hooksEvent='';state.data.hooksScope='all';state.data.hooksRiskOnly=false;renderView();">✕ ${t('필터 초기화')}</button>` : ''}
         <span class="text-[10px] text-[var(--text-dim)]">${totalShown}/${totalAll} ${t('표시')}</span>
       </div>
       <div class="flex items-center gap-1 flex-wrap">
@@ -15371,10 +15631,10 @@ VIEWS.hooks = async () => {
     </div>
 
     ${totalShown ? orderedEvents.map(ev => {
-      const userGroup = userFiltered.filter(h => h.event === ev);
-      const pluginGroup = pluginFiltered.filter(h => h.event === ev);
-      if (!userGroup.length && !pluginGroup.length) return '';
-      return `
+    const userGroup = userFiltered.filter(h => h.event === ev);
+    const pluginGroup = pluginFiltered.filter(h => h.event === ev);
+    if (!userGroup.length && !pluginGroup.length) return '';
+    return `
       <div class="card p-4 mb-3">
         <div class="flex items-center justify-between mb-3">
           <div class="font-semibold text-sm flex items-center gap-2">
@@ -15387,9 +15647,9 @@ VIEWS.hooks = async () => {
           ${pluginGroup.map(h => _decorateRisk(renderPluginCard(h), h)).join('')}
         </div>
       </div>`;
-    }).join('') : (totalAll
-      ? `<div class="card empty">${t('필터에 매치되는 훅 없음')} — <button class="btn text-[10px]" onclick="state.data.hooksFilter='';state.data.hooksEvent='';state.data.hooksScope='all';state.data.hooksRiskOnly=false;renderView();">${t('필터 초기화')}</button></div>`
-      : `<div class="card empty">훅이 설정되지 않았습니다. 우측 상단 <b>＋ 새 훅 추가</b> 를 눌러 추가하세요.</div>`)}
+  }).join('') : (totalAll
+    ? `<div class="card empty">${t('필터에 매치되는 훅 없음')} — <button class="btn text-[10px]" onclick="state.data.hooksFilter='';state.data.hooksEvent='';state.data.hooksScope='all';state.data.hooksRiskOnly=false;renderView();">${t('필터 초기화')}</button></div>`
+    : `<div class="card empty">훅이 설정되지 않았습니다. 우측 상단 <b>＋ 새 훅 추가</b> 를 눌러 추가하세요.</div>`)}
   `;
 };
 
@@ -15410,8 +15670,8 @@ function _renderRecentBlocksPanel(data) {
       </div>
       <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));">
         ${items.map(rb => {
-          const dt = rb.lastSeen ? new Date(rb.lastSeen).toLocaleString() : '—';
-          return `<button class="rounded-lg p-2 text-left text-xs hover-lift" style="background:rgba(0,0,0,0.2); border:1px solid rgba(239,68,68,0.25); cursor:pointer;"
+    const dt = rb.lastSeen ? new Date(rb.lastSeen).toLocaleString() : '—';
+    return `<button class="rounded-lg p-2 text-left text-xs hover-lift" style="background:rgba(0,0,0,0.2); border:1px solid rgba(239,68,68,0.25); cursor:pointer;"
             data-hook-id="${escapeHtml(rb.id)}"
             onclick="_jumpToHookCard(this.dataset.hookId)">
             <div class="flex items-center justify-between gap-2 mb-1">
@@ -15420,7 +15680,7 @@ function _renderRecentBlocksPanel(data) {
             </div>
             <div class="mono truncate" style="font-size:0.78rem;color:var(--text);">${escapeHtml(rb.id)}</div>
           </button>`;
-        }).join('')}
+  }).join('')}
       </div>
     </div>`;
 }
@@ -15443,9 +15703,9 @@ AFTER.hooks = () => {
   if (!__hooksRecentBlocks && !__hooksRecentBlocksFetching) {
     __hooksRecentBlocksFetching = true;
     api('/api/hooks/recent-blocks')
-      .catch(() => ({items: [], totalEvents: 0, scanned: 0}))
+      .catch(() => ({ items: [], totalEvents: 0, scanned: 0 }))
       .then(data => {
-        __hooksRecentBlocks = data || {items: [], totalEvents: 0, scanned: 0};
+        __hooksRecentBlocks = data || { items: [], totalEvents: 0, scanned: 0 };
         __hooksRecentBlocksFetching = false;
         const host = document.getElementById('hooksRecentBlocksHost');
         if (host) host.innerHTML = _renderRecentBlocksPanel(__hooksRecentBlocks);
@@ -15501,7 +15761,7 @@ function _pulseHookCard() {
   const cards = document.querySelectorAll('.card .rounded-lg');
   if (cards.length !== 1) return;
   const c = cards[0];
-  c.scrollIntoView({behavior:'smooth', block:'center'});
+  c.scrollIntoView({ behavior: 'smooth', block: 'center' });
   c.style.transition = 'box-shadow 0.3s';
   const original = c.style.boxShadow;
   let pulses = 0;
@@ -15525,10 +15785,10 @@ function _decodeHookCommand(cmd) {
   // <hookId> <handler> <flags>".
   const m = cmd.match(/(?:require\(s\)["']?\s*)?node\s+(\S+)\s+([a-z]+(?::[a-z][a-z0-9_-]*)+)\s+(\S+)(?:\s+([^"]*))?/);
   if (m) {
-    out.runner  = m[1];
-    out.hookId  = m[2];
+    out.runner = m[1];
+    out.hookId = m[2];
     out.handler = m[3];
-    out.flags   = (m[4] || '').trim();
+    out.flags = (m[4] || '').trim();
     out.rawTail = m[0];
   }
   // Standalone hook id anywhere in the command (fallback for shell-only entries).
@@ -15551,12 +15811,12 @@ function openHookDetail(payloadJson) {
       <div class="flex items-center gap-2 flex-wrap text-[11px]">
         <span class="chip mono text-[10px]">${t('node')}</span>
         <span style="color:var(--text-dim);">→</span>
-        ${dec.runner ? `<span class="chip mono text-[10px]" title="${t('runner script')}">${escapeHtml(dec.runner)}</span>`:''}
-        ${dec.runner ? '<span style="color:var(--text-dim);">→</span>':''}
+        ${dec.runner ? `<span class="chip mono text-[10px]" title="${t('runner script')}">${escapeHtml(dec.runner)}</span>` : ''}
+        ${dec.runner ? '<span style="color:var(--text-dim);">→</span>' : ''}
         <span class="chip mono text-[10px]" style="background:rgba(59,130,246,0.2);color:#93c5fd;" title="${t('hook id')}">${escapeHtml(dec.hookId || '?')}</span>
-        ${dec.handler ? '<span style="color:var(--text-dim);">→</span>':''}
-        ${dec.handler ? `<span class="chip mono text-[10px]" title="${t('handler script')}">${escapeHtml(dec.handler)}</span>`:''}
-        ${dec.flags ? `<span class="chip mono text-[10px] ml-1" title="${t('flags')}">${escapeHtml(dec.flags)}</span>`:''}
+        ${dec.handler ? '<span style="color:var(--text-dim);">→</span>' : ''}
+        ${dec.handler ? `<span class="chip mono text-[10px]" title="${t('handler script')}">${escapeHtml(dec.handler)}</span>` : ''}
+        ${dec.flags ? `<span class="chip mono text-[10px] ml-1" title="${t('flags')}">${escapeHtml(dec.flags)}</span>` : ''}
       </div>
     </div>` : '';
 
@@ -15564,8 +15824,8 @@ function openHookDetail(payloadJson) {
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
       <div>
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">🔬 ${t('훅 상세')}</div>
-        <h2 class="text-lg font-bold mono">${escapeHtml(h.id || h.name || (h.event + ' · ' + (h.matcher||'-')))}</h2>
-        ${h.description ? `<div class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(h.description)}</div>`:''}
+        <h2 class="text-lg font-bold mono">${escapeHtml(h.id || h.name || (h.event + ' · ' + (h.matcher || '-')))}</h2>
+        ${h.description ? `<div class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(h.description)}</div>` : ''}
       </div>
       <button class="btn-ghost btn" onclick="closeModal()" aria-label="닫기">✕</button>
     </div>
@@ -15582,9 +15842,9 @@ function openHookDetail(payloadJson) {
       </div>
       ${h.command ? `
       <div class="mb-2 text-[10px] uppercase tracking-widest text-[var(--text-dim)]">${t('Full command (raw)')}</div>
-      <pre class="mono" style="max-height:300px;overflow-y:auto;background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(h.command)}</pre>`:''}
+      <pre class="mono" style="max-height:300px;overflow-y:auto;background:rgba(0,0,0,0.3);padding:10px;border-radius:8px;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(h.command)}</pre>` : ''}
     </div>
-  `, {wide: true});
+  `, { wide: true });
 }
 
 // v2.40.2 — Panic button. Walks every user + plugin hook entry whose matcher
@@ -15617,7 +15877,7 @@ async function _panicDisableRiskyHooks() {
       if (!newSettings.hooks.PreToolUse.length) delete newSettings.hooks.PreToolUse;
       if (userRemoved > 0) {
         await api('/api/settings', {
-          method: 'PUT', headers: {'Content-Type':'application/json'},
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newSettings),
         });
       }
@@ -15628,18 +15888,18 @@ async function _panicDisableRiskyHooks() {
   //    by descending (groupIdx, subIdx) so removing earlier entries doesn't
   //    shift later indices.
   const pluginTargets = targets.filter(h => h.scope === 'plugin');
-  pluginTargets.sort((a,b) => (b.groupIdx-a.groupIdx) || (b.subIdx-a.subIdx));
+  pluginTargets.sort((a, b) => (b.groupIdx - a.groupIdx) || (b.subIdx - a.subIdx));
   for (const h of pluginTargets) {
     try {
       const r = await api('/api/hooks/plugin/update', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ op:'delete', pluginKey: h.pluginKey, event: h.event, groupIdx: h.groupIdx, subIdx: h.subIdx }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'delete', pluginKey: h.pluginKey, event: h.event, groupIdx: h.groupIdx, subIdx: h.subIdx }),
       });
       if (r.ok) pluginRemoved++; else errs++;
     } catch (e) { errs++; console.warn('panic plugin-hook delete failed', e); }
   }
 
-  toast(t('위험 훅 비활성화 완료') + ` — ${t('사용자')} ${userRemoved} · ${t('플러그인')} ${pluginRemoved}` + (errs?` · ${t('실패')} ${errs}`:''), errs?'warn':'ok');
+  toast(t('위험 훅 비활성화 완료') + ` — ${t('사용자')} ${userRemoved} · ${t('플러그인')} ${pluginRemoved}` + (errs ? ` · ${t('실패')} ${errs}` : ''), errs ? 'warn' : 'ok');
   renderView();
 }
 
@@ -15754,38 +16014,38 @@ window._applyHookPreset = _applyHookPreset;
 function openHookEditor(existing) {
   const isEdit = !!existing;
   const isPlugin = isEdit && existing.scope === 'plugin';
-  const e = existing || { scope:'user', event: 'SessionStart', matcher: '', type: 'command', command: '', timeout: 5000 };
+  const e = existing || { scope: 'user', event: 'SessionStart', matcher: '', type: 'command', command: '', timeout: 5000 };
   const titlePrefix = isEdit ? (isPlugin ? '🔌 플러그인 훅 수정 — ' : '훅 수정 — ') : '새 훅 추가';
   showModal(`
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
-      <h2 class="font-semibold">${titlePrefix}${isPlugin ? escapeHtml(existing.pluginKey||'') : ''}</h2>
+      <h2 class="font-semibold">${titlePrefix}${isPlugin ? escapeHtml(existing.pluginKey || '') : ''}</h2>
       <button class="btn-ghost btn" onclick="closeModal()">✕</button>
     </div>
     <div class="p-5 space-y-3">
-      ${isPlugin ? `<div class="text-[11px] text-[var(--warn)] bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.25)] rounded p-2">⚠️ 플러그인의 hooks.json 을 직접 수정합니다. 플러그인 업데이트 시 변경이 덮어써질 수 있습니다.</div>`:''}
+      ${isPlugin ? `<div class="text-[11px] text-[var(--warn)] bg-[rgba(251,191,36,0.08)] border border-[rgba(251,191,36,0.25)] rounded p-2">⚠️ 플러그인의 hooks.json 을 직접 수정합니다. 플러그인 업데이트 시 변경이 덮어써질 수 있습니다.</div>` : ''}
       <div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">이벤트</div>
         <select id="hookEvent" class="input">
-          ${HOOK_EVENTS.map(ev => `<option value="${ev}" ${ev===e.event?'selected':''}>${ev}</option>`).join('')}
+          ${HOOK_EVENTS.map(ev => `<option value="${ev}" ${ev === e.event ? 'selected' : ''}>${ev}</option>`).join('')}
         </select>
       </div>
       <div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">matcher (선택 — PreToolUse/PostToolUse 에서 도구 이름 패턴)</div>
-        <input id="hookMatcher" class="input" value="${escapeHtml(e.matcher||'')}" placeholder="예: Bash|Edit" />
+        <input id="hookMatcher" class="input" value="${escapeHtml(e.matcher || '')}" placeholder="예: Bash|Edit" />
       </div>
       <div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">type</div>
         <select id="hookType" class="input">
-          <option value="command" ${e.type==='command'?'selected':''}>command (쉘 명령 실행)</option>
+          <option value="command" ${e.type === 'command' ? 'selected' : ''}>command (쉘 명령 실행)</option>
         </select>
       </div>
       <div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">command</div>
-        <textarea id="hookCommand" class="input mono" style="min-height:200px; font-size:12px;" placeholder="echo 'hook fired'">${escapeHtml(e.command||'')}</textarea>
+        <textarea id="hookCommand" class="input mono" style="min-height:200px; font-size:12px;" placeholder="echo 'hook fired'">${escapeHtml(e.command || '')}</textarea>
       </div>
       <div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">timeout (ms, 선택)</div>
-        <input id="hookTimeout" type="number" class="input" value="${e.timeout||''}" placeholder="예: 5000" />
+        <input id="hookTimeout" type="number" class="input" value="${e.timeout || ''}" placeholder="예: 5000" />
       </div>
     </div>
     <div class="p-4 border-t border-[var(--border)] flex justify-end gap-2">
@@ -15804,14 +16064,14 @@ function openHookEditor(existing) {
     if (!payload.command.trim()) { toast('command 를 입력하세요', 'warn'); return; }
     if (isPlugin) {
       const r = await api('/api/hooks/plugin/update', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pluginKey: existing.pluginKey, event: existing.event,
           groupIdx: existing.groupIdx, subIdx: existing.subIdx,
           op: 'update', payload,
         }),
       });
-      toast(r.ok ? '플러그인 훅 저장됨' : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
+      toast(r.ok ? '플러그인 훅 저장됨' : ('실패: ' + (r.error || 'unknown')), r.ok ? 'ok' : 'err');
       if (r.ok) closeModal();
     } else {
       await upsertHook(payload, existing);
@@ -15853,8 +16113,8 @@ async function upsertHook(payload, existing) {
     addHookEntry(s, payload, newSubEntry);
   }
 
-  const r = await api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(s) });
-  toast(r.ok ? '훅 저장됨' : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
+  const r = await api('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) });
+  toast(r.ok ? '훅 저장됨' : ('실패: ' + (r.error || 'unknown')), r.ok ? 'ok' : 'err');
   if (r.ok) { closeModal(); renderView(); }
 }
 
@@ -15871,7 +16131,7 @@ function addHookEntry(s, payload, newSubEntry) {
 }
 
 async function deleteHook(payload) {
-  const {scope, event, groupIdx, subIdx, pluginKey} = payload || {};
+  const { scope, event, groupIdx, subIdx, pluginKey } = payload || {};
   if (scope === 'plugin') {
     const ok = await confirmModal({
       title: t('플러그인 훅 삭제'),
@@ -15880,10 +16140,10 @@ async function deleteHook(payload) {
     });
     if (!ok) return;
     const r = await api('/api/hooks/plugin/update', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ pluginKey, event, groupIdx, subIdx, op:'delete' }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pluginKey, event, groupIdx, subIdx, op: 'delete' }),
     });
-    toast(r.ok ? t('플러그인 훅 삭제됨') : (t('실패')+': '+(r.error||'unknown')), r.ok?'ok':'err');
+    toast(r.ok ? t('플러그인 훅 삭제됨') : (t('실패') + ': ' + (r.error || 'unknown')), r.ok ? 'ok' : 'err');
     // v2.42.3 — re-render so the deleted hook actually disappears. Without
     // this the toast fires but the card stays on screen until the user
     // navigates away, making it look like delete didn't work.
@@ -15902,8 +16162,8 @@ async function deleteHook(payload) {
     s.hooks[event].splice(groupIdx, 1);
   }
   if (!s.hooks[event].length) delete s.hooks[event];
-  const r = await api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(s) });
-  toast(r.ok ? t('삭제됨') : (t('실패')+': '+(r.error||'unknown')), r.ok?'ok':'err');
+  const r = await api('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) });
+  toast(r.ok ? t('삭제됨') : (t('실패') + ': ' + (r.error || 'unknown')), r.ok ? 'ok' : 'err');
   if (r.ok) renderView();
 }
 
@@ -15925,14 +16185,14 @@ VIEWS.permissions = async () => {
         <button class="btn-primary btn text-xs" onclick="quickAddPerm('${kind}')">추가</button>
       </div>
       <div class="space-y-1 max-h-[520px] overflow-y-auto">
-        ${list.map((x,i) => {
-          const bad = issueRules.has(x);
-          return `
-          <div class="group flex items-center justify-between mono text-xs py-1 px-2 rounded hover:bg-white/5" style="${color} ${bad?'background:rgba(248,113,113,0.12); border:1px solid rgba(248,113,113,0.35);':''}">
-            <span class="truncate" title="${bad?'⚠️ Claude Code doctor 가 거부하는 패턴':''}">${bad?'⚠️ ':''}${escapeHtml(x)}</span>
+        ${list.map((x, i) => {
+    const bad = issueRules.has(x);
+    return `
+          <div class="group flex items-center justify-between mono text-xs py-1 px-2 rounded hover:bg-white/5" style="${color} ${bad ? 'background:rgba(248,113,113,0.12); border:1px solid rgba(248,113,113,0.35);' : ''}">
+            <span class="truncate" title="${bad ? '⚠️ Claude Code doctor 가 거부하는 패턴' : ''}">${bad ? '⚠️ ' : ''}${escapeHtml(x)}</span>
             <button class="btn-ghost btn text-[10px] opacity-0 group-hover:opacity-100" style="color:#fca5a5" onclick="removePermission('${kind}', ${i})">✕</button>
           </div>`;
-        }).join('') || `<div class="empty text-xs">비어있음</div>`}
+  }).join('') || `<div class="empty text-xs">비어있음</div>`}
       </div>
     </div>`;
   return `
@@ -15973,11 +16233,11 @@ VIEWS.permissions = async () => {
 async function autoFixPermissions() {
   const s = await api('/api/settings');
   // 서버의 put_settings 가 자동 교정해서 저장
-  const r = await api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(s) });
+  const r = await api('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) });
   if (r.ok) {
-    const n = (r.fixed||[]).length;
+    const n = (r.fixed || []).length;
     toast(n ? `✅ ${n}개 규칙 자동 교정됨` : '교정할 항목 없음', 'ok');
-  } else toast('실패: ' + (r.error||'unknown'), 'err');
+  } else toast('실패: ' + (r.error || 'unknown'), 'err');
 }
 
 async function quickAddPerm(kind) {
@@ -16008,8 +16268,8 @@ async function setPermAndSave(kind, op, value) {
   } else if (op === 'remove') {
     s.permissions[kind].splice(value, 1);
   }
-  const r = await api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(s) });
-  toast(r.ok ? '저장됨' : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
+  const r = await api('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) });
+  toast(r.ok ? '저장됨' : ('실패: ' + (r.error || 'unknown')), r.ok ? 'ok' : 'err');
   if (r.ok) renderView();
 }
 
@@ -16025,13 +16285,13 @@ VIEWS.mcp = async () => {
   state.data.mcpCatalog = cat.catalog;
   const q = (state.data.mcpFilter || '').toLowerCase();
   const filteredCat = cat.catalog.filter(x =>
-    !q || (x.name+' '+x.description+' '+x.id+' '+(x.category||'')).toLowerCase().includes(q)
+    !q || (x.name + ' ' + x.description + ' ' + x.id + ' ' + (x.category || '')).toLowerCase().includes(q)
   );
   return `
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">MCP 커넥터</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">Code 로컬 ${(conn.local||[]).length} · 플랫폼 ${(conn.platform||[]).length} · 플러그인 ${(conn.plugin||[]).length} · Desktop 앱 ${(conn.desktop||[]).length} · 프로젝트 ${(conn.project||[]).length} · 카탈로그 ${cat.catalog.length}개</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">Code 로컬 ${(conn.local || []).length} · 플랫폼 ${(conn.platform || []).length} · 플러그인 ${(conn.plugin || []).length} · Desktop 앱 ${(conn.desktop || []).length} · 프로젝트 ${(conn.project || []).length} · 카탈로그 ${cat.catalog.length}개</p>
       </div>
       <div class="flex gap-2">
         <button class="btn-primary btn text-xs" onclick="aiRecommendList('mcp')">🤖 AI 추천</button>
@@ -16073,7 +16333,7 @@ VIEWS.mcp = async () => {
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <h3 class="font-semibold text-sm">🔎 MCP 카탈로그 · 원클릭 설치</h3>
-        <input id="mcpQ" class="input max-w-[260px] text-xs" placeholder="검색: context7, github, search..." value="${escapeHtml(state.data.mcpFilter||'')}" />
+        <input id="mcpQ" class="input max-w-[260px] text-xs" placeholder="검색: context7, github, search..." value="${escapeHtml(state.data.mcpFilter || '')}" />
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
         ${filteredCat.map(m => `
@@ -16081,14 +16341,14 @@ VIEWS.mcp = async () => {
             <div class="flex items-center justify-between gap-2 mb-1">
               <div class="font-semibold text-sm truncate">${escapeHtml(m.name)}</div>
               ${m.installed
-                ? '<span class="chip chip-ok text-[10px]">설치됨</span>'
-                : `<button class="btn-primary btn text-[10px]" onclick="installMcp('${m.id}')">＋ 설치</button>`}
+      ? '<span class="chip chip-ok text-[10px]">설치됨</span>'
+      : `<button class="btn-primary btn text-[10px]" onclick="installMcp('${m.id}')">＋ 설치</button>`}
             </div>
-            <div class="text-[10px] mono text-[var(--text-dim)] mb-1">${escapeHtml(m.category||'')}</div>
-            <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(m.description||'—')}</div>
+            <div class="text-[10px] mono text-[var(--text-dim)] mb-1">${escapeHtml(m.category || '')}</div>
+            <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(m.description || '—')}</div>
             <details class="text-[10px] mt-2">
               <summary class="cursor-pointer text-[var(--text-dim)]">CLI 명령 보기</summary>
-              <pre class="mono bg-[var(--code-bg)] p-2 rounded mt-1 whitespace-pre-wrap break-all">${escapeHtml(m.cli||'')}</pre>
+              <pre class="mono bg-[var(--code-bg)] p-2 rounded mt-1 whitespace-pre-wrap break-all">${escapeHtml(m.cli || '')}</pre>
             </details>
           </div>`).join('') || '<div class="empty text-xs" style="grid-column:1/-1;">카탈로그 결과 없음</div>'}
       </div>
@@ -16114,7 +16374,7 @@ AFTER.mcp = () => {
 async function installMcp(id) {
   // 1) prepare — 필요한 env/값 조회
   const prep = await api('/api/mcp/install/prepare', {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id })
   });
   if (prep.error) { toast(errMsg(prep), 'err'); return; }
   const placeholders = prep.placeholders || [];
@@ -16131,10 +16391,10 @@ async function installMcp(id) {
     const isSecret = /TOKEN|KEY|SECRET|PASSWORD/i.test(p.key);
     return `
       <div>
-        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">${escapeHtml(p.key)} ${isSecret?'<span class="chip chip-warn text-[9px]">secret</span>':''}</div>
-        <input class="input mcp-ph-input" data-key="${escapeHtml(p.key)}" type="${isSecret?'password':'text'}" placeholder="${escapeHtml(example)}" />
+        <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">${escapeHtml(p.key)} ${isSecret ? '<span class="chip chip-warn text-[9px]">secret</span>' : ''}</div>
+        <input class="input mcp-ph-input" data-key="${escapeHtml(p.key)}" type="${isSecret ? 'password' : 'text'}" placeholder="${escapeHtml(example)}" />
         ${hint ? `<div class="text-[10px] text-[var(--text-dim)] mt-1">${escapeHtml(hint)}</div>` : ''}
-        <div class="text-[10px] text-[var(--text-mute)] mt-1 mono truncate">where: ${escapeHtml(p.where)} · 원본: ${escapeHtml(p.raw||'')}</div>
+        <div class="text-[10px] text-[var(--text-mute)] mt-1 mono truncate">where: ${escapeHtml(p.where)} · 원본: ${escapeHtml(p.raw || '')}</div>
       </div>`;
   }).join('');
 
@@ -16176,7 +16436,7 @@ async function installMcp(id) {
     const missing = placeholders.filter(p => !values[p.key]).map(p => p.key);
     if (missing.length) { toast('필수 값 누락: ' + missing.join(', '), 'warn'); return; }
     const r = await api('/api/mcp/install', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, as: asName, values }),
     });
     if (r.ok) {
@@ -16195,7 +16455,7 @@ async function removeMcp(name) {
     confirmLabel: t('제거'), danger: true,
   });
   if (!ok) return;
-  const r = await api('/api/mcp/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
+  const r = await api('/api/mcp/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
   if (r.ok) toast(`'${name}' 제거됨`, 'ok');
   else toast(errMsg(r), 'err');
 }
@@ -16208,7 +16468,7 @@ async function removeProjectMcp(cwd, name) {
   });
   if (!ok) return;
   const r = await api('/api/mcp/project/remove', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cwd, name }),
   });
   if (r.ok) toast(`'${name}' 제거됨 (${r.configPath})`, 'ok');
@@ -16229,7 +16489,7 @@ AFTER.mcp = () => {
       const label = status === 'ok' ? t('probe ok') : status === 'offline' ? t('probe 실패') : t('probe 미상');
       el.innerHTML = `<span class="chip ${cls} text-[9px]" title="${escapeHtml(note || '')}">${label}</span>`;
     });
-  }).catch(() => {});
+  }).catch(() => { });
 };
 function renderConnectorGroup(title, list, allowRemove) {
   const statusBadge = (m) => {
@@ -16246,21 +16506,21 @@ function renderConnectorGroup(title, list, allowRemove) {
           <div class="card p-3 hover-lift" style="overflow:hidden;">
             <div class="flex items-center justify-between mb-2 gap-2">
               <div class="flex items-center gap-2 min-w-0 flex-1">
-                <span class="pulse-dot ${m.connected===false?'off':''}"></span>
+                <span class="pulse-dot ${m.connected === false ? 'off' : ''}"></span>
                 <div class="font-semibold text-sm truncate" title="${escapeHtml(m.name)}">${escapeHtml(m.name)}</div>
               </div>
               <div class="flex items-center gap-1 flex-shrink-0">
                 ${statusBadge(m)}
                 <span class="mcp-health-chip" data-mcp-id="${escapeHtml(m.id || m.name)}"></span>
                 ${m.scope === 'project' && m.projectCwd
-                  ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeProjectMcp(JSON.parse(this.dataset.cwd), JSON.parse(this.dataset.name))" data-cwd="${jsonAttr(m.projectCwd)}" data-name="${jsonAttr(m.name)}">제거</button>`
-                  : (allowRemove ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeMcp(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr(m.name)}">제거</button>` : '')}
+      ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeProjectMcp(JSON.parse(this.dataset.cwd), JSON.parse(this.dataset.name))" data-cwd="${jsonAttr(m.projectCwd)}" data-name="${jsonAttr(m.name)}">제거</button>`
+      : (allowRemove ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick="removeMcp(JSON.parse(this.dataset.payload))" data-payload="${jsonAttr(m.name)}">제거</button>` : '')}
               </div>
             </div>
             ${m.endpoint ? `<div class="text-[10px] mono text-[var(--text-dim)] truncate" title="${escapeHtml(m.endpoint)}">${escapeHtml(m.endpoint)}</div>` : ''}
-            ${(m.type || m.command) ? `<div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(m.type||'')} · ${escapeHtml(m.command||'')}</div>`:''}
-            ${m.args && m.args.length ? `<div class="text-[10px] mono text-[var(--text-mute)] truncate mt-1">${escapeHtml(m.args.join(' '))}</div>`: ''}
-            ${m.missingEnv && m.missingEnv.length ? `<div class="text-[10px] mt-2 p-1.5 rounded" style="background:rgba(248,113,113,0.1); color:#fca5a5;">⚠️ 환경변수 누락: ${m.missingEnv.map(k=>`<code class="mono">${escapeHtml(k)}</code>`).join(', ')}</div>` : ''}
+            ${(m.type || m.command) ? `<div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(m.type || '')} · ${escapeHtml(m.command || '')}</div>` : ''}
+            ${m.args && m.args.length ? `<div class="text-[10px] mono text-[var(--text-mute)] truncate mt-1">${escapeHtml(m.args.join(' '))}</div>` : ''}
+            ${m.missingEnv && m.missingEnv.length ? `<div class="text-[10px] mt-2 p-1.5 rounded" style="background:rgba(248,113,113,0.1); color:#fca5a5;">⚠️ 환경변수 누락: ${m.missingEnv.map(k => `<code class="mono">${escapeHtml(k)}</code>`).join(', ')}</div>` : ''}
             ${m.projectCwd ? `<div class="text-[10px] text-[var(--text-dim)] mt-1 truncate">📁 ${escapeHtml(m.projectCwd)}</div>` : ''}
             ${m.description ? `<div class="text-[10px] text-[var(--text-mute)] mt-1 line-clamp-2">${escapeHtml(m.description)}</div>` : ''}
           </div>
@@ -16278,7 +16538,7 @@ VIEWS.plugins = async () => {
   const onlyEnabled = !!state.data.pluginOnlyEnabled;
 
   const filtered = browse.plugins.filter(p => {
-    if (q && !(p.name+' '+p.description+' '+(p.tags||[]).join(' ')+' '+p.marketplace).toLowerCase().includes(q)) return false;
+    if (q && !(p.name + ' ' + p.description + ' ' + (p.tags || []).join(' ') + ' ' + p.marketplace).toLowerCase().includes(q)) return false;
     if (selMkt && p.marketplace !== selMkt) return false;
     if (onlyEnabled && !p.enabled) return false;
     return true;
@@ -16286,7 +16546,7 @@ VIEWS.plugins = async () => {
 
   const enabledCount = browse.plugins.filter(p => p.enabled).length;
   const mktCounts = {};
-  browse.plugins.forEach(p => { mktCounts[p.marketplace] = (mktCounts[p.marketplace]||0)+1; });
+  browse.plugins.forEach(p => { mktCounts[p.marketplace] = (mktCounts[p.marketplace] || 0) + 1; });
 
   return `
     <div class="mb-4 flex items-center justify-between gap-2 flex-wrap">
@@ -16302,11 +16562,11 @@ VIEWS.plugins = async () => {
     </div>
 
     <div class="card p-3 mb-4 flex flex-wrap items-center gap-2">
-      <input id="pluginQ" class="input max-w-[260px] text-xs" placeholder="검색: kotlin, security, django..." value="${escapeHtml(state.data.pluginFilter||'')}" />
-      <button class="chip ${!selMkt?'chip-accent':''}" onclick="setPluginMkt('')">전체 ${browse.plugins.length}</button>
-      ${Object.entries(mktCounts).map(([m,n]) => `<button class="chip ${m===selMkt?'chip-accent':''}" onclick="setPluginMkt('${escapeHtml(m)}')">${escapeHtml(m)} ${n}</button>`).join('')}
+      <input id="pluginQ" class="input max-w-[260px] text-xs" placeholder="검색: kotlin, security, django..." value="${escapeHtml(state.data.pluginFilter || '')}" />
+      <button class="chip ${!selMkt ? 'chip-accent' : ''}" onclick="setPluginMkt('')">전체 ${browse.plugins.length}</button>
+      ${Object.entries(mktCounts).map(([m, n]) => `<button class="chip ${m === selMkt ? 'chip-accent' : ''}" onclick="setPluginMkt('${escapeHtml(m)}')">${escapeHtml(m)} ${n}</button>`).join('')}
       <label class="flex items-center gap-1 text-xs text-[var(--text-mute)] ml-auto">
-        <input type="checkbox" id="pluginOnlyEnabled" ${onlyEnabled?'checked':''}/> 활성만
+        <input type="checkbox" id="pluginOnlyEnabled" ${onlyEnabled ? 'checked' : ''}/> 활성만
       </label>
     </div>
 
@@ -16316,23 +16576,23 @@ VIEWS.plugins = async () => {
           <div class="flex items-start justify-between gap-2 mb-1">
             <div class="min-w-0 flex-1">
               <div class="font-semibold text-sm truncate">${escapeHtml(p.name)}</div>
-              <div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(p.marketplace)}${p.version?' · v'+escapeHtml(p.version):''}</div>
+              <div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(p.marketplace)}${p.version ? ' · v' + escapeHtml(p.version) : ''}</div>
             </div>
             <label class="switch inline-flex items-center cursor-pointer gap-1 text-xs">
-              <input type="checkbox" ${p.enabled?'checked':''} onchange="togglePlugin('${escapeHtml(p.id)}', this.checked)"/>
-              <span>${p.enabled?'활성':'비활성'}</span>
+              <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="togglePlugin('${escapeHtml(p.id)}', this.checked)"/>
+              <span>${p.enabled ? '활성' : '비활성'}</span>
             </label>
           </div>
           <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3.2em;">${escapeHtml(_localDesc(p) || '—')}</div>
           <div class="flex gap-1 flex-wrap mb-2">
-            ${(p.tags||[]).slice(0,4).map(t => `<span class="chip text-[9px]">${escapeHtml(t)}</span>`).join('')}
+            ${(p.tags || []).slice(0, 4).map(t => `<span class="chip text-[9px]">${escapeHtml(t)}</span>`).join('')}
           </div>
           <div class="text-[10px] text-[var(--text-dim)] flex gap-2">
-            ${p.counts.agents?`<span>🤝${p.counts.agents}</span>`:''}
-            ${p.counts.skills?`<span>✨${p.counts.skills}</span>`:''}
-            ${p.counts.commands?`<span>/${p.counts.commands}</span>`:''}
-            ${p.counts.hooks?`<span>🪝${p.counts.hooks}</span>`:''}
-            ${!p.installed?'<span class="ml-auto" style="color:#fbbf24">미설치 (CLI)</span>':''}
+            ${p.counts.agents ? `<span>🤝${p.counts.agents}</span>` : ''}
+            ${p.counts.skills ? `<span>✨${p.counts.skills}</span>` : ''}
+            ${p.counts.commands ? `<span>/${p.counts.commands}</span>` : ''}
+            ${p.counts.hooks ? `<span>🪝${p.counts.hooks}</span>` : ''}
+            ${!p.installed ? '<span class="ml-auto" style="color:#fbbf24">미설치 (CLI)</span>' : ''}
           </div>
         </div>`).join('') || `<div class="card empty" style="grid-column:1/-1;">필터 결과 없음</div>`}
     </div>
@@ -16357,8 +16617,8 @@ AFTER.plugins = () => {
 function setPluginMkt(m) { state.data.pluginMkt = m; renderView(); }
 
 async function togglePlugin(id, enable) {
-  const r = await api('/api/plugins/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, enable }) });
-  toast(r.ok ? (enable?'활성화됨':'비활성화됨') : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
+  const r = await api('/api/plugins/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, enable }) });
+  toast(r.ok ? (enable ? '활성화됨' : '비활성화됨') : ('실패: ' + (r.error || 'unknown')), r.ok ? 'ok' : 'err');
   if (r.ok) {
     // 현재 view 상태 유지하며 재렌더
     renderView();
@@ -16390,18 +16650,18 @@ VIEWS.settings = async () => {
     pathLabel = '~/.claude/settings.json';
   }
   // recommended profiles only apply to global scope.
-  let rec = {profiles: []};
+  let rec = { profiles: [] };
   if (!isProject) {
-    rec = await api('/api/guide/recommended-settings').catch(() => ({profiles: []}));
+    rec = await api('/api/guide/recommended-settings').catch(() => ({ profiles: [] }));
     window.__recProfiles = rec.profiles;
   }
   return `
-    ${_renderConfigScopeToggle({scope, cwd, projects, label: t('Settings 스코프')})}
+    ${_renderConfigScopeToggle({ scope, cwd, projects, label: t('Settings 스코프') })}
     ${isProject ? `
       <div class="card p-3 mb-3" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span class="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">${t('파일')}</span>
-        <button class="chip text-[11px] cursor-pointer" style="${settingsKind==='project'?'background:var(--accent);color:#fff;':''}" onclick="state.data.cfgSettingsKind='project';renderView();">settings.json <span class="text-[10px] opacity-70">${t('(커밋됨)')}</span></button>
-        <button class="chip text-[11px] cursor-pointer" style="${settingsKind==='project-local'?'background:var(--accent);color:#fff;':''}" onclick="state.data.cfgSettingsKind='project-local';renderView();">settings.local.json <span class="text-[10px] opacity-70">${t('(개인, gitignore)')}</span></button>
+        <button class="chip text-[11px] cursor-pointer" style="${settingsKind === 'project' ? 'background:var(--accent);color:#fff;' : ''}" onclick="state.data.cfgSettingsKind='project';renderView();">settings.json <span class="text-[10px] opacity-70">${t('(커밋됨)')}</span></button>
+        <button class="chip text-[11px] cursor-pointer" style="${settingsKind === 'project-local' ? 'background:var(--accent);color:#fff;' : ''}" onclick="state.data.cfgSettingsKind='project-local';renderView();">settings.local.json <span class="text-[10px] opacity-70">${t('(개인, gitignore)')}</span></button>
         ${!exists ? `<span class="chip chip-warn text-[10px]">${t('파일 없음 — 저장 시 생성됨')}</span>` : ''}
       </div>
     ` : ''}
@@ -16434,7 +16694,7 @@ VIEWS.settings = async () => {
         ` : `
           <div class="text-[11px] uppercase text-[var(--text-dim)]">${t('추천 프로파일')}</div>
           <div class="text-xs text-[var(--text-mute)]">${t('클릭 시 Auth 확인 → 변경 미리보기 → 적용까지 안내됩니다.')}</div>
-          ${(rec.profiles||[]).map((p,i) => `
+          ${(rec.profiles || []).map((p, i) => `
             <div class="card p-4 hover-lift cursor-pointer" onclick="startProfileFlow(${i})">
               <div class="flex items-center justify-between mb-1">
                 <div class="font-semibold text-sm">${escapeHtml(p.name)}</div>
@@ -16472,12 +16732,12 @@ async function saveSettings() {
   if (scope === 'project' && cwd) {
     const ep = kind === 'project-local' ? '/api/project/settings-local' : '/api/project/settings';
     r = await api(ep, {
-      method: 'PUT', headers: {'Content-Type':'application/json'},
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cwd, data: parsed }),
     });
   } else {
     r = await api('/api/settings', {
-      method: 'PUT', headers: {'Content-Type':'application/json'},
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(parsed),
     });
   }
@@ -16485,12 +16745,12 @@ async function saveSettings() {
 }
 function applyProfile(i) {
   // 구 버전 호환용 — editor에 직접 머지만 (저장 클릭 필요)
-  const prof = (window.__recProfiles||[])[i];
+  const prof = (window.__recProfiles || [])[i];
   if (!prof) return;
   const cur = document.getElementById('settingsEditor');
   try {
     const existing = JSON.parse(cur.value || '{}');
-    const merged = { ...existing, ...prof.settings, permissions: { ...(existing.permissions||{}), ...prof.settings.permissions } };
+    const merged = { ...existing, ...prof.settings, permissions: { ...(existing.permissions || {}), ...prof.settings.permissions } };
     cur.value = JSON.stringify(merged, null, 2);
     toast(`"${prof.name}" 프로파일 적용됨 — 저장을 눌러 반영`, 'info');
   } catch {
@@ -16500,7 +16760,7 @@ function applyProfile(i) {
 
 // ── 추천 프로파일 3단계 적용 플로우 ──
 async function startProfileFlow(i) {
-  const prof = (window.__recProfiles||[])[i];
+  const prof = (window.__recProfiles || [])[i];
   if (!prof) return;
 
   // 스텝 1: Auth 확인 화면 (로딩)
@@ -16521,7 +16781,7 @@ async function startProfileFlow(i) {
   try {
     [auth, preview] = await Promise.all([
       api('/api/auth/status'),
-      api('/api/settings/preview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ patch: prof.settings }) }),
+      api('/api/settings/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patch: prof.settings }) }),
     ]);
   } catch (e) {
     document.getElementById('profileFlowBody').innerHTML = `<div class="empty text-sm">불러오기 실패: ${escapeHtml(e.message)}</div>`;
@@ -16534,7 +16794,7 @@ async function startProfileFlow(i) {
          <div class="flex-1">
            <div class="text-xs uppercase tracking-widest text-[var(--text-dim)]">1. 계정 연결</div>
            <div class="font-semibold text-sm">${escapeHtml(auth.displayName) || _renderEmail(auth.email)} · ${escapeHtml(auth.planLabel)}</div>
-           <div class="text-xs text-[var(--text-mute)] mt-0.5">${_renderEmail(auth.email)} · 조직 역할: ${escapeHtml(auth.organizationRole||'—')}</div>
+           <div class="text-xs text-[var(--text-mute)] mt-0.5">${_renderEmail(auth.email)} · 조직 역할: ${escapeHtml(auth.organizationRole || '—')}</div>
          </div>
          <span class="chip chip-ok">연결됨</span>
        </div>`
@@ -16543,14 +16803,14 @@ async function startProfileFlow(i) {
          <div class="flex-1">
            <div class="text-xs uppercase tracking-widest text-[var(--text-dim)]">1. 계정 연결</div>
            <div class="font-semibold text-sm">연결되지 않음</div>
-           <div class="text-xs text-[var(--text-mute)] mt-0.5">${escapeHtml(auth.reason||'Claude에 로그인되지 않음')}</div>
+           <div class="text-xs text-[var(--text-mute)] mt-0.5">${escapeHtml(auth.reason || 'Claude에 로그인되지 않음')}</div>
            <div class="text-xs mt-2 mono">터미널에서 <code>claude login</code> 실행 후 다시 시도하세요.</div>
          </div>
        </div>`;
 
   const diff = preview.diff || {};
   const diffList = (arr, color) => arr.length
-    ? `<ul class="text-xs space-y-0.5 mono">${arr.map(x=>`<li style="color:${color}">+ ${escapeHtml(x)}</li>`).join('')}</ul>`
+    ? `<ul class="text-xs space-y-0.5 mono">${arr.map(x => `<li style="color:${color}">+ ${escapeHtml(x)}</li>`).join('')}</ul>`
     : '<div class="text-xs text-[var(--text-dim)]">없음</div>';
 
   const step2 = `
@@ -16566,7 +16826,7 @@ async function startProfileFlow(i) {
           ${diffList(diff.addedDeny, '#fca5a5')}
         </div>
       </div>
-      ${diff.topChanged.length ? `<div class="mt-3 text-xs"><span class="text-[var(--text-mute)]">다른 변경 키:</span> ${diff.topChanged.map(k=>`<code class="mono">${escapeHtml(k)}</code>`).join(', ')}</div>` : ''}
+      ${diff.topChanged.length ? `<div class="mt-3 text-xs"><span class="text-[var(--text-mute)]">다른 변경 키:</span> ${diff.topChanged.map(k => `<code class="mono">${escapeHtml(k)}</code>`).join(', ')}</div>` : ''}
       <details class="mt-4">
         <summary class="cursor-pointer text-xs text-[var(--text-mute)]">전체 병합 결과 보기 (raw JSON)</summary>
         <pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-3 rounded mt-2 max-h-[240px] overflow-y-auto">${escapeHtml(JSON.stringify(preview.merged, null, 2))}</pre>
@@ -16603,7 +16863,7 @@ async function startProfileFlow(i) {
           closeModal();
           renderView();
         } else {
-          toast('저장 실패: ' + (r.error||'알 수 없음'), 'err');
+          toast('저장 실패: ' + (r.error || '알 수 없음'), 'err');
           applyBtn.disabled = false;
           applyBtn.textContent = '💾 적용';
         }
@@ -16625,21 +16885,21 @@ async function startProfileFlow(i) {
 // tabs so they don't re-pick a project on every navigation.
 async function _ensureProjectsCache() {
   if (window.__cfgProjects) return window.__cfgProjects;
-  const r = await cachedApi('/api/projects', 30000).catch(() => ({projects: []}));
+  const r = await cachedApi('/api/projects', 30000).catch(() => ({ projects: [] }));
   window.__cfgProjects = (r.projects || []).filter(p => p.cwdResolved && p.path);
   return window.__cfgProjects;
 }
-function _renderConfigScopeToggle({scope, cwd, projects, label}) {
-  const opts = projects.map(p => `<option value="${escapeHtml(p.path)}" ${p.path===cwd?'selected':''}>${escapeHtml(p.name)} — ${escapeHtml(p.path)}</option>`).join('');
+function _renderConfigScopeToggle({ scope, cwd, projects, label }) {
+  const opts = projects.map(p => `<option value="${escapeHtml(p.path)}" ${p.path === cwd ? 'selected' : ''}>${escapeHtml(p.name)} — ${escapeHtml(p.path)}</option>`).join('');
   const noProjects = projects.length === 0;
   return `
     <div class="card p-3 mb-3" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <span class="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">${escapeHtml(label || t('스코프'))}</span>
       <div class="flex gap-1">
-        <button class="chip text-[11px] cursor-pointer" style="${scope==='global'?'background:var(--accent);color:#fff;':''}" onclick="setConfigScope('global')">🌐 ${t('글로벌')}</button>
-        <button class="chip text-[11px] cursor-pointer" style="${scope==='project'?'background:var(--accent);color:#fff;':''}" onclick="setConfigScope('project')" ${noProjects?'disabled':''}>📁 ${t('프로젝트')}</button>
+        <button class="chip text-[11px] cursor-pointer" style="${scope === 'global' ? 'background:var(--accent);color:#fff;' : ''}" onclick="setConfigScope('global')">🌐 ${t('글로벌')}</button>
+        <button class="chip text-[11px] cursor-pointer" style="${scope === 'project' ? 'background:var(--accent);color:#fff;' : ''}" onclick="setConfigScope('project')" ${noProjects ? 'disabled' : ''}>📁 ${t('프로젝트')}</button>
       </div>
-      ${scope==='project' ? `
+      ${scope === 'project' ? `
         <select class="input text-xs" style="min-width:280px;" onchange="setConfigScope('project', this.value)">
           ${noProjects ? `<option value="">${t('인덱스된 프로젝트 없음')}</option>` : opts}
         </select>
@@ -16673,11 +16933,11 @@ VIEWS.claudemd = async () => {
     ? t('이 프로젝트에서 작업할 때만 로드되는 지침.')
     : t('모든 세션에 로드되는 글로벌 지침.');
   return `
-    ${_renderConfigScopeToggle({scope, cwd, projects, label: t('CLAUDE.md 스코프')})}
+    ${_renderConfigScopeToggle({ scope, cwd, projects, label: t('CLAUDE.md 스코프') })}
     <div class="mb-4 flex items-center justify-between flex-wrap gap-2">
       <div>
         <h1 class="text-2xl font-bold">CLAUDE.md</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(pathLabel)} — ${blurb}${isEmpty?' <span class="chip chip-warn ml-2">'+t('파일 없음')+'</span>':''}</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(pathLabel)} — ${blurb}${isEmpty ? ' <span class="chip chip-warn ml-2">' + t('파일 없음') + '</span>' : ''}</p>
       </div>
       <div class="flex gap-2">
         ${isProject ? '' : '<button class="btn" onclick="startGlobalClaudeMdRecommend()">🤖 AI 에게 추천</button>'}
@@ -16697,7 +16957,7 @@ VIEWS.claudemd = async () => {
       </div>
       <div class="card p-5 overflow-y-auto" style="max-height: 620px;">
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('미리보기')}</div>
-        <div id="claudeMdPreview" class="prose-claude">${isEmpty ? '<div class="empty">'+t('소스가 비어있습니다')+'</div>' : marked.parse(raw)}</div>
+        <div id="claudeMdPreview" class="prose-claude">${isEmpty ? '<div class="empty">' + t('소스가 비어있습니다') + '</div>' : marked.parse(raw)}</div>
       </div>
     </div>
   `;
@@ -16706,20 +16966,20 @@ async function startGlobalClaudeMdRecommend() {
   showModalLoading(t('Claude 에게 초안 요청 중 (30~90초)…'));
   try {
     const r = await api('/api/global/claude-md-recommend', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ lang: _curLang }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: _curLang }),
     });
     if (r.error) { closeModal(); toast(errMsg(r), 'err'); return; }
     closeModal();
     openDiffApplyModal({
       title: '글로벌 CLAUDE.md 초안',
       relpath: '~/.claude/CLAUDE.md',
-      reason: `비용 $${(r.costInfo?.costUsd||0).toFixed(4)} · ${Math.round((r.costInfo?.durationMs||0)/1000)}초 소요. 좌측은 현재 파일, 우측은 AI 제안. 편집 후 원하는 쪽 저장.`,
+      reason: `비용 $${(r.costInfo?.costUsd || 0).toFixed(4)} · ${Math.round((r.costInfo?.durationMs || 0) / 1000)}초 소요. 좌측은 현재 파일, 우측은 AI 제안. 편집 후 원하는 쪽 저장.`,
       cwd: '',
       currentRaw: r.existing || '',
       proposedRaw: r.content || '',
       badge: '🤖 글로벌 CLAUDE.md 추천',
       saveFn: async (newRaw) => api('/api/claude-md', {
-        method:'PUT', headers:{'Content-Type':'application/json'},
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ raw: newRaw }),
       }),
     });
@@ -16738,13 +16998,13 @@ async function saveClaudeMd() {
   const cwd = state.data.cfgCwd || '';
   const r = (scope === 'project' && cwd)
     ? await api('/api/project/claude-md', {
-        method: 'PUT', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ cwd, raw }),
-      })
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd, raw }),
+    })
     : await api('/api/claude-md', {
-        method: 'PUT', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ raw }),
-      });
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw }),
+    });
   toast(r.ok ? t('저장됨') : (t('저장 실패') + (r.error ? ': ' + r.error : '')), r.ok ? 'ok' : 'err');
 }
 
@@ -16754,16 +17014,16 @@ async function saveClaudeMd() {
 VIEWS.projects = async () => {
   const [p, summary] = await Promise.all([cachedApi('/api/projects', 30000), cachedApi('/api/briefing/projects-summary', 30000)]);
   const summaryMap = {};
-  (summary.summaries||[]).forEach(s => { summaryMap[s.cwd] = s; });
+  (summary.summaries || []).forEach(s => { summaryMap[s.cwd] = s; });
   return `
     ${viewHeader('프로젝트', `${p.projects.length}개 인덱스 프로젝트. 카드를 클릭하면 실제 설정 스냅샷이 열립니다.`, 'projects')}
     <div class="grid-list">
       ${p.projects.map(pr => {
-        const cwd = pr.path || '';
-        const s = summaryMap[cwd] || {};
-        const canOpen = pr.cwdResolved && cwd;
-        return `
-          <div class="card p-4 hover-lift ${canOpen?'cursor-pointer':'opacity-60'}"
+    const cwd = pr.path || '';
+    const s = summaryMap[cwd] || {};
+    const canOpen = pr.cwdResolved && cwd;
+    return `
+          <div class="card p-4 hover-lift ${canOpen ? 'cursor-pointer' : 'opacity-60'}"
                onclick='${canOpen ? `openProjectDetail(${JSON.stringify(cwd)})` : `toast("실제 경로 확인 불가 — 재인덱스 해보세요","warn")`}'>
             <div class="flex items-center justify-between mb-1">
               <div class="font-semibold text-sm truncate">${escapeHtml(pr.name)}</div>
@@ -16773,19 +17033,19 @@ VIEWS.projects = async () => {
             <div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(cwd || pr.metaDir || '—')}</div>
             ${pr.slug !== pr.name ? `<div class="text-[9px] mono text-[var(--text-dim)] truncate">slug: ${escapeHtml(pr.slug)}</div>` : ''}
             <div class="text-[11px] text-[var(--text-mute)] mt-2 flex gap-2 flex-wrap">
-              <span>세션 ${pr.sessionCount||0}</span>
+              <span>세션 ${pr.sessionCount || 0}</span>
               ${s.lastActivity ? `<span>· 최근 ${fmtRel(s.lastActivity)}</span>` : ''}
             </div>
             <div class="flex gap-1 mt-3">
-              <button class="btn flex-1 justify-center text-xs" ${canOpen?'':'disabled style="opacity:0.4;cursor:not-allowed;"'}
+              <button class="btn flex-1 justify-center text-xs" ${canOpen ? '' : 'disabled style="opacity:0.4;cursor:not-allowed;"'}
                       onclick='event.stopPropagation();${canOpen ? `openProjectDetail(${JSON.stringify(cwd)})` : ''}'>📋 상세</button>
-              <button class="btn flex-1 justify-center text-xs" ${canOpen?'':'disabled style="opacity:0.4;cursor:not-allowed;"'}
+              <button class="btn flex-1 justify-center text-xs" ${canOpen ? '' : 'disabled style="opacity:0.4;cursor:not-allowed;"'}
                       onclick='event.stopPropagation();${canOpen ? `openFolder(${JSON.stringify(cwd)})` : ''}'>📂 폴더</button>
-              <button class="btn justify-center text-xs" title="${t('Ralph 추천 PROMPT.md 생성')}" ${canOpen?'':'disabled style="opacity:0.4;cursor:not-allowed;"'}
+              <button class="btn justify-center text-xs" title="${t('Ralph 추천 PROMPT.md 생성')}" ${canOpen ? '' : 'disabled style="opacity:0.4;cursor:not-allowed;"'}
                       onclick='event.stopPropagation();${canOpen ? `openRalphRecommend(${JSON.stringify(cwd)})` : ''}'>🦞</button>
             </div>
           </div>`;
-      }).join('') || `<div class="card empty" style="grid-column:1/-1;">프로젝트 없음</div>`}
+  }).join('') || `<div class="card empty" style="grid-column:1/-1;">프로젝트 없음</div>`}
     </div>
   `;
 };
@@ -16807,11 +17067,11 @@ async function openRalphRecommend(cwd) {
       <div class="text-[12px] font-semibold mb-2">🦞 ${t('Ralph 추천')} — ${escapeHtml(cwd)}</div>
       <div class="text-[10px] mb-2" style="color:var(--text-dim)">
         ${t('rationale')}: ${escapeHtml(rec.rationale || '')}
-        <span class="ml-2">CLAUDE.md ${sources.hasClaudeMd?'✓':'·'} · git ${sources.gitLogLines||0} commits · dirty ${sources.dirtyFiles||0} · TODOs ${sources.todoCount||0}</span>
+        <span class="ml-2">CLAUDE.md ${sources.hasClaudeMd ? '✓' : '·'} · git ${sources.gitLogLines || 0} commits · dirty ${sources.dirtyFiles || 0} · TODOs ${sources.todoCount || 0}</span>
       </div>
       <textarea id="ralphRecPrompt" rows="14" class="input text-xs" style="font-family:ui-monospace,monospace;">${escapeHtml(rec.promptMd || '')}</textarea>
       <div class="flex items-center gap-2 mt-3">
-        <label class="text-[11px]"><input type="checkbox" id="ralphRecPolish" ${state.data._ralphPolish?'checked':''} onclick="state.data._ralphPolish=this.checked;openRalphRecommend(${JSON.stringify(cwd).replace(/"/g,'&quot;')})"> ${t('LLM 다듬기')}</label>
+        <label class="text-[11px]"><input type="checkbox" id="ralphRecPolish" ${state.data._ralphPolish ? 'checked' : ''} onclick="state.data._ralphPolish=this.checked;openRalphRecommend(${JSON.stringify(cwd).replace(/"/g, '&quot;')})"> ${t('LLM 다듬기')}</label>
         <label class="text-[11px] flex-1">${t('Max iter')}
           <input id="ralphRecMax" type="number" value="25" min="1" max="200" class="input text-xs" style="width:72px;">
         </label>
@@ -16819,7 +17079,7 @@ async function openRalphRecommend(cwd) {
           <input id="ralphRecBudget" type="number" value="5" min="0.01" max="100" step="0.5" class="input text-xs" style="width:72px;">
         </label>
         <button class="chip text-[10px]" onclick="closeModal()">${t('취소')}</button>
-        <button class="chip text-[10px]" onclick="_ralphRecStart(${JSON.stringify(cwd).replace(/"/g,'&quot;')})">🚀 ${t('Ralph 시작')}</button>
+        <button class="chip text-[10px]" onclick="_ralphRecStart(${JSON.stringify(cwd).replace(/"/g, '&quot;')})">🚀 ${t('Ralph 시작')}</button>
       </div>
     `, { title: '' });
   } catch (e) {
@@ -16832,11 +17092,13 @@ async function _ralphRecStart(cwd) {
   const max = parseInt((document.getElementById('ralphRecMax') || {}).value || '25', 10);
   const budget = parseFloat((document.getElementById('ralphRecBudget') || {}).value || '5');
   if (!prompt.trim()) { toast(t('프롬프트가 비어 있음')); return; }
-  const r = await api('/api/ralph/start', { method: 'POST', body: {
-    prompt, maxIterations: max, budgetUsd: budget,
-    completion: (state.data._ralphRec && state.data._ralphRec.completion) || '<promise>DONE</promise>',
-    cwd: cwd,
-  }});
+  const r = await api('/api/ralph/start', {
+    method: 'POST', body: {
+      prompt, maxIterations: max, budgetUsd: budget,
+      completion: (state.data._ralphRec && state.data._ralphRec.completion) || '<promise>DONE</promise>',
+      cwd: cwd,
+    }
+  });
   closeModal();
   if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
   toast(`🦞 ${t('시작됨')}: ${r.runId}`);
@@ -16863,7 +17125,7 @@ function renderProjectAgentsSection(tb, cwd) {
   const slot = document.getElementById('projectAgentsSlot');
   if (!slot) return;
   const subs = tb.subagents || [];
-  const total = subs.reduce((a,b)=>a+b.n,0);
+  const total = subs.reduce((a, b) => a + b.n, 0);
   // 프로젝트에 정의된 에이전트 (.claude/agents/*.md) — 별도로 가져옴
   const definedAgents = (window.__projectDetailData && window.__projectDetailData.repo && window.__projectDetailData.repo.agents) || [];
   const definedHtml = definedAgents.length ? `
@@ -16871,9 +17133,9 @@ function renderProjectAgentsSection(tb, cwd) {
       <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)] mb-2">📂 프로젝트에 정의된 에이전트 (${definedAgents.length})</div>
       <div class="flex flex-wrap gap-1">
         ${definedAgents.map(a => {
-          const cnt = (subs.find(s => s.name === a.name) || {}).n || 0;
-          return `<span class="chip ${cnt>0?'chip-accent':''}" title="${escapeHtml(a.description||a.id||'')}">${escapeHtml(a.name)} ${cnt?`<span class="ml-1">×${cnt}</span>`:'<span class="ml-1 text-[var(--text-dim)]">미사용</span>'}</span>`;
-        }).join('')}
+    const cnt = (subs.find(s => s.name === a.name) || {}).n || 0;
+    return `<span class="chip ${cnt > 0 ? 'chip-accent' : ''}" title="${escapeHtml(a.description || a.id || '')}">${escapeHtml(a.name)} ${cnt ? `<span class="ml-1">×${cnt}</span>` : '<span class="ml-1 text-[var(--text-dim)]">미사용</span>'}</span>`;
+  }).join('')}
       </div>
     </div>` : '';
   if (!subs.length) {
@@ -16933,16 +17195,16 @@ function renderProjectDetail(d) {
     <div class="card p-3">
       <div class="flex justify-between mb-1 gap-2"><b class="text-sm truncate">${escapeHtml(a.name)}</b><span class="chip text-[10px]">${escapeHtml(a.model)}</span></div>
       <div class="text-[10px] mono text-[var(--text-dim)] mb-1 truncate">${escapeHtml(a.id)}</div>
-      <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(a.description||'—')}</div>
-      <div class="mt-1">${(a.tools||[]).slice(0,6).map(t=>`<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
+      <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(a.description || '—')}</div>
+      <div class="mt-1">${(a.tools || []).slice(0, 6).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
     </div>`).join('') : '<div class="text-xs text-[var(--text-dim)]">.claude/agents 비어있음</div>';
 
   const cmdsHtml = r.commands.length ? r.commands.map(c => `
-    <div class="card p-2 text-xs"><span class="mono">/${escapeHtml(c.name||c.id)}</span><div class="text-[var(--text-mute)] line-clamp-2 mt-0.5">${escapeHtml(c.description||'—')}</div></div>
+    <div class="card p-2 text-xs"><span class="mono">/${escapeHtml(c.name || c.id)}</span><div class="text-[var(--text-mute)] line-clamp-2 mt-0.5">${escapeHtml(c.description || '—')}</div></div>
   `).join('') : '<div class="text-xs text-[var(--text-dim)]">—</div>';
 
   const skillsHtml = r.skills.length ? r.skills.map(s => `
-    <div class="card p-2"><b class="text-sm">${escapeHtml(s.name)}</b><div class="text-xs text-[var(--text-mute)] line-clamp-2 mt-0.5">${escapeHtml(s.description||'—')}</div></div>
+    <div class="card p-2"><b class="text-sm">${escapeHtml(s.name)}</b><div class="text-xs text-[var(--text-mute)] line-clamp-2 mt-0.5">${escapeHtml(s.description || '—')}</div></div>
   `).join('') : '<div class="text-xs text-[var(--text-dim)]">—</div>';
 
   const hooksHtml = r.hooks.length ? r.hooks.map(h => `<div class="mono text-xs text-[var(--text-mute)]">${escapeHtml(h.name)}</div>`).join('') : '<div class="text-xs text-[var(--text-dim)]">—</div>';
@@ -16953,7 +17215,7 @@ function renderProjectDetail(d) {
 
   const cjEntryHtml = Object.keys(e).length
     ? `<div class="card p-3 text-xs space-y-1">
-        ${Object.entries(e).map(([k,v]) => `<div class="flex justify-between gap-2"><span class="text-[var(--text-mute)]">${k}</span><span class="mono truncate max-w-[240px]">${escapeHtml(JSON.stringify(v))}</span></div>`).join('')}
+        ${Object.entries(e).map(([k, v]) => `<div class="flex justify-between gap-2"><span class="text-[var(--text-mute)]">${k}</span><span class="mono truncate max-w-[240px]">${escapeHtml(JSON.stringify(v))}</span></div>`).join('')}
       </div>` : '<div class="text-xs text-[var(--text-dim)]">—</div>';
 
   const claudeMdHtml = r.claudeMd
@@ -16964,11 +17226,11 @@ function renderProjectDetail(d) {
     <table class="data">
       <thead><tr><th>점수</th><th>첫 요청</th><th class="text-right">도구</th><th class="text-right">에이전트</th><th class="text-right">오류</th><th class="text-right">시작</th></tr></thead>
       <tbody>
-        ${sessions.slice(0,20).map(s => `
+        ${sessions.slice(0, 20).map(s => `
           <tr class="link-row" onclick="closeModal();openSessionDetail('${s.session_id}')">
             <td><div class="inline-flex items-center justify-center w-9 h-7 rounded mono font-bold text-xs"
               style="background:${scoreColor(s.score)}22;color:${scoreColor(s.score)}">${s.score}</div></td>
-            <td class="text-xs max-w-[320px] truncate">${escapeHtml((s.first_user_prompt||'').slice(0,120)||'—')}</td>
+            <td class="text-xs max-w-[320px] truncate">${escapeHtml((s.first_user_prompt || '').slice(0, 120) || '—')}</td>
             <td class="text-right text-xs">${s.tool_use_count}</td>
             <td class="text-right text-xs">${s.agent_call_count || 0}</td>
             <td class="text-right text-xs">${s.error_count || 0}</td>
@@ -16995,12 +17257,12 @@ function renderProjectDetail(d) {
         <h2 class="text-xl font-bold truncate">${escapeHtml(d.name)}</h2>
         <div class="text-xs mono text-[var(--text-mute)] truncate mt-1">${escapeHtml(d.cwd)}</div>
         <div class="flex flex-wrap gap-2 mt-3">
-          <button class="chip cursor-pointer hover:brightness-125" style="background:${scoreColor(st.avgScore)}22; color:${scoreColor(st.avgScore)}" onclick="openScoreDetail({cwd: ${JSON.stringify(d.cwd).replace(/"/g,'&quot;')}})" title="점수 계산식 상세">★ 평균 ${st.avgScore}</button>
+          <button class="chip cursor-pointer hover:brightness-125" style="background:${scoreColor(st.avgScore)}22; color:${scoreColor(st.avgScore)}" onclick="openScoreDetail({cwd: ${JSON.stringify(d.cwd).replace(/"/g, '&quot;')}})" title="점수 계산식 상세">★ 평균 ${st.avgScore}</button>
           <button class="chip cursor-pointer hover:brightness-125" onclick="scrollToSessions()" title="세션 리스트로 스크롤">📊 세션 ${st.sessionCount}</button>
-          <button class="chip cursor-pointer hover:brightness-125" onclick='openToolBreakdown(${JSON.stringify(d.cwd).replace(/'/g,"&#39;")})' title="도구 사용 드릴다운">🛠 도구 ${st.totalTools}</button>
-          <span class="chip" title="프로젝트에 정의된 .claude/agents/*.md 파일 수">📂 정의 에이전트 ${(r.agents||[]).length}</span>
+          <button class="chip cursor-pointer hover:brightness-125" onclick='openToolBreakdown(${JSON.stringify(d.cwd).replace(/'/g, "&#39;")})' title="도구 사용 드릴다운">🛠 도구 ${st.totalTools}</button>
+          <span class="chip" title="프로젝트에 정의된 .claude/agents/*.md 파일 수">📂 정의 에이전트 ${(r.agents || []).length}</span>
           <button class="chip chip-accent cursor-pointer hover:brightness-125" onclick='openAgentBreakdown(${JSON.stringify(d.cwd)})' title="세션에서 Agent 도구로 위임된 총 횟수 (통계 탭 참고)">🤝 위임 호출 ${st.totalAgents}</button>
-          ${st.totalErrors ? `<span class="chip chip-err">❌ ${st.totalErrors}</span>`:''}
+          ${st.totalErrors ? `<span class="chip chip-err">❌ ${st.totalErrors}</span>` : ''}
           ${r.exists ? '<span class="chip chip-ok">.claude 존재</span>' : '<span class="chip">.claude 없음</span>'}
         </div>
         <div class="mt-3">
@@ -17028,9 +17290,9 @@ function renderProjectDetail(d) {
           ${section('🗂 ~/.claude.json 프로젝트 엔트리', cjEntryHtml)}
           ${section('🕒 세션 히스토리 (점수 포함)', sessionsHtml, sessions.length)}
           ${section('🤝 ' + t('최근 서브에이전트 활동'),
-            _renderSubagentActivity(d.subagentActivity || [], d.cwd),
-            (d.subagentActivity || []).length
-          )}
+    _renderSubagentActivity(d.subagentActivity || [], d.cwd),
+    (d.subagentActivity || []).length
+  )}
         </div>
       </div>
     </div>
@@ -17083,7 +17345,7 @@ function _renderSubagentActivity(activity, cwd) {
               <span class="chip text-[9px]" style="white-space:nowrap;">${escapeHtml(it.agent)}</span>
               <div class="flex-1 min-w-0">
                 <div class="text-[11px]" style="overflow-wrap:anywhere;color:var(--text);">${escapeHtml(it.inputSummary || '(no preview)')}</div>
-                <div class="text-[10px] text-[var(--text-dim)] mt-0.5">${escapeHtml(it.tool || '')} · ${(it.turnTokens||0).toLocaleString()} tok · ${fmtRel(it.ts)}${it.hadError ? ' · <span style="color:#fca5a5;">⚠ error</span>' : ''}</div>
+                <div class="text-[10px] text-[var(--text-dim)] mt-0.5">${escapeHtml(it.tool || '')} · ${(it.turnTokens || 0).toLocaleString()} tok · ${fmtRel(it.ts)}${it.hadError ? ' · <span style="color:#fca5a5;">⚠ error</span>' : ''}</div>
               </div>
             </div>
           `).join('')}
@@ -17099,11 +17361,11 @@ async function _spawnSubagentCli(cwd, sessionId) {
   if (!sessionId) return;
   try {
     const r = await api('/api/session/spawn', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, cwd: cwd || '' }),
     });
     if (r.ok) toast(t('Terminal 에서 세션 재개 중…'), 'ok');
-    else      toast(t('CLI 실행 실패: ') + (r.error || ''), 'err');
+    else toast(t('CLI 실행 실패: ') + (r.error || ''), 'err');
   } catch (e) {
     toast(t('CLI 실행 실패: ') + e.message, 'err');
   }
@@ -17136,7 +17398,7 @@ async function openToolBreakdown(cwd) {
         <div class="py-1.5 border-b border-[var(--border)]">
           <div class="flex justify-between items-center mb-1">
             <span class="mono text-xs truncate pr-2">${escapeHtml(t.tool)}</span>
-            <span class="mono text-xs font-bold">${t.n}${t.errors ? ` <span class="text-[var(--err)]">✖${t.errors}</span>`:''}</span>
+            <span class="mono text-xs font-bold">${t.n}${t.errors ? ` <span class="text-[var(--err)]">✖${t.errors}</span>` : ''}</span>
           </div>
           <div class="h-1 bg-white/5 rounded"><div style="width:${pct}%; height:100%; background:var(--grad); border-radius:inherit;"></div></div>
         </div>`;
@@ -17164,7 +17426,7 @@ async function openAgentBreakdown(cwd) {
   try {
     const d = await api('/api/project/tool-breakdown?cwd=' + encodeURIComponent(cwd));
     if (d.error) { closeModal(); toast(errMsg(d), 'err'); return; }
-    const total = d.subagents.reduce((a,b)=>a+b.n, 0);
+    const total = d.subagents.reduce((a, b) => a + b.n, 0);
     showModal(`
       <div class="p-5 border-b border-[var(--border)] flex justify-between items-start">
         <div>
@@ -17207,12 +17469,12 @@ async function startAiRecommend(cwd) {
   const started = Date.now();
   const tick = setInterval(() => {
     const p = document.getElementById('aiRecProgress');
-    if (p) p.textContent = `경과 ${Math.round((Date.now()-started)/1000)}초 · claude CLI 응답 대기…`;
+    if (p) p.textContent = `경과 ${Math.round((Date.now() - started) / 1000)}초 · claude CLI 응답 대기…`;
   }, 1000);
 
   try {
     const r = await api('/api/project/ai-recommend', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cwd, lang: _curLang })
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd, lang: _curLang })
     });
     clearInterval(tick);
     if (r.error) {
@@ -17221,7 +17483,7 @@ async function startAiRecommend(cwd) {
           <div class="card p-4" style="border-color: rgba(248,113,113,0.4);">
             <div class="font-semibold text-sm text-[var(--err)] mb-1">❌ AI 추천 실패</div>
             <div class="text-xs text-[var(--text-mute)]">${escapeHtml(r.error)}</div>
-            ${r.rawResponse ? `<details class="mt-2"><summary class="text-xs cursor-pointer">원본 응답 보기</summary><pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded mt-2 max-h-[260px] overflow-y-auto">${escapeHtml(r.rawResponse)}</pre></details>`:''}
+            ${r.rawResponse ? `<details class="mt-2"><summary class="text-xs cursor-pointer">원본 응답 보기</summary><pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded mt-2 max-h-[260px] overflow-y-auto">${escapeHtml(r.rawResponse)}</pre></details>` : ''}
             <button class="btn mt-3 text-xs" onclick='startAiRecommend(${JSON.stringify(cwd)})'>다시 시도</button>
           </div>
         </div>`;
@@ -17255,31 +17517,31 @@ function renderAiRecommendations(r, cwd) {
       <div class="flex items-center justify-between mb-3">
         <div class="font-semibold gradient-text">🤖 Claude 가 제안한 개선안 · ${recs.length}건</div>
         <div class="flex gap-2 items-center text-[11px] text-[var(--text-dim)]">
-          ${cost.costUsd != null ? `<span>비용 $${cost.costUsd.toFixed(4)}</span>`:''}
-          ${cost.durationMs ? `<span>· ${Math.round(cost.durationMs/1000)}s</span>`:''}
-          ${cost.model ? `<span>· ${escapeHtml(cost.model)}</span>`:''}
+          ${cost.costUsd != null ? `<span>비용 $${cost.costUsd.toFixed(4)}</span>` : ''}
+          ${cost.durationMs ? `<span>· ${Math.round(cost.durationMs / 1000)}s</span>` : ''}
+          ${cost.model ? `<span>· ${escapeHtml(cost.model)}</span>` : ''}
           <button class="btn text-xs" onclick='startAiRecommend(${JSON.stringify(cwd)})'>🔄 다시 받기</button>
         </div>
       </div>
       ${recs.length ? recs.map(rec => `
         <div class="card p-4 mb-2">
           <div class="flex items-start gap-3">
-            <div class="w-1 self-stretch rounded" style="background:${axisColor[rec.axis]||'#a78bfa'}"></div>
+            <div class="w-1 self-stretch rounded" style="background:${axisColor[rec.axis] || '#a78bfa'}"></div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap mb-1">
                 <span class="font-semibold text-sm">${escapeHtml(rec.title)}</span>
-                <span class="chip text-[10px]" style="color:${axisColor[rec.axis]||'#a78bfa'}">${escapeHtml(rec.axis||'')}</span>
-                <span class="chip chip-ok text-[10px]">${escapeHtml(rec.impact||'')}</span>
+                <span class="chip text-[10px]" style="color:${axisColor[rec.axis] || '#a78bfa'}">${escapeHtml(rec.axis || '')}</span>
+                <span class="chip chip-ok text-[10px]">${escapeHtml(rec.impact || '')}</span>
               </div>
-              <div class="text-[10px] mono text-[var(--text-dim)] mb-2 truncate">${escapeHtml(rec.relpath||'')}</div>
-              <div class="text-xs text-[var(--text-mute)] line-clamp-4 mb-2">${escapeHtml(rec.reason||'')}</div>
+              <div class="text-[10px] mono text-[var(--text-dim)] mb-2 truncate">${escapeHtml(rec.relpath || '')}</div>
+              <div class="text-xs text-[var(--text-mute)] line-clamp-4 mb-2">${escapeHtml(rec.reason || '')}</div>
               <details class="mb-2">
                 <summary class="text-[11px] cursor-pointer text-[var(--accent)]">제안된 내용 미리보기</summary>
-                <pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded mt-2 max-h-[200px] overflow-y-auto">${escapeHtml(rec.content||'')}</pre>
+                <pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded mt-2 max-h-[200px] overflow-y-auto">${escapeHtml(rec.content || '')}</pre>
               </details>
               <div class="flex gap-2">
                 <button class="btn-primary btn text-xs" onclick="openAiRecEditor('${escapeHtml(rec.id)}')">📝 편집 & 저장</button>
-                ${rec.mode === 'append-claude-md' ? `<button class="btn text-xs" onclick="appendAiRecClaudeMd('${escapeHtml(rec.id)}')">➕ CLAUDE.md 에 추가</button>`:''}
+                ${rec.mode === 'append-claude-md' ? `<button class="btn text-xs" onclick="appendAiRecClaudeMd('${escapeHtml(rec.id)}')">➕ CLAUDE.md 에 추가</button>` : ''}
               </div>
             </div>
           </div>
@@ -17307,15 +17569,15 @@ async function openAiRecEditor(recId) {
       // 프로젝트-로컬 파일 존재시 대략적으로: project/detail 에는 없으니 시도 생략, 빈값 표시
       currentRaw = '';
     }
-  } catch {}
+  } catch { }
 
   const saveFn = async (newRaw) => {
     if (isGlobal) {
-      let parsed; try { parsed = JSON.parse(newRaw); } catch (e) { return {ok:false, error: 'JSON: '+e.message}; }
-      return api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(parsed) });
+      let parsed; try { parsed = JSON.parse(newRaw); } catch (e) { return { ok: false, error: 'JSON: ' + e.message }; }
+      return api('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsed) });
     }
     return api('/api/project/file', {
-      method:'PUT', headers:{'Content-Type':'application/json'},
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cwd, relpath: rec.relpath, raw: newRaw }),
     });
   };
@@ -17341,9 +17603,9 @@ function openDiffApplyModal({ title, relpath, reason, cwd, currentRaw, proposedR
     <div class="p-5 border-b border-[var(--border)] flex items-start justify-between gap-3 flex-shrink-0">
       <div class="min-w-0 flex-1">
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${badge || '추천 비교 & 적용'}</div>
-        <h2 class="text-lg font-bold truncate">${escapeHtml(title||'')}</h2>
+        <h2 class="text-lg font-bold truncate">${escapeHtml(title || '')}</h2>
         <div class="flex items-center gap-2 mt-1 flex-wrap">
-          <span class="text-[11px] mono text-[var(--text-mute)] truncate">${escapeHtml(relpath||'')}</span>
+          <span class="text-[11px] mono text-[var(--text-mute)] truncate">${escapeHtml(relpath || '')}</span>
           ${hintEmpty}
         </div>
         ${reason ? `<div class="text-xs text-[var(--text-mute)] mt-2 line-clamp-2"><b>근거:</b> ${escapeHtml(reason)}</div>` : ''}
@@ -17360,18 +17622,18 @@ function openDiffApplyModal({ title, relpath, reason, cwd, currentRaw, proposedR
           <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">현재 (왼쪽)</div>
           <span class="chip text-[10px]">${isEmpty ? '비어있음' : (currentRaw.length + '자')}</span>
         </div>
-        <textarea id="diffLeftText" spellcheck="false" class="mono" style="flex:1 1 0; min-height:0; width:100%; padding:16px; border-radius:0; border:none; background:transparent; resize:none; color:var(--text); font-size:13px; line-height:1.55; outline:none;">${escapeHtml(currentRaw||'')}</textarea>
+        <textarea id="diffLeftText" spellcheck="false" class="mono" style="flex:1 1 0; min-height:0; width:100%; padding:16px; border-radius:0; border:none; background:transparent; resize:none; color:var(--text); font-size:13px; line-height:1.55; outline:none;">${escapeHtml(currentRaw || '')}</textarea>
       </div>
       <div class="flex flex-col" style="background: rgba(217,119,87,0.04); min-height:0; overflow:hidden;">
         <div class="px-4 py-2 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
           <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">제안 (오른쪽) · AI</div>
-          <span class="chip chip-accent text-[10px]">${(proposedRaw||'').length}자</span>
+          <span class="chip chip-accent text-[10px]">${(proposedRaw || '').length}자</span>
         </div>
-        <textarea id="diffRightText" spellcheck="false" class="mono" style="flex:1 1 0; min-height:0; width:100%; padding:16px; border-radius:0; border:none; background:transparent; resize:none; color:var(--text); font-size:13px; line-height:1.55; outline:none;">${escapeHtml(proposedRaw||'')}</textarea>
+        <textarea id="diffRightText" spellcheck="false" class="mono" style="flex:1 1 0; min-height:0; width:100%; padding:16px; border-radius:0; border:none; background:transparent; resize:none; color:var(--text); font-size:13px; line-height:1.55; outline:none;">${escapeHtml(proposedRaw || '')}</textarea>
       </div>
     </div>
     <div class="p-3 border-t border-[var(--border)] flex items-center justify-between text-[11px] text-[var(--text-dim)] flex-shrink-0 flex-wrap gap-2">
-      <div>저장 위치: <span class="mono">${relpath==='~/.claude/settings.json' ? relpath : escapeHtml((cwd||'')+'/'+(relpath||''))}</span></div>
+      <div>저장 위치: <span class="mono">${relpath === '~/.claude/settings.json' ? relpath : escapeHtml((cwd || '') + '/' + (relpath || ''))}</span></div>
       <div>양쪽 값을 자유롭게 편집한 뒤 어느 쪽을 저장할지 고르세요. · <kbd class="chip text-[9px]">Esc</kbd> 닫기</div>
     </div>
   `, { wide: true });
@@ -17380,9 +17642,9 @@ function openDiffApplyModal({ title, relpath, reason, cwd, currentRaw, proposedR
     const raw = (which === 'left' ? document.getElementById('diffLeftText') : document.getElementById('diffRightText')).value;
     try {
       const r = await saveFn(raw);
-      toast(r.ok ? `저장됨 (${which==='left'?'현재 값 유지':'제안 적용'})` : ('실패: '+(r.error||'unknown')), r.ok?'ok':'err');
+      toast(r.ok ? `저장됨 (${which === 'left' ? '현재 값 유지' : '제안 적용'})` : ('실패: ' + (r.error || 'unknown')), r.ok ? 'ok' : 'err');
       if (r.ok) { closeModal(); renderView(); }
-    } catch (e) { toast('실패: '+e.message, 'err'); }
+    } catch (e) { toast('실패: ' + e.message, 'err'); }
   };
   document.getElementById('diffUseLeftBtn').onclick = () => commit('left');
   document.getElementById('diffUseRightBtn').onclick = () => commit('right');
@@ -17397,16 +17659,16 @@ async function appendAiRecClaudeMd(recId) {
     const existing = (d.repo && d.repo.claudeMd) || '';
     const merged = (existing ? existing.replace(/\s+$/, '') : `# ${d.name}`) + '\n' + rec.content;
     const r = await api('/api/project/file', {
-      method:'PUT', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ cwd, relpath:'CLAUDE.md', raw: merged }),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd, relpath: 'CLAUDE.md', raw: merged }),
     });
-    toast(r.ok ? 'CLAUDE.md 갱신됨' : (r.error||'실패'), r.ok?'ok':'err');
-  } catch (e) { toast('실패: '+e.message, 'err'); }
+    toast(r.ok ? 'CLAUDE.md 갱신됨' : (r.error || '실패'), r.ok ? 'ok' : 'err');
+  } catch (e) { toast('실패: ' + e.message, 'err'); }
 }
 
 async function openFolder(path) {
-  const r = await api('/api/open-folder', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ folderPath: path }) });
-  toast(r.ok ? '폴더 열림' : (r.error||'실패'), r.ok ? 'ok' : 'err');
+  const r = await api('/api/open-folder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folderPath: path }) });
+  toast(r.ok ? '폴더 열림' : (r.error || '실패'), r.ok ? 'ok' : 'err');
 }
 // Y4 (v2.66.11) — inline mac-style terminal viewer. Replaces the previous
 // behaviour of spawning an OS-level Terminal app. Now we render the
@@ -17432,7 +17694,7 @@ async function openSessionTerminal(sessionId) {
 
   // Build conversation lines mac-terminal style.
   const lines = [];
-  lines.push(`<div class="mac-term-line meta">$ claude --resume ${sessionId.slice(0,8)}</div>`);
+  lines.push(`<div class="mac-term-line meta">$ claude --resume ${sessionId.slice(0, 8)}</div>`);
   if (cwd) lines.push(`<div class="mac-term-line meta">cwd: ${escapeHtml(cwd)}</div>`);
   if (startedAt) lines.push(`<div class="mac-term-line meta">started: ${escapeHtml(startedAt)}</div>`);
   lines.push(`<div class="mac-term-line meta">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>`);
@@ -17480,9 +17742,9 @@ async function openSessionTerminal(sessionId) {
   }, 80);
 }
 
-window._macTermSpawnReal = async function(sessionId) {
-  const r = await api('/api/open-session', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ sessionId }) });
-  toast(r.ok ? `${t('터미널 활성화')} (${r.app})` : (r.error||t('실패')), r.ok ? 'ok' : 'err');
+window._macTermSpawnReal = async function (sessionId) {
+  const r = await api('/api/open-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) });
+  toast(r.ok ? `${t('터미널 활성화')} (${r.app})` : (r.error || t('실패')), r.ok ? 'ok' : 'err');
 };
 
 // ────────────────────────────────────────────────────────────────
@@ -17499,7 +17761,7 @@ VIEWS.projectAgents = async () => {
     api('/api/project-agents/roles'),
     cwd ? api('/api/project-agents/list?cwd=' + encodeURIComponent(cwd)) : Promise.resolve({ agents: [], dirExists: false }),
     api('/api/subagent/model-choices'),
-    api('/api/hyper-agents/list').catch(() => ({items:[]})),
+    api('/api/hyper-agents/list').catch(() => ({ items: [] })),
   ]);
   window.__subModelChoices = modelRes.choices || [];
   const roles = rolesRes.roles || [];
@@ -17516,7 +17778,7 @@ VIEWS.projectAgents = async () => {
   window.__paRoles = roles;
   window.__paCwd = cwd;
 
-  const projectOptions = validProjects.map(p => `<option value="${escapeHtml(p.path)}" ${p.path===cwd?'selected':''}>${escapeHtml(p.name)} — ${escapeHtml(p.path)}</option>`).join('');
+  const projectOptions = validProjects.map(p => `<option value="${escapeHtml(p.path)}" ${p.path === cwd ? 'selected' : ''}>${escapeHtml(p.name)} — ${escapeHtml(p.path)}</option>`).join('');
 
   const modelBadgeColor = (m) => ({
     inherit: 'rgba(255,255,255,0.08)',
@@ -17529,7 +17791,7 @@ VIEWS.projectAgents = async () => {
     const hyperBtn = `<button class="btn text-[10px]"
         onclick='openHyperAgent(${JSON.stringify(a.id)}, ${JSON.stringify(cwd)})'
         title="${t('Hyper Agent — 자동 정교화 토글/설정')}"
-        style="${hyperOn?'background:rgba(244,114,182,0.28);color:#fff;':'background:rgba(244,114,182,0.12);'}">⚡ ${hyperOn?'ON':'Hyper'}</button>`;
+        style="${hyperOn ? 'background:rgba(244,114,182,0.28);color:#fff;' : 'background:rgba(244,114,182,0.12);'}">⚡ ${hyperOn ? 'ON' : 'Hyper'}</button>`;
     return `
     <div class="card p-4 hover-lift">
       <div class="flex items-start justify-between gap-2 mb-2">
@@ -17544,14 +17806,14 @@ VIEWS.projectAgents = async () => {
         </div>
       </div>
       <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3em;">${escapeHtml(a.description || '—')}</div>
-      <div class="mb-2">${(a.tools||[]).slice(0,6).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
+      <div class="mb-2">${(a.tools || []).slice(0, 6).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
       <div class="flex items-center gap-2 pt-2 border-t border-[var(--border)]">
         <span class="text-[10px] text-[var(--text-dim)]">모델</span>
         <select class="input text-[11px] flex-1 py-1"
                 style="background:${modelBadgeColor(a.model)};"
                 onchange="setSubagentModel('project','${escapeHtml(a.id)}', this.value, this.dataset.cwd)"
                 data-cwd="${escapeHtml(cwd)}">
-          ${(window.__subModelChoices || []).map(m => `<option value="${escapeHtml(m.id)}" ${a.model===m.id?'selected':''}>${escapeHtml(m.label)}</option>`).join('')}
+          ${(window.__subModelChoices || []).map(m => `<option value="${escapeHtml(m.id)}" ${a.model === m.id ? 'selected' : ''}>${escapeHtml(m.label)}</option>`).join('')}
         </select>
       </div>
     </div>`;
@@ -17569,7 +17831,7 @@ VIEWS.projectAgents = async () => {
           ${already ? '<span class="chip chip-ok text-[10px]">설치됨</span>' : '<span class="chip text-[10px]">+ 추가</span>'}
         </div>
         <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3.2em;">${escapeHtml(r.summary)}</div>
-        <div>${(r.tools||[]).slice(0,5).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
+        <div>${(r.tools || []).slice(0, 5).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
       </div>`;
   }).join('');
 
@@ -17653,7 +17915,7 @@ async function paRefreshViz() {
   });
   container.style.cursor = 'pointer';
   net.once('stabilizationIterationsDone', () => {
-    try { net.setOptions({ physics: { enabled: false } }); net.fit({ animation: false }); } catch {}
+    try { net.setOptions({ physics: { enabled: false } }); net.fit({ animation: false }); } catch { }
   });
   const handlePa = (id) => {
     if (id === '__claude') return;
@@ -17675,7 +17937,7 @@ function paOpenRolePreview(roleId) {
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">역할 프리셋</div>
         <h2 class="text-lg font-bold">${role.icon} ${escapeHtml(role.label)}</h2>
         <div class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(role.summary)}</div>
-        <div class="mt-2">${(role.tools||[]).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
+        <div class="mt-2">${(role.tools || []).map(t => `<span class="tag-tool">${escapeHtml(t)}</span>`).join('')}</div>
       </div>
       <button class="btn-ghost btn" onclick="closeModal()">✕</button>
     </div>
@@ -17704,7 +17966,7 @@ function paOpenRolePreview(roleId) {
     const desc = document.getElementById('paDescInput').value;
     const overwrite = document.getElementById('paOverwrite').checked;
     const r = await api('/api/project-agents/add', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cwd, roleId: role.id, name, description: desc, overwrite }),
     });
     if (r.ok) { toast(`'${r.name}' 설치됨`, 'ok'); closeModal(); renderView(); }
@@ -17721,7 +17983,7 @@ async function paEdit(name) {
     title: `프로젝트 에이전트 편집 — ${ag.name}`,
     raw: ag.raw,
     save: async (v) => api('/api/project-agents/save', {
-      method:'PUT', headers:{'Content-Type':'application/json'},
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cwd, name: ag.id, raw: v })
     }),
   });
@@ -17735,7 +17997,7 @@ async function paDelete(name) {
   if (!ok) return;
   const cwd = window.__paCwd || '';
   const r = await api('/api/project-agents/delete', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cwd, name }),
   });
   if (r.ok) { toast('삭제됨', 'ok'); renderView(); }
@@ -17747,17 +18009,17 @@ async function setSubagentModel(scope, agentId, model, cwd) {
   if (scope === 'project') payload.cwd = cwd || window.__paCwd || '';
   try {
     const r = await api('/api/subagent/set-model', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     });
     if (r.ok) { toast(`모델을 '${model}' 로 변경`, 'ok'); renderView(); }
     else toast(errMsg(r), 'err');
-  } catch (e) { toast('실패: '+e.message, 'err'); }
+  } catch (e) { toast('실패: ' + e.message, 'err'); }
 }
 
 // project-agents/save 는 PUT 으로 받도록 라우트가 있으면 좋지만 서버는 POST 로 처리
 // 위 paEdit 호출은 POST 로 변환
 async function __paSavePut(body) {
-  return api('/api/project-agents/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  return api('/api/project-agents/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -17784,7 +18046,7 @@ async function openScoreDetail(keyOrObj) {
 function renderScoreDetail(d) {
   const total = d.totalAvg;
   const totalColor = scoreColor(total);
-  const axes = ['engagement','productivity','delegation','diversity','reliability'];
+  const axes = ['engagement', 'productivity', 'delegation', 'diversity', 'reliability'];
 
   const axisRow = k => {
     const f = d.formula[k];
@@ -17816,7 +18078,7 @@ function renderScoreDetail(d) {
   };
 
   const recById = {};
-  (d.recommendations||[]).forEach(r => { recById[r.id] = r; });
+  (d.recommendations || []).forEach(r => { recById[r.id] = r; });
   window.__scoreRecs = recById;
   window.__scoreCwd = d.cwd;
 
@@ -17825,42 +18087,42 @@ function renderScoreDetail(d) {
     diversity: '#fb923c', reliability: '#4ade80',
   };
 
-  const recsHtml = (d.recommendations||[]).map(r => `
+  const recsHtml = (d.recommendations || []).map(r => `
     <div class="card p-4 mb-3">
       <div class="flex items-start gap-3">
-        <div class="w-1 self-stretch rounded" style="background:${axisColor[r.axis]||'#a78bfa'}"></div>
+        <div class="w-1 self-stretch rounded" style="background:${axisColor[r.axis] || '#a78bfa'}"></div>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap mb-1">
             <span class="font-semibold text-sm">${escapeHtml(r.title)}</span>
-            <span class="chip text-[10px]" style="color:${axisColor[r.axis]||'#a78bfa'}">${r.axis}</span>
+            <span class="chip text-[10px]" style="color:${axisColor[r.axis] || '#a78bfa'}">${r.axis}</span>
             <span class="chip chip-ok text-[10px]">${escapeHtml(r.impact)}</span>
           </div>
           <div class="text-[10px] mono text-[var(--text-dim)] mb-2 truncate">${escapeHtml(r.relpath)}</div>
           <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2">${escapeHtml(r.reason)}</div>
           <div class="flex gap-2 flex-wrap">
             ${r.mode === 'manual'
-              ? `<span class="text-xs text-[var(--text-dim)]">📌 수동 단계</span>`
-              : `<button class="btn text-xs" onclick="openRecEditor('${escapeHtml(r.id)}')">📝 파일 편집</button>`}
+      ? `<span class="text-xs text-[var(--text-dim)]">📌 수동 단계</span>`
+      : `<button class="btn text-xs" onclick="openRecEditor('${escapeHtml(r.id)}')">📝 파일 편집</button>`}
             ${r.mode === 'append-claude-md'
-              ? `<button class="btn text-xs" onclick="appendToClaudeMd('${escapeHtml(r.id)}')">➕ CLAUDE.md 에 추가</button>`
-              : ''}
+      ? `<button class="btn text-xs" onclick="appendToClaudeMd('${escapeHtml(r.id)}')">➕ CLAUDE.md 에 추가</button>`
+      : ''}
           </div>
         </div>
       </div>
     </div>`).join('');
 
-  const bestSess = (d.best||[]).map(s => `
+  const bestSess = (d.best || []).map(s => `
     <tr class="link-row" onclick="closeModal();openSessionDetail('${s.session_id}')">
       <td><span class="chip" style="background:${scoreColor(s.score)}22;color:${scoreColor(s.score)}">★ ${s.score}</span></td>
-      <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt||'').slice(0,100))}</td>
+      <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt || '').slice(0, 100))}</td>
       <td class="text-right text-xs">${s.tool_use_count}</td>
       <td class="text-right text-xs">${s.agent_call_count || 0}</td>
     </tr>`).join('');
 
-  const worstSess = (d.worst||[]).map(s => `
+  const worstSess = (d.worst || []).map(s => `
     <tr class="link-row" onclick="closeModal();openSessionDetail('${s.session_id}')">
       <td><span class="chip" style="background:${scoreColor(s.score)}22;color:${scoreColor(s.score)}">★ ${s.score}</span></td>
-      <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt||'').slice(0,100))}</td>
+      <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt || '').slice(0, 100))}</td>
       <td class="text-right text-xs">${s.tool_use_count}</td>
       <td class="text-right text-xs">${s.agent_call_count || 0}</td>
     </tr>`).join('');
@@ -17880,11 +18142,11 @@ function renderScoreDetail(d) {
         <h2 class="text-lg font-bold truncate">${escapeHtml(d.projectDir || d.cwd)}</h2>
         <div class="text-xs text-[var(--text-mute)] mt-1">총 ${d.sessionCount}개 세션의 5축 평균 · 각 세션은 max 100</div>
         <div class="flex flex-wrap gap-2 mt-2 text-[11px]">
-          <span class="chip ${repoStatus.claudeMd?'chip-ok':''}">CLAUDE.md ${repoStatus.claudeMd?'✓':'✗'}</span>
+          <span class="chip ${repoStatus.claudeMd ? 'chip-ok' : ''}">CLAUDE.md ${repoStatus.claudeMd ? '✓' : '✗'}</span>
           <span class="chip">에이전트 ${repoStatus.agents}</span>
           <span class="chip">스킬 ${repoStatus.skills}</span>
           <span class="chip">명령 ${repoStatus.commands}</span>
-          <span class="chip ${repoStatus.settingsLocal?'chip-ok':''}">settings.local ${repoStatus.settingsLocal?'✓':'✗'}</span>
+          <span class="chip ${repoStatus.settingsLocal ? 'chip-ok' : ''}">settings.local ${repoStatus.settingsLocal ? '✓' : '✗'}</span>
         </div>
       </div>
       <button class="btn-ghost btn" onclick="closeModal()">✕</button>
@@ -17901,10 +18163,10 @@ function renderScoreDetail(d) {
         </div>
       </div>
       <div>
-        <div class="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-3">🛠 파일별 개선 추천 (${(d.recommendations||[]).length})</div>
-        ${(d.recommendations||[]).length ? recsHtml : '<div class="empty card">이미 권장 설정이 갖춰져 있습니다. 🎉</div>'}
+        <div class="text-xs uppercase tracking-widest text-[var(--text-dim)] mb-3">🛠 파일별 개선 추천 (${(d.recommendations || []).length})</div>
+        ${(d.recommendations || []).length ? recsHtml : '<div class="empty card">이미 권장 설정이 갖춰져 있습니다. 🎉</div>'}
         <div class="card p-3 text-[11px] text-[var(--text-dim)] mt-2">
-          각 추천은 프로젝트 루트(<span class="mono">${escapeHtml(d.cwd||'(cwd 미확인)')}</span>) 하위 <span class="mono">.claude/…</span> 또는 <span class="mono">CLAUDE.md</span>, 혹은 전역 <span class="mono">~/.claude/settings.json</span> 만 편집 가능 (안전장치).
+          각 추천은 프로젝트 루트(<span class="mono">${escapeHtml(d.cwd || '(cwd 미확인)')}</span>) 하위 <span class="mono">.claude/…</span> 또는 <span class="mono">CLAUDE.md</span>, 혹은 전역 <span class="mono">~/.claude/settings.json</span> 만 편집 가능 (안전장치).
         </div>
       </div>
     </div>
@@ -17921,14 +18183,14 @@ function openRecEditor(recId) {
     if (isGlobal) {
       let parsed;
       try { parsed = JSON.parse(newRaw); }
-      catch (e) { return { ok:false, error: 'JSON: '+e.message }; }
+      catch (e) { return { ok: false, error: 'JSON: ' + e.message }; }
       return api('/api/settings', {
-        method: 'PUT', headers: {'Content-Type':'application/json'},
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed),
       });
     }
     return api('/api/project/file', {
-      method: 'PUT', headers: {'Content-Type':'application/json'},
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cwd, relpath: rec.relpath, raw: newRaw }),
     });
   };
@@ -17938,7 +18200,7 @@ function openRecEditor(recId) {
       <div class="min-w-0">
         <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">추천 편집</div>
         <h2 class="text-lg font-bold truncate">${escapeHtml(rec.title)}</h2>
-        <div class="text-[11px] mono text-[var(--text-mute)] truncate">${escapeHtml(rec.relpath)} · ${escapeHtml(rec.mode||'')} · 예상 ${escapeHtml(rec.impact)}</div>
+        <div class="text-[11px] mono text-[var(--text-mute)] truncate">${escapeHtml(rec.relpath)} · ${escapeHtml(rec.mode || '')} · 예상 ${escapeHtml(rec.impact)}</div>
       </div>
       <div class="flex gap-2">
         <button class="btn-primary btn" id="recSaveBtn">💾 이 내용으로 저장</button>
@@ -17947,7 +18209,7 @@ function openRecEditor(recId) {
     </div>
     <div class="p-5 flex-1 overflow-y-auto">
       <div class="card p-3 text-xs text-[var(--text-mute)] mb-3"><b>왜 필요한가:</b> ${escapeHtml(rec.reason)}</div>
-      <textarea id="recEditor" class="input" style="min-height: 480px;">${escapeHtml(rec.content||'')}</textarea>
+      <textarea id="recEditor" class="input" style="min-height: 480px;">${escapeHtml(rec.content || '')}</textarea>
       <div class="text-[11px] text-[var(--text-dim)] mt-2">
         저장 위치: ${isGlobal ? '<span class="mono">~/.claude/settings.json</span>' : `<span class="mono">${escapeHtml(cwd)}/${escapeHtml(rec.relpath)}</span>`}
       </div>
@@ -17962,7 +18224,7 @@ function openRecEditor(recId) {
         toast('저장됨 — 다음 세션부터 적용', 'ok');
         closeModal();
       } else {
-        toast('저장 실패: ' + (r.error||'알 수 없음'), 'err');
+        toast('저장 실패: ' + (r.error || '알 수 없음'), 'err');
       }
     } catch (e) {
       toast('실패: ' + e.message, 'err');
@@ -17984,10 +18246,10 @@ async function appendToClaudeMd(recId) {
     }
     const merged = (existing ? existing.replace(/\s+$/, '') : `# ${d.name}`) + '\n' + rec.content;
     const r = await api('/api/project/file', {
-      method: 'PUT', headers: {'Content-Type':'application/json'},
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cwd, relpath: 'CLAUDE.md', raw: merged }),
     });
-    toast(r.ok ? 'CLAUDE.md 갱신됨' : (r.error||'실패'), r.ok?'ok':'err');
+    toast(r.ok ? 'CLAUDE.md 갱신됨' : (r.error || '실패'), r.ok ? 'ok' : 'err');
   } catch (e) {
     toast('실패: ' + e.message, 'err');
   }
@@ -17997,12 +18259,12 @@ async function appendToClaudeMd(recId) {
 // AI PROVIDERS — 멀티 AI 프로바이더 설정
 // ────────────────────────────────────────────────────────────────
 // providerId(claude-cli, ollama, gemini-cli, codex) → cli_tools 카탈로그 키
-const _CLI_TOOL_MAP = { 'claude-cli':'claude', 'ollama':'ollama', 'gemini-cli':'gemini', 'codex':'codex' };
+const _CLI_TOOL_MAP = { 'claude-cli': 'claude', 'ollama': 'ollama', 'gemini-cli': 'gemini', 'codex': 'codex' };
 
 VIEWS.aiProviders = async () => {
   const [d, cliStatus] = await Promise.all([
     cachedApi('/api/ai-providers/list'),
-    api('/api/cli/status').catch(() => ({tools: {}, brewAvailable:false, npmAvailable:false})),
+    api('/api/cli/status').catch(() => ({ tools: {}, brewAvailable: false, npmAvailable: false })),
   ]);
   state.data._aiProviders = d;
   state.data._cliStatus = cliStatus;
@@ -18164,7 +18426,7 @@ VIEWS.aiProviders = async () => {
   }).join('');
 
   return `
-    ${viewHeader(t('ai_providers_title','AI 프로바이더'), t('ai_providers_subtitle','Claude · GPT · Gemini · Ollama · Codex 등 멀티 AI 프로바이더 관리'), 'aiProviders')}
+    ${viewHeader(t('ai_providers_title', 'AI 프로바이더'), t('ai_providers_subtitle', 'Claude · GPT · Gemini · Ollama · Codex 등 멀티 AI 프로바이더 관리'), 'aiProviders')}
 
     ${localStorage.getItem('providerWizardDismissed') ? '' : `
     <details id="providerSetupWizard" class="card mb-6" open>
@@ -18289,17 +18551,17 @@ VIEWS.aiProviders = async () => {
       <p class="text-xs mb-3" style="color:var(--text-dim)">${t('워크플로우 노드가 실패하면 순서대로 다음 프로바이더를 시도합니다. 드래그하거나 체크박스로 편집하세요.')}</p>
       <div class="mb-3" id="fallbackChainEditor">
         ${providers.map(p => {
-          const inChain = fallbackChain.includes(p.id);
-          const idx = fallbackChain.indexOf(p.id);
-          return `<label class="flex items-center gap-2 mb-1.5 p-2 rounded hover-lift" style="background:var(--card);border:1px solid var(--border);cursor:pointer;">
-            <input type="checkbox" class="fallback-chain-cb" value="${escapeHtml(p.id)}" ${inChain?'checked':''} data-idx="${idx>=0?idx:99}">
-            <span>${p.icon||'🔌'}</span>
+    const inChain = fallbackChain.includes(p.id);
+    const idx = fallbackChain.indexOf(p.id);
+    return `<label class="flex items-center gap-2 mb-1.5 p-2 rounded hover-lift" style="background:var(--card);border:1px solid var(--border);cursor:pointer;">
+            <input type="checkbox" class="fallback-chain-cb" value="${escapeHtml(p.id)}" ${inChain ? 'checked' : ''} data-idx="${idx >= 0 ? idx : 99}">
+            <span>${p.icon || '🔌'}</span>
             <span class="text-sm" style="color:var(--text)">${escapeHtml(p.name)}</span>
             <span class="text-[10px]" style="color:var(--text-dim)">${escapeHtml(p.id)}</span>
             ${p.available ? '<span class="chip chip-ok text-[9px]">✓</span>' : '<span class="chip chip-err text-[9px]">✗</span>'}
-            ${inChain ? `<span class="text-[10px] font-bold" style="color:var(--accent)">#${idx+1}</span>` : ''}
+            ${inChain ? `<span class="text-[10px] font-bold" style="color:var(--accent)">#${idx + 1}</span>` : ''}
           </label>`;
-        }).join('')}
+  }).join('')}
       </div>
       <button class="btn btn-sm btn-primary" onclick="_saveFallbackChain()">${t('폴백 체인 저장')}</button>
       <span id="fallbackChainMsg" class="text-xs ml-2" style="color:var(--text-mute)"></span>
@@ -18528,7 +18790,7 @@ AFTER.aiProviders = () => {
     _ollamaLoadSettings(),
     _ollamaLoadCatalog(),
     _ollamaLoadInstalled(),
-  ]).catch(() => {});
+  ]).catch(() => { });
 };
 
 // 프로바이더 헬스 체크
@@ -18570,11 +18832,11 @@ async function _aiRefreshHealth() {
           // CLI: 짧은 경로만 (마지막 부분)
           epHtml = `<span class="text-[9px]" style="color:var(--cyan);font-family:monospace">CLI ✓</span>`;
         } else if (ep.startsWith('http')) {
-          const epShort = ep.replace('https://','').replace('http://','');
+          const epShort = ep.replace('https://', '').replace('http://', '');
           epHtml = `<span class="text-[9px]" style="color:var(--cyan);font-family:monospace">${escapeHtml(epShort)}</span>`;
         }
       }
-      return `<div class="flex items-center gap-1.5" title="${escapeHtml(ep||pid)}">
+      return `<div class="flex items-center gap-1.5" title="${escapeHtml(ep || pid)}">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
         <span class="text-sm">${icon}</span>
         <span class="${chipCls} text-[11px]">${name}</span>
@@ -18864,7 +19126,7 @@ window._wizardTestConnection = async () => {
       const outPreview = (resp.output || '').substring(0, 80);
       result.innerHTML = `<span style="color:var(--ok)">✓ ${t('성공')} (${resp.duration_ms || 0}ms)${outPreview ? ' — ' + escapeHtml(outPreview) : ''}</span>`;
     } else {
-      const errTxt = r.error || (r.response||{}).error || t('실패');
+      const errTxt = r.error || (r.response || {}).error || t('실패');
       result.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(errTxt)}</span>`;
     }
   } catch (e) {
@@ -18916,7 +19178,7 @@ window._cliInstall = async (toolId) => {
           } else if (tries >= 30) { // 5분 후 중단
             clearInterval(poll);
           }
-        } catch {}
+        } catch { }
       }, 10000);
     } else {
       toast(errMsg(r) || t('설치 실패'), 'err');
@@ -18975,7 +19237,7 @@ window._saveFallbackChain = async () => {
     } else {
       if (msgEl) msgEl.innerHTML = `<span style="color:var(--err)">✗ ${errMsg(r)}</span>`;
     }
-  } catch(e) {
+  } catch (e) {
     if (msgEl) msgEl.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(String(e))}</span>`;
   }
 };
@@ -18984,9 +19246,9 @@ window.saveApiKey = async (pid) => {
   const inp = document.getElementById('apiKey-' + pid);
   if (!inp) return;
   const val = inp.value.trim();
-  if (!val || val === '••••••••') { toast(t('enter_api_key','API 키를 입력하세요'), 'warn'); return; }
+  if (!val || val === '••••••••') { toast(t('enter_api_key', 'API 키를 입력하세요'), 'warn'); return; }
   const r = await api('/api/ai-providers/save-key', { method: 'POST', body: JSON.stringify({ providerId: pid, apiKey: val }) });
-  if (r.ok) { toast(t('api_key_saved','API 키 저장 완료'), 'ok'); renderView(); }
+  if (r.ok) { toast(t('api_key_saved', 'API 키 저장 완료'), 'ok'); renderView(); }
   else toast(errMsg(r), 'err');
 };
 
@@ -18994,7 +19256,7 @@ window.deleteApiKey = async (pid) => {
   const ok = await confirmModal({ title: t('삭제 확인'), message: t('이 API 키를 삭제하시겠습니까?'), confirmLabel: t('삭제'), danger: true });
   if (!ok) return;
   await api('/api/ai-providers/delete-key', { method: 'POST', body: JSON.stringify({ providerId: pid }) });
-  toast(t('api_key_deleted','API 키 삭제 완료'), 'ok'); renderView();
+  toast(t('api_key_deleted', 'API 키 삭제 완료'), 'ok'); renderView();
 };
 
 window.deleteCustomProvider = async (pid) => {
@@ -19116,7 +19378,7 @@ async function _ollamaServeCheckStatus() {
         logEl.scrollTop = logEl.scrollHeight;
       }
     }
-  } catch(e) {
+  } catch (e) {
     dot.style.background = 'var(--text-dim)';
     msgEl.textContent = t('상태 확인 실패');
   }
@@ -19137,7 +19399,7 @@ async function _ollamaServeStart() {
     } else {
       toast(errMsg(r), 'err');
     }
-  } catch(e) {
+  } catch (e) {
     toast(String(e), 'err');
   }
   if (startBtn) startBtn.disabled = false;
@@ -19150,7 +19412,7 @@ async function _ollamaServeStop() {
     const r = await api('/api/ollama/serve/stop', { method: 'POST', body: '{}' });
     toast(r.message || t('Ollama 정지됨'), 'ok');
     _ollamaServeCheckStatus();
-  } catch(e) { toast(String(e), 'err'); }
+  } catch (e) { toast(String(e), 'err'); }
 }
 
 // ── Ollama 엔진 설정 ──
@@ -19183,7 +19445,7 @@ async function _ollamaLoadSettings() {
       embedOpts.push(`<option disabled>${t('설치된 임베딩 모델 없음 — bge-m3 권장')}</option>`);
     }
     embedSel.innerHTML = embedOpts.join('');
-  } catch(e) {
+  } catch (e) {
     // Ollama 미실행 시 무시
   }
 }
@@ -19203,7 +19465,7 @@ async function _ollamaSaveSettings() {
     } else {
       if (msgEl) msgEl.innerHTML = `<span style="color:var(--err)">✗ ${errMsg(r)}</span>`;
     }
-  } catch(e) {
+  } catch (e) {
     if (msgEl) msgEl.innerHTML = `<span style="color:var(--err)">✗ ${escapeHtml(String(e))}</span>`;
   }
 }
@@ -19399,15 +19661,15 @@ async function _ollamaPull(modelName) {
     // v2.33.6 — ETA + 바이트 진행률 계산
     const fmtBytes = (b) => {
       if (!b) return '';
-      if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
-      if (b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + ' MB';
-      return (b/(1024*1024*1024)).toFixed(2) + ' GB';
+      if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+      if (b < 1024 * 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + ' MB';
+      return (b / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
     };
     const fmtEta = (sec) => {
       if (!isFinite(sec) || sec <= 0) return '';
       if (sec < 60) return Math.round(sec) + 's';
-      if (sec < 3600) return Math.floor(sec/60) + 'm ' + Math.round(sec%60) + 's';
-      return Math.floor(sec/3600) + 'h ' + Math.floor((sec%3600)/60) + 'm';
+      if (sec < 3600) return Math.floor(sec / 60) + 'm ' + Math.round(sec % 60) + 's';
+      return Math.floor(sec / 3600) + 'h ' + Math.floor((sec % 3600) / 60) + 'm';
     };
     // 2초 간격 폴링
     if (_ollamaPullTimers[pullId]) clearInterval(_ollamaPullTimers[pullId]);
@@ -19424,12 +19686,12 @@ async function _ollamaPull(modelName) {
           extra = ` · ${fmtBytes(s.bytesDownloaded)} / ${fmtBytes(s.bytesTotal)}`;
         }
         if (s.startedAt && pct > 2 && pct < 100) {
-          const elapsed = Date.now()/1000 - s.startedAt;
+          const elapsed = Date.now() / 1000 - s.startedAt;
           const eta = (elapsed / pct) * (100 - pct);
           const etaStr = fmtEta(eta);
           if (etaStr) extra += ' · ETA ' + etaStr;
         }
-        const lineHint = s.lastLine ? ` — ${s.lastLine.slice(0,80)}` : '';
+        const lineHint = s.lastLine ? ` — ${s.lastLine.slice(0, 80)}` : '';
 
         if (barEl) barEl.style.width = pct + '%';
         if (percentEl) percentEl.textContent = Math.round(pct) + '%' + extra;
@@ -19589,7 +19851,7 @@ window.initCostCharts = async () => {
     // 프로바이더별 비용 비교 (도넛 차트)
     const ctxProvider = document.getElementById('costByProvider');
     if (ctxProvider) {
-      const providerColors = ['#d97757','#7dd3fc','#4ade80','#c084fc','#fbbf24','#f87171','#a78bfa','#38bdf8'];
+      const providerColors = ['#d97757', '#7dd3fc', '#4ade80', '#c084fc', '#fbbf24', '#f87171', '#a78bfa', '#38bdf8'];
       _renderChart(ctxProvider, {
         type: 'doughnut',
         data: {
@@ -19610,7 +19872,7 @@ window.initCostCharts = async () => {
         }
       });
     }
-  } catch(e) { /* 비용 API 미지원 시 조용히 무시 */ }
+  } catch (e) { /* 비용 API 미지원 시 조용히 무시 */ }
 };
 
 // ── 멀티 AI 비교 모드 ──
@@ -19643,7 +19905,7 @@ window.runMultiCompare = async () => {
         tokens: resp.tokens || 0,
         error: r.ok ? null : (r.error || resp.error || t('실패')),
       };
-    } catch(e) {
+    } catch (e) {
       return { providerId: pid, ok: false, output: '', duration: Date.now() - start, tokens: 0, error: String(e) };
     }
   });
@@ -19719,7 +19981,7 @@ VIEWS.modelConfig = async () => {
       <div class="card p-5">
         <h3 class="font-semibold text-sm mb-3">🧬 현재 Settings 키</h3>
         ${Object.keys(cur).length ? `<table class="data"><tbody>
-          ${Object.entries(cur).map(([k,v]) => `<tr><td class="text-[var(--text-mute)] text-xs w-[180px]">${escapeHtml(k)}</td><td class="mono text-xs break-all">${escapeHtml(typeof v==='string'?v:JSON.stringify(v))}</td></tr>`).join('')}
+          ${Object.entries(cur).map(([k, v]) => `<tr><td class="text-[var(--text-mute)] text-xs w-[180px]">${escapeHtml(k)}</td><td class="mono text-xs break-all">${escapeHtml(typeof v === 'string' ? v : JSON.stringify(v))}</td></tr>`).join('')}
         </tbody></table>` : '<div class="text-xs text-[var(--text-dim)]">설정된 모델 관련 키 없음 — 기본값 사용 중</div>'}
         <button class="btn mt-3 text-xs" onclick="go('settings')">Settings 편집으로 이동 →</button>
       </div>
@@ -19756,8 +20018,8 @@ VIEWS.ideStatus = async () => {
         <tbody>
           ${d.activeSessions.map(s => `
             <tr>
-              <td class="mono text-xs">${s.pid||'—'}</td>
-              <td class="mono text-[10px] text-[var(--text-mute)]">${escapeHtml(s.sessionId.slice(0,8))}…</td>
+              <td class="mono text-xs">${s.pid || '—'}</td>
+              <td class="mono text-[10px] text-[var(--text-mute)]">${escapeHtml(s.sessionId.slice(0, 8))}…</td>
               <td class="mono text-xs truncate" style="max-width:320px;">${escapeHtml(s.cwd)}</td>
               <td class="text-xs">${escapeHtml(s.entrypoint)}</td>
               <td class="mono text-xs">${escapeHtml(s.version)}</td>
@@ -19792,7 +20054,7 @@ VIEWS.scheduled = async () => {
             ${t.cron ? `<span class="chip text-[10px]">${escapeHtml(t.cron)}</span>` : ''}
           </div>
           <div class="text-[10px] mono text-[var(--text-dim)] mb-2 truncate">${escapeHtml(t.id)}</div>
-          <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(t.description||'—')}</div>
+          <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(t.description || '—')}</div>
         </div>`).join('')}
     </div>` : `<div class="card empty">예약된 작업 없음<br><span class="text-xs">Claude Code 에서 <code class="mono">CronCreate</code> 도구로 추가 가능</span></div>`}`;
 };
@@ -19823,9 +20085,9 @@ VIEWS.marketplaces = async () => {
             <div class="font-semibold text-sm truncate">${escapeHtml(m.name)}</div>
             ${m.inSettingsExtra ? `<button class="btn text-[10px]" style="color:#fca5a5" onclick='removeMarketplace(${JSON.stringify(m.name)})'>제거</button>` : '<span class="chip chip-ok text-[10px]">내장</span>'}
           </div>
-          <div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(m.type||'')}</div>
-          <div class="text-xs mono text-[var(--text-mute)] mt-1 truncate">${escapeHtml(m.repo||'')}</div>
-          <div class="text-[10px] text-[var(--text-mute)] mt-1">${escapeHtml((m.lastUpdated||'').slice(0,10))}</div>
+          <div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(m.type || '')}</div>
+          <div class="text-xs mono text-[var(--text-mute)] mt-1 truncate">${escapeHtml(m.repo || '')}</div>
+          <div class="text-[10px] text-[var(--text-mute)] mt-1">${escapeHtml((m.lastUpdated || '').slice(0, 10))}</div>
         </div>`).join('') || '<div class="card empty" style="grid-column:1/-1;">알려진 마켓플레이스 없음</div>'}
     </div>`;
 };
@@ -19834,7 +20096,7 @@ async function addMarketplace() {
   const name = document.getElementById('mpName').value.trim();
   const url = document.getElementById('mpUrl').value.trim();
   if (!name || !url) { toast('이름/URL 모두 입력', 'warn'); return; }
-  const r = await api('/api/marketplaces/add', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, url }) });
+  const r = await api('/api/marketplaces/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, url }) });
   if (r.ok) { toast('추가됨', 'ok'); renderView(); } else toast(errMsg(r), 'err');
 }
 async function removeMarketplace(name) {
@@ -19844,7 +20106,7 @@ async function removeMarketplace(name) {
     confirmLabel: t('제거'), danger: true,
   });
   if (!ok) return;
-  const r = await api('/api/marketplaces/remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name }) });
+  const r = await api('/api/marketplaces/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
   if (r.ok) { toast('제거됨', 'ok'); renderView(); } else toast(errMsg(r), 'err');
 }
 
@@ -19856,7 +20118,7 @@ VIEWS.bashHistory = async () => {
   const r = await api('/api/bash-history/list?limit=200&q=' + encodeURIComponent(q));
   if (!r.exists) return `${viewHeader('셸 명령 기록', null, 'bashHistory')}<div class="card empty">bash-commands.log 없음</div>`;
   return `
-    ${viewHeader('셸 명령 기록', `총 ${r.totalParsed}회 호출 · ${(r.fileSize/(1024*1024)).toFixed(2)}MB`, 'bashHistory')}
+    ${viewHeader('셸 명령 기록', `총 ${r.totalParsed}회 호출 · ${(r.fileSize / (1024 * 1024)).toFixed(2)}MB`, 'bashHistory')}
     <div class="card p-3 mb-4">
       <input id="bashQ" class="input text-xs max-w-[360px]" placeholder="명령 검색 (예: git, npm, curl)" value="${escapeHtml(q)}" />
     </div>
@@ -19865,8 +20127,8 @@ VIEWS.bashHistory = async () => {
         ${r.items.map(x => `
           <div class="flex items-start gap-2 py-1 px-2 hover:bg-white/5 rounded">
             <span class="chip text-[9px]">${escapeHtml(x.tool)}</span>
-            <span class="text-[10px] text-[var(--text-dim)] mono flex-shrink-0">${escapeHtml(x.ts.slice(5,16).replace('T',' '))}</span>
-            <span class="mono text-xs text-[var(--text-mute)] flex-1 break-all">${escapeHtml(x.command.slice(0,280))}</span>
+            <span class="text-[10px] text-[var(--text-dim)] mono flex-shrink-0">${escapeHtml(x.ts.slice(5, 16).replace('T', ' '))}</span>
+            <span class="mono text-xs text-[var(--text-mute)] flex-1 break-all">${escapeHtml(x.command.slice(0, 280))}</span>
           </div>`).join('') || '<div class="empty text-xs">결과 없음</div>'}
       </div>
     </div>`;
@@ -19899,7 +20161,7 @@ function _telToggleLive() {
     }, 30000);
     // 알림 권한 요청 (1회)
     if ('Notification' in window && Notification.permission === 'default') {
-      try { Notification.requestPermission(); } catch {}
+      try { Notification.requestPermission(); } catch { }
     }
   }
   renderView();
@@ -19913,16 +20175,16 @@ VIEWS.telemetry = async () => {
   // 오류 급등 감지 (이전 대비 5+ 증가) — 알림
   if (live.enabled && live.lastTotal > 0) {
     const delta = tel.totalLines - live.lastTotal;
-    const errEvents = (tel.topEvents||[]).filter(e => /error|err|fail/i.test(e.event));
-    const errTotal = errEvents.reduce((a,b)=>a+b.n, 0);
+    const errEvents = (tel.topEvents || []).filter(e => /error|err|fail/i.test(e.event));
+    const errTotal = errEvents.reduce((a, b) => a + b.n, 0);
     const errDelta = errTotal - live.lastErrors;
     if (errDelta >= 5 && 'Notification' in window && Notification.permission === 'granted') {
-      try { new Notification('Telemetry 오류 급등', { body: `+${errDelta} errors since last refresh (total ${errTotal})` }); } catch {}
+      try { new Notification('Telemetry 오류 급등', { body: `+${errDelta} errors since last refresh (total ${errTotal})` }); } catch { }
     }
     live.lastErrors = errTotal;
   } else {
-    const errEvents = (tel.topEvents||[]).filter(e => /error|err|fail/i.test(e.event));
-    live.lastErrors = errEvents.reduce((a,b)=>a+b.n, 0);
+    const errEvents = (tel.topEvents || []).filter(e => /error|err|fail/i.test(e.event));
+    live.lastErrors = errEvents.reduce((a, b) => a + b.n, 0);
   }
   live.lastTotal = tel.totalLines;
   live.lastUpdate = Date.now();
@@ -19935,30 +20197,30 @@ VIEWS.telemetry = async () => {
       </div>
       <div class="flex gap-2">
         <button class="btn text-xs" onclick="renderView()">🔄 ${t('지금 갱신')}</button>
-        <button class="btn text-xs ${live.enabled?'btn-primary':''}" onclick="_telToggleLive()">${live.enabled ? '⏸ ' + t('자동 갱신 중지') : '▶ ' + t('자동 갱신 시작')}</button>
+        <button class="btn text-xs ${live.enabled ? 'btn-primary' : ''}" onclick="_telToggleLive()">${live.enabled ? '⏸ ' + t('자동 갱신 중지') : '▶ ' + t('자동 갱신 시작')}</button>
       </div>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
       <div class="card p-5">
         <h3 class="font-semibold text-sm mb-3">📊 상위 이벤트 타입</h3>
         <div class="space-y-1 max-h-[480px] overflow-y-auto">
-          ${(tel.topEvents||[]).map(e => {
-            const top = tel.topEvents[0].n; const pct = Math.round((e.n/top)*100);
-            const isErr = /error|err|fail/i.test(e.event);
-            return `<div class="py-1.5">
+          ${(tel.topEvents || []).map(e => {
+    const top = tel.topEvents[0].n; const pct = Math.round((e.n / top) * 100);
+    const isErr = /error|err|fail/i.test(e.event);
+    return `<div class="py-1.5">
               <div class="flex justify-between text-xs">
-                <span class="mono truncate pr-2" ${isErr?'style="color:#f87171"':''}>${escapeHtml(e.event)}</span>
+                <span class="mono truncate pr-2" ${isErr ? 'style="color:#f87171"' : ''}>${escapeHtml(e.event)}</span>
                 <span class="mono">${e.n}</span>
               </div>
-              <div class="h-1 bg-white/5 rounded"><div style="width:${pct}%; height:100%; background:${isErr?'#f87171':'var(--grad)'};"></div></div>
+              <div class="h-1 bg-white/5 rounded"><div style="width:${pct}%; height:100%; background:${isErr ? '#f87171' : 'var(--grad)'};"></div></div>
             </div>`;
-          }).join('')}
+  }).join('')}
         </div>
       </div>
       <div class="card p-5">
         <h3 class="font-semibold text-sm mb-3">📁 최근 텔레메트리 파일</h3>
         <table class="data"><tbody>
-          ${(tel.files||[]).map(f => `<tr>
+          ${(tel.files || []).map(f => `<tr>
             <td class="mono text-[10px] truncate" style="max-width:280px;">${escapeHtml(f.name)}</td>
             <td class="text-right text-xs">${formatBytes(f.size)}</td>
             <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(f.mtime)}</td>
@@ -19990,9 +20252,9 @@ VIEWS.homunculus = async () => {
           ${ps.map(p => `<tr>
             <td class="font-semibold text-sm">${escapeHtml(p.name)}</td>
             <td class="mono text-[10px] text-[var(--text-mute)] truncate" style="max-width:320px;">${escapeHtml(p.root)}</td>
-            <td class="mono text-[10px] text-[var(--text-dim)] truncate" style="max-width:200px;">${escapeHtml(p.remote||'—')}</td>
-            <td class="text-right text-xs text-[var(--text-mute)]">${escapeHtml((p.createdAt||'').slice(0,10))}</td>
-            <td class="text-right text-xs text-[var(--text-mute)]">${escapeHtml((p.lastSeen||'').slice(0,10))}</td>
+            <td class="mono text-[10px] text-[var(--text-dim)] truncate" style="max-width:200px;">${escapeHtml(p.remote || '—')}</td>
+            <td class="text-right text-xs text-[var(--text-mute)]">${escapeHtml((p.createdAt || '').slice(0, 10))}</td>
+            <td class="text-right text-xs text-[var(--text-mute)]">${escapeHtml((p.lastSeen || '').slice(0, 10))}</td>
           </tr>`).join('') || '<tr><td colspan="5" class="empty">없음</td></tr>'}
         </tbody>
       </table>
@@ -20033,7 +20295,7 @@ VIEWS.outputStyles = async () => {
             <button class="btn text-[10px]" style="color:#fca5a5" onclick='event.stopPropagation();deleteOutputStyle(${JSON.stringify(s.id)})'>삭제</button>
           </div>
           <div class="text-[10px] mono text-[var(--text-dim)] mb-1 truncate">${escapeHtml(s.id)}.md</div>
-          <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(s.description||s.content.slice(0,160)||'—')}</div>
+          <div class="text-xs text-[var(--text-mute)] line-clamp-3">${escapeHtml(s.description || s.content.slice(0, 160) || '—')}</div>
         </div>`).join('') || `<div class="card empty" style="grid-column:1/-1;">
           아직 없음 — 위 "＋ 만들기" 로 첫 스타일 추가<br>
           <span class="text-xs">Claude Code 에서 <code class="mono">/output-style &lt;name&gt;</code> 로 적용</span>
@@ -20069,7 +20331,7 @@ function editOutputStyle(existing) {
     const raw = document.getElementById('osRaw').value;
     if (!id) { toast('이름 입력', 'warn'); return; }
     const r = await api('/api/output-styles/save', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, raw }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, raw }),
     });
     if (r.ok) { toast('저장됨', 'ok'); closeModal(); renderView(); }
     else toast(errMsg(r), 'err');
@@ -20084,7 +20346,7 @@ async function deleteOutputStyle(id) {
   });
   if (!ok) return;
   const r = await api('/api/output-styles/delete', {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
   });
   if (r.ok) { toast('삭제됨', 'ok'); renderView(); } else toast(errMsg(r), 'err');
 }
@@ -20140,7 +20402,7 @@ VIEWS.plans = async () => {
 };
 async function viewPlan(id) {
   const d = await api('/api/plans/list');
-  const p = (d.plans||[]).find(x => x.id === id);
+  const p = (d.plans || []).find(x => x.id === id);
   if (!p) return;
   showModal(`
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
@@ -20150,7 +20412,7 @@ async function viewPlan(id) {
       </div>
       <button class="btn-ghost btn" onclick="closeModal()">✕</button>
     </div>
-    <div class="p-5 overflow-y-auto prose-claude">${marked.parse(p.raw||'')}</div>
+    <div class="p-5 overflow-y-auto prose-claude">${marked.parse(p.raw || '')}</div>
   `);
 }
 
@@ -20166,19 +20428,19 @@ VIEWS.metrics = async () => {
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">토큰 메트릭 <span class="text-xs text-[var(--text-dim)]">(DB 기반)</span></h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(d.note||'')} · 세션 ${t.n}개</p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(d.note || '')} · 세션 ${t.n}개</p>
       </div>
       <a class="btn text-xs" href="${DOCS_BASE}monitoring-usage" target="_blank" rel="noopener noreferrer">📖</a>
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
       ${[
-        ['전체 토큰', fmtTokens(t.total||0), '#d97757'],
-        ['입력', fmtTokens(t.in||0), '#86efac'],
-        ['출력', fmtTokens(t.out||0), '#7dd3fc'],
-        ['캐시 read', fmtTokens(t.cacheRead||0), '#a78bfa'],
-        ['캐시 create', fmtTokens(t.cacheCreate||0), '#fcd34d'],
-      ].map(([l,v,c]) => `
+      ['전체 토큰', fmtTokens(t.total || 0), '#d97757'],
+      ['입력', fmtTokens(t.in || 0), '#86efac'],
+      ['출력', fmtTokens(t.out || 0), '#7dd3fc'],
+      ['캐시 read', fmtTokens(t.cacheRead || 0), '#a78bfa'],
+      ['캐시 create', fmtTokens(t.cacheCreate || 0), '#fcd34d'],
+    ].map(([l, v, c]) => `
         <div class="card p-3">
           <div class="text-[10px] uppercase text-[var(--text-dim)]">${l}</div>
           <div class="text-2xl font-bold mono mt-1" style="color:${c}">${v}</div>
@@ -20186,16 +20448,16 @@ VIEWS.metrics = async () => {
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-      ${statCard('추정 비용 ($)', (t.cost||0).toFixed(2), '#4ade80', '2025 공식 요금표 기준 추정')}
+      ${statCard('추정 비용 ($)', (t.cost || 0).toFixed(2), '#4ade80', '2025 공식 요금표 기준 추정')}
       ${statCard('세션 수', t.n, '', '토큰 있는 세션만')}
-      ${statCard('평균 세션 토큰', fmtTokens(Math.round((t.total||0)/Math.max(1,t.n||1))), '#d97757')}
+      ${statCard('평균 세션 토큰', fmtTokens(Math.round((t.total || 0) / Math.max(1, t.n || 1))), '#d97757')}
     </div>
 
     <div class="card p-5 mb-4">
       <h3 class="font-semibold text-sm mb-3">📈 일자별 토큰 (최근 60일)</h3>
-      ${(d.timeline||[]).length
-        ? `<div style="position:relative; height:300px;"><canvas id="metricsDaily"></canvas></div>`
-        : '<div class="empty text-xs">데이터 없음</div>'}
+      ${(d.timeline || []).length
+      ? `<div style="position:relative; height:300px;"><canvas id="metricsDaily"></canvas></div>`
+      : '<div class="empty text-xs">데이터 없음</div>'}
     </div>
 
     <div class="card p-5">
@@ -20211,7 +20473,7 @@ VIEWS.metrics = async () => {
           <th class="text-right">비용 ($, 추정)</th>
         </tr></thead>
         <tbody>
-          ${(d.models||[]).map(m => `
+          ${(d.models || []).map(m => `
             <tr>
               <td class="mono text-xs">${escapeHtml(m.model || 'unknown')}</td>
               <td class="text-right mono text-xs">${m.n}</td>
@@ -20219,7 +20481,7 @@ VIEWS.metrics = async () => {
               <td class="text-right mono text-xs">${fmtTokens(m.out)}</td>
               <td class="text-right mono text-xs">${fmtTokens(m.cacheRead)}</td>
               <td class="text-right mono" style="color:#d97757">${fmtTokens(m.total)}</td>
-              <td class="text-right mono" style="color:#4ade80">${(m.cost||0).toFixed(2)}</td>
+              <td class="text-right mono" style="color:#4ade80">${(m.cost || 0).toFixed(2)}</td>
             </tr>`).join('') || `<tr><td colspan="7" class="empty">데이터 없음</td></tr>`}
         </tbody>
       </table>
@@ -20234,21 +20496,26 @@ AFTER.metrics = () => {
     data: {
       labels: d.timeline.map(x => x.date.slice(5)),
       datasets: [
-        { label: '입력', data: d.timeline.map(x=>x.in), borderColor: '#86efac', backgroundColor: 'rgba(134,239,172,0.1)', fill: true, tension: 0.4, yAxisID: 'y' },
-        { label: '출력', data: d.timeline.map(x=>x.out), borderColor: '#7dd3fc', backgroundColor: 'rgba(125,211,252,0.1)', fill: true, tension: 0.4, yAxisID: 'y' },
-        { label: '캐시 read', data: d.timeline.map(x=>x.cacheRead||0), borderColor: '#a78bfa', tension: 0.4, yAxisID: 'y' },
-        { label: '전체', data: d.timeline.map(x=>x.total||0), borderColor: '#d97757', tension: 0.4, yAxisID: 'y', borderWidth: 2 },
-        { label: '비용 ($)', data: d.timeline.map(x=>x.cost), borderColor: '#4ade80', tension: 0.4, yAxisID: 'y1', borderDash: [4,3] },
+        { label: '입력', data: d.timeline.map(x => x.in), borderColor: '#86efac', backgroundColor: 'rgba(134,239,172,0.1)', fill: true, tension: 0.4, yAxisID: 'y' },
+        { label: '출력', data: d.timeline.map(x => x.out), borderColor: '#7dd3fc', backgroundColor: 'rgba(125,211,252,0.1)', fill: true, tension: 0.4, yAxisID: 'y' },
+        { label: '캐시 read', data: d.timeline.map(x => x.cacheRead || 0), borderColor: '#a78bfa', tension: 0.4, yAxisID: 'y' },
+        { label: '전체', data: d.timeline.map(x => x.total || 0), borderColor: '#d97757', tension: 0.4, yAxisID: 'y', borderWidth: 2 },
+        { label: '비용 ($)', data: d.timeline.map(x => x.cost), borderColor: '#4ade80', tension: 0.4, yAxisID: 'y1', borderDash: [4, 3] },
       ],
     },
-    options: { responsive: true, maintainAspectRatio: false,
+    options: {
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { labels: { color: '#e7e7ea' } },
-        tooltip: { callbacks: { label: c => {
-          const l = c.dataset.label;
-          if (l === '비용 ($)') return `${l}: $${c.parsed.y.toFixed(2)}`;
-          return `${l}: ${fmtTokens(c.parsed.y)}`;
-        }}},
+        tooltip: {
+          callbacks: {
+            label: c => {
+              const l = c.dataset.label;
+              if (l === '비용 ($)') return `${l}: $${c.parsed.y.toFixed(2)}`;
+              return `${l}: ${fmtTokens(c.parsed.y)}`;
+            }
+          }
+        },
       },
       scales: {
         x: { ticks: { color: document.body.classList.contains('theme-light') ? '#666' : '#9aa0aa' }, grid: { color: document.body.classList.contains('theme-light') ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)' } },
@@ -20278,7 +20545,7 @@ async function _bkShowDiff(a, b) {
     const qs = new URLSearchParams({ a, b });
     const r = await api('/api/backups/diff?' + qs);
     if (!r.ok) { closeModal(); toast(r.error || 'diff failed', 'err'); return; }
-    const esc = (s) => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const esc = (s) => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
     const colored = r.diff.split('\n').map(line => {
       let color = 'var(--text-mute)';
       if (line.startsWith('+++') || line.startsWith('---')) color = '#7dd3fc';
@@ -20315,23 +20582,23 @@ VIEWS.backups = async () => {
           <h3 class="font-semibold text-sm">${title}</h3>
           <p class="text-[11px] text-[var(--text-mute)] mt-0.5">${hint}${compareable ? ` · <span class="text-[var(--accent)]">${t('파일 2개를 선택해 diff 비교')}</span>` : ''}</p>
         </div>
-        <span class="chip">${data.items.length} / 전체 ${data.total||'—'}</span>
+        <span class="chip">${data.items.length} / 전체 ${data.total || '—'}</span>
       </div>
       ${data.exists ? `
         <table class="data">
           <thead><tr>${compareable ? '<th></th>' : ''}<th>이름</th><th class="text-right">크기</th><th class="text-right">수정</th></tr></thead>
           <tbody>
             ${data.items.map(x => {
-              const isPicked = sel.includes(x.path);
-              const canPick = compareable && !x.isDir;
-              return `
-              <tr ${canPick ? `class="link-row" onclick="_bkToggleSel(${JSON.stringify(x.path).replace(/"/g,'&quot;')})"` : ''} style="${isPicked?'background:rgba(217,119,87,0.12);':''}">
+    const isPicked = sel.includes(x.path);
+    const canPick = compareable && !x.isDir;
+    return `
+              <tr ${canPick ? `class="link-row" onclick="_bkToggleSel(${JSON.stringify(x.path).replace(/"/g, '&quot;')})"` : ''} style="${isPicked ? 'background:rgba(217,119,87,0.12);' : ''}">
                 ${compareable ? `<td style="width:30px;">${canPick ? (isPicked ? '✓' : '○') : ''}</td>` : ''}
-                <td class="mono text-xs truncate" style="max-width:420px;">${x.isDir?'📁 ':'📄 '}${escapeHtml(x.name)}</td>
+                <td class="mono text-xs truncate" style="max-width:420px;">${x.isDir ? '📁 ' : '📄 '}${escapeHtml(x.name)}</td>
                 <td class="text-right text-xs">${formatBytes(x.size)}</td>
                 <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(x.modifiedAt)}</td>
               </tr>`;
-            }).join('') || `<tr><td colspan="${compareable?4:3}" class="empty text-xs">없음</td></tr>`}
+  }).join('') || `<tr><td colspan="${compareable ? 4 : 3}" class="empty text-xs">없음</td></tr>`}
           </tbody>
         </table>` : '<div class="empty text-xs">디렉토리 없음</div>'}
     </div>`;
@@ -20348,9 +20615,9 @@ VIEWS.backups = async () => {
 function formatBytes(n) {
   if (!n) return '0';
   if (n < 1024) return n + 'B';
-  if (n < 1024*1024) return (n/1024).toFixed(1) + 'KB';
-  if (n < 1024*1024*1024) return (n/1024/1024).toFixed(2) + 'MB';
-  return (n/1024/1024/1024).toFixed(2) + 'GB';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + 'KB';
+  if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(2) + 'MB';
+  return (n / 1024 / 1024 / 1024).toFixed(2) + 'GB';
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -20371,7 +20638,7 @@ VIEWS.artifacts = async () => {
       <div class="text-[10px] font-mono" style="color:var(--text-dim)">${escapeHtml(it.runId.slice(-12))}</div>
       <div class="flex items-center gap-1 mt-1">
         <span class="chip text-[9px]">${escapeHtml(it.formatHint)}</span>
-        <span class="chip text-[9px]" style="color:${it.status==='ok'?'var(--success)':'#fca5a5'}">${escapeHtml(it.status)}</span>
+        <span class="chip text-[9px]" style="color:${it.status === 'ok' ? 'var(--success)' : '#fca5a5'}">${escapeHtml(it.status)}</span>
         <span class="text-[9px]" style="color:var(--text-dim);margin-left:auto;">${it.outputLen.toLocaleString()}B</span>
       </div>
       <div class="text-[9px]" style="color:var(--text-dim)">${fmtMs(it.finishedAt)}</div>
@@ -20387,11 +20654,11 @@ VIEWS.artifacts = async () => {
       </div>
       <div id="artDetail" class="card p-4">
         ${selected ? `<div class="text-[11px]" style="color:var(--text-dim)">${t('로딩 중...')}</div>`
-          : `<div class="text-[12px] text-center py-16" style="color:var(--text-dim)">
+      : `<div class="text-[12px] text-center py-16" style="color:var(--text-dim)">
               ${t('art_pick', '왼쪽에서 run 을 선택하세요.')}<br>
               <div class="text-[10px] mt-3">🛡️ ${t('art_sec_hint', 'sandbox 속성 = "" (모든 권한 차단) + CSP default-src:none + 정적 필터 (script/iframe/on*/javascript: 제거).')}</div>
              </div>`
-        }
+    }
       </div>
     </div>
   `;
@@ -20410,10 +20677,10 @@ async function _artLoad(rid) {
   const fmt = state.data._artFormat || 'auto';
   try {
     const r = await api(`/api/artifacts/render?runId=${encodeURIComponent(rid)}&format=${encodeURIComponent(fmt)}`);
-    if (!r.ok) { host.innerHTML = `<div class="text-[12px]" style="color:var(--danger)">${escapeHtml(r.error||'error')}</div>`; return; }
-    const formats = ['auto','html','svg','markdown','json','text'];
+    if (!r.ok) { host.innerHTML = `<div class="text-[12px]" style="color:var(--danger)">${escapeHtml(r.error || 'error')}</div>`; return; }
+    const formats = ['auto', 'html', 'svg', 'markdown', 'json', 'text'];
     const fmtTabs = formats.map(f => `
-      <button class="btn text-[10px] ${(f===fmt||(f==='auto'&&fmt==='auto'))?'btn-primary':''}"
+      <button class="btn text-[10px] ${(f === fmt || (f === 'auto' && fmt === 'auto')) ? 'btn-primary' : ''}"
               onclick="_artSetFormat('${f}')">${f}</button>
     `).join(' ');
     // sandbox="" (빈 문자열) = 모든 권한 차단. srcdoc 은 서버 sanitize 완료.
@@ -20421,7 +20688,7 @@ async function _artLoad(rid) {
       <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
         <div class="text-[11px]">
           <span class="chip text-[10px]">📄 ${escapeHtml(r.format)}</span>
-          <span class="text-[10px]" style="color:var(--text-dim);margin-left:6px;">${(r.rawLen||0).toLocaleString()} bytes</span>
+          <span class="text-[10px]" style="color:var(--text-dim);margin-left:6px;">${(r.rawLen || 0).toLocaleString()} bytes</span>
         </div>
         <div class="flex gap-1">${fmtTabs}</div>
       </div>
@@ -20459,7 +20726,7 @@ VIEWS.orchestrator = async () => {
   const avail = (cfgR.availableProviders || []).join(', ') || '—';
   const bindings = cfg.bindings || [];
   const slackOk = slkR && slkR.configured;
-  const tgOk    = tgR && tgR.configured;
+  const tgOk = tgR && tgR.configured;
 
   // W1 (v2.66.9) — picker-friendly assignee list. Build from
   // /api/ai-providers/list, restricted to *available* providers, and
@@ -20470,11 +20737,11 @@ VIEWS.orchestrator = async () => {
   const availProvs = allProvs.filter(p => p.available && (p.models || []).length > 0);
   // Provider-alias short names so the option labels stay readable
   const _provAlias = {
-    'claude-cli': 'claude',     'claude': 'claude',
+    'claude-cli': 'claude', 'claude': 'claude',
     'anthropic-api': 'claude-api', 'openai-api': 'openai',
-    'gemini-cli': 'gemini',     'gemini-api': 'gemini-api',
-    'ollama': 'ollama',         'ollama-api': 'ollama-api',
-    'codex': 'codex',           'groq-api': 'groq',
+    'gemini-cli': 'gemini', 'gemini-api': 'gemini-api',
+    'ollama': 'ollama', 'ollama-api': 'ollama-api',
+    'codex': 'codex', 'groq-api': 'groq',
     'deepseek-api': 'deepseek',
   };
   // X3 (v2.66.10) — clean assignee-option builder. Skip embedding-only
@@ -20525,8 +20792,8 @@ VIEWS.orchestrator = async () => {
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="card p-4">
         <div class="text-[12px] font-semibold mb-2">${t('연결 상태')}</div>
-        <div class="text-[11px] mb-1">Slack: <span class="chip text-[10px]" style="color:${slackOk?'var(--success)':'#fca5a5'}">${slackOk?'configured':'not set'}</span></div>
-        <div class="text-[11px] mb-1">Telegram: <span class="chip text-[10px]" style="color:${tgOk?'var(--success)':'#fca5a5'}">${tgOk?'configured':'not set'}</span></div>
+        <div class="text-[11px] mb-1">Slack: <span class="chip text-[10px]" style="color:${slackOk ? 'var(--success)' : '#fca5a5'}">${slackOk ? 'configured' : 'not set'}</span></div>
+        <div class="text-[11px] mb-1">Telegram: <span class="chip text-[10px]" style="color:${tgOk ? 'var(--success)' : '#fca5a5'}">${tgOk ? 'configured' : 'not set'}</span></div>
         <div class="text-[11px] mt-3" style="color:var(--text-dim)">${t('가용 프로바이더')}: ${escapeHtml(avail)}</div>
         <button class="chip text-[10px] mt-3" onclick="_orchStart()">${t('리스너 시작')}</button>
       </div>
@@ -20579,9 +20846,9 @@ VIEWS.orchestrator = async () => {
       <div class="card p-4 lg:col-span-2">
         <div class="text-[12px] font-semibold mb-2">${t('최근 디스패치')}</div>
         ${(() => {
-          const runs = (histR && histR.runs) || [];
-          if (!runs.length) return _emptyState(t('아직 디스패치 기록 없음'), '🎼');
-          return `<table class="w-full text-left">
+      const runs = (histR && histR.runs) || [];
+      if (!runs.length) return _emptyState(t('아직 디스패치 기록 없음'), '🎼');
+      return `<table class="w-full text-left">
             <thead><tr class="text-[10px]" style="color:var(--text-dim)"><th class="p-1">ts</th><th class="p-1">kind</th><th class="p-1">via</th><th class="p-1">channel</th><th class="p-1">text</th><th class="p-1">final</th></tr></thead>
             <tbody>${runs.map(r => `
               <tr class="text-[11px]">
@@ -20590,10 +20857,10 @@ VIEWS.orchestrator = async () => {
                 <td class="p-1">${escapeHtml(r.via)}</td>
                 <td class="p-1 font-mono">${escapeHtml((r.channel || '').slice(0, 16))}</td>
                 <td class="p-1 truncate" style="max-width:280px;">${escapeHtml((r.text || '').slice(0, 80))}</td>
-                <td class="p-1 truncate" style="max-width:380px;color:${r.ok?'var(--text)':'#fca5a5'};">${escapeHtml((r.final || r.error || '').slice(0, 120))}</td>
+                <td class="p-1 truncate" style="max-width:380px;color:${r.ok ? 'var(--text)' : '#fca5a5'};">${escapeHtml((r.final || r.error || '').slice(0, 120))}</td>
               </tr>`).join('')}</tbody>
           </table>`;
-        })()}
+    })()}
       </div>
       <div class="card p-4 lg:col-span-2">
         <div class="text-[12px] font-semibold mb-2">${t('라이브 디스패치 테스트')}</div>
@@ -20660,7 +20927,7 @@ async function _orchRefreshSweeper() {
   if (!host || !r) return;
   if (!r.ok) { host.textContent = r.error || 'error'; return; }
   if (!r.schedules.length) {
-    host.innerHTML = `${t('예약된 바인딩 없음')} · sweeper ${r.running?'🟢':'⚪'}`;
+    host.innerHTML = `${t('예약된 바인딩 없음')} · sweeper ${r.running ? '🟢' : '⚪'}`;
     return;
   }
   const rows = r.schedules.map(s => {
@@ -20675,7 +20942,7 @@ async function _orchRefreshSweeper() {
     </tr>`;
   }).join('');
   host.innerHTML = `
-    <div class="text-[10px] mb-2">sweeper ${r.running?'🟢':'⚪'} · ${t('주기')} ${r.intervalSec}s · ${r.schedules.length} ${t('예약됨')}</div>
+    <div class="text-[10px] mb-2">sweeper ${r.running ? '🟢' : '⚪'} · ${t('주기')} ${r.intervalSec}s · ${r.schedules.length} ${t('예약됨')}</div>
     <table class="w-full text-left">
       <thead><tr class="text-[10px]" style="color:var(--text-dim)">
         <th class="p-1">kind</th><th class="p-1">channel</th>
@@ -20712,13 +20979,13 @@ async function _orchRefreshIpc() {
   if (outHost) {
     const items = (out && out.items) || [];
     outHost.innerHTML = items.length ? items.map(it => `
-      <div class="card p-2 mb-1" style="background:rgba(${it.ok?'34,197,94':'252,165,165'},0.04);">
+      <div class="card p-2 mb-1" style="background:rgba(${it.ok ? '34,197,94' : '252,165,165'},0.04);">
         <div class="flex items-center gap-2 text-[10px]" style="color:var(--text-dim)">
           <span class="font-mono">${fmtMs(it.ts)}</span>
           <span class="chip text-[9px]">${escapeHtml(it.kind)}</span>
           <span class="chip text-[9px]">${escapeHtml(it.via || 'ad-hoc')}</span>
           <span class="font-mono truncate" style="max-width:120px;">${escapeHtml(it.channel || '')}</span>
-          <span class="font-mono ml-auto" style="color:${it.ok?'var(--success)':'#fca5a5'};">${it.ok?'ok':'err'}</span>
+          <span class="font-mono ml-auto" style="color:${it.ok ? 'var(--success)' : '#fca5a5'};">${it.ok ? 'ok' : 'err'}</span>
         </div>
         <div class="text-[11px] mt-1">${escapeHtml((it.text || '').slice(0, 200))}</div>
       </div>`).join('') : _emptyState(t('outbound 없음'), '⬆');
@@ -20727,12 +20994,12 @@ async function _orchRefreshIpc() {
 
 AFTER.orchestrator = () => {
   // I4 (v2.61.0) — initial IPC fetch.
-  try { _orchRefreshIpc(); } catch (_) {}
+  try { _orchRefreshIpc(); } catch (_) { }
   // K2 (v2.63.0) — initial sweeper status fetch.
-  try { _orchRefreshSweeper(); } catch (_) {}
+  try { _orchRefreshSweeper(); } catch (_) { }
   // Auto-stop any prior stream when leaving the tab.
   if (state.data._orchEs) {
-    try { state.data._orchEs.close(); } catch (_) {}
+    try { state.data._orchEs.close(); } catch (_) { }
     state.data._orchEs = null;
   }
 };
@@ -20758,10 +21025,10 @@ function _orchToggleAssignee(value) {
 
 async function _orchSaveCfg() {
   const body = {
-    plannerAssignee:    (document.getElementById('orchPlanner') || {}).value,
+    plannerAssignee: (document.getElementById('orchPlanner') || {}).value,
     aggregatorAssignee: (document.getElementById('orchAggregator') || {}).value,
-    defaultAssignees:   ((document.getElementById('orchDefaults') || {}).value || '').split(',').map(s => s.trim()).filter(Boolean),
-    maxParallel:        parseInt((document.getElementById('orchParallel') || {}).value || '4', 10),
+    defaultAssignees: ((document.getElementById('orchDefaults') || {}).value || '').split(',').map(s => s.trim()).filter(Boolean),
+    maxParallel: parseInt((document.getElementById('orchParallel') || {}).value || '4', 10),
   };
   const r = await api('/api/orchestrator/config/save', { method: 'POST', body });
   toast(r.ok ? t('저장됨') : (r.error || t('저장 실패')));
@@ -20815,7 +21082,7 @@ function _orchToggleLive() {
   const stat = document.getElementById('orchLiveStatus');
   const log = document.getElementById('orchLiveLog');
   if (state.data._orchEs) {
-    try { state.data._orchEs.close(); } catch (_) {}
+    try { state.data._orchEs.close(); } catch (_) { }
     state.data._orchEs = null;
     if (btn) btn.textContent = t('라이브 시작');
     if (stat) stat.textContent = t('대기');
@@ -20832,18 +21099,18 @@ function _orchToggleLive() {
   es.addEventListener('bus', (e) => {
     try {
       const ev = JSON.parse(e.data);
-      const line = `[${new Date(ev.ts).toLocaleTimeString()}] ${ev.topic}  ${ev.source||''}  ` + JSON.stringify(ev.payload).slice(0, 240);
+      const line = `[${new Date(ev.ts).toLocaleTimeString()}] ${ev.topic}  ${ev.source || ''}  ` + JSON.stringify(ev.payload).slice(0, 240);
       if (log) {
         log.textContent = (line + '\n' + log.textContent).slice(0, 16000);
       }
-    } catch (_) {}
+    } catch (_) { }
   });
   es.addEventListener('ping', () => {
     if (stat) stat.textContent = t('연결됨') + ' · ♥';
   });
   es.onerror = () => {
     if (stat) stat.textContent = t('연결 끊김');
-    try { es.close(); } catch (_) {}
+    try { es.close(); } catch (_) { }
     state.data._orchEs = null;
     if (btn) btn.textContent = t('라이브 시작');
   };
@@ -20861,7 +21128,7 @@ VIEWS.ralph = async () => {
   const filterQ = (state.data._ralphFilterQ || '').toLowerCase();
   const runs = allRuns.filter(it => {
     if (filterStatus !== 'all' && it.status !== filterStatus) return false;
-    if (filterQ && !((it.runId||'') + ' ' + (it.assignee||'')).toLowerCase().includes(filterQ)) return false;
+    if (filterQ && !((it.runId || '') + ' ' + (it.assignee || '')).toLowerCase().includes(filterQ)) return false;
     return true;
   });
   // count by status for the chip bar
@@ -20872,8 +21139,8 @@ VIEWS.ralph = async () => {
   const _statusChip = (k, label) => {
     const n = statusCounts[k] || 0;
     const active = filterStatus === k;
-    return `<button class="chip text-[10px]" style="${active?'background:var(--accent);color:#fff;':''}"
-      onclick="state.data._ralphFilter='${k}';renderView()">${label}${n?` <span class="font-mono ml-1">${n}</span>`:''}</button>`;
+    return `<button class="chip text-[10px]" style="${active ? 'background:var(--accent);color:#fff;' : ''}"
+      onclick="state.data._ralphFilter='${k}';renderView()">${label}${n ? ` <span class="font-mono ml-1">${n}</span>` : ''}</button>`;
   };
   const fmtMs = (ms) => ms ? new Date(ms).toLocaleString() : '—';
   const statusClass = (st) => ({
@@ -20984,27 +21251,27 @@ async function _ralphPolishLoad() {
 async function _ralphPolishSave() {
   const text = (document.getElementById('ralphPolishText') || {}).value || '';
   if (!text.trim()) { toast(t('비어있는 프롬프트는 저장할 수 없음. 기본값 복원을 사용하세요.'), 'err'); return; }
-  const r = await api('/api/ralph/polish-prompt', { method: 'POST', body: { text }});
+  const r = await api('/api/ralph/polish-prompt', { method: 'POST', body: { text } });
   toast(r && r.ok ? t('저장됨') : ((r && r.error) || t('실패')), r && r.ok ? 'ok' : 'err');
   if (r && r.ok) _ralphPolishLoad();
 }
 async function _ralphPolishClear() {
   if (!confirm(t('Polish 시스템 프롬프트를 기본값으로 되돌릴까요?'))) return;
-  const r = await api('/api/ralph/polish-prompt', { method: 'POST', body: { clear: true }});
+  const r = await api('/api/ralph/polish-prompt', { method: 'POST', body: { clear: true } });
   toast(r && r.ok ? t('기본값으로 복원됨') : ((r && r.error) || t('실패')), r && r.ok ? 'ok' : 'err');
   if (r && r.ok) _ralphPolishLoad();
 }
 
 AFTER.ralph = () => {
   if (state.data._ralphEs) {
-    try { state.data._ralphEs.close(); } catch (_) {}
+    try { state.data._ralphEs.close(); } catch (_) { }
     state.data._ralphEs = null;
   }
   // J1 (v2.62.0) — auto-load polish prompt on tab open.
-  try { _ralphPolishLoad(); } catch (_) {}
+  try { _ralphPolishLoad(); } catch (_) { }
   // L1 (v2.64.0) — poll the runs list while any run is in-flight; stop
   // when all settle. Cleared on tab leave by BEFORE-style hook below.
-  try { _ralphStartAutoRefresh(); } catch (_) {}
+  try { _ralphStartAutoRefresh(); } catch (_) { }
 };
 
 function _ralphStartAutoRefresh() {
@@ -21030,7 +21297,7 @@ function _ralphStartAutoRefresh() {
       const r = await api('/api/ralph/list?limit=200');
       if (!r || !r.ok) return;
       const runs = r.runs || [];
-      const sig = runs.map(x => `${x.runId}:${x.status}:${x.iterations||0}:${(x.costUsd||0).toFixed(4)}`).join('|');
+      const sig = runs.map(x => `${x.runId}:${x.status}:${x.iterations || 0}:${(x.costUsd || 0).toFixed(4)}`).join('|');
       const anyRunning = runs.some(x => x.status === 'running');
       if (!anyRunning) {
         clearInterval(state.data._ralphPollTimer);
@@ -21045,15 +21312,17 @@ function _ralphStartAutoRefresh() {
 }
 
 async function _ralphStart() {
-  const prompt   = (document.getElementById('ralphPrompt') || {}).value || '';
+  const prompt = (document.getElementById('ralphPrompt') || {}).value || '';
   const assignee = (document.getElementById('ralphAssignee') || {}).value || '';
   const completion = (document.getElementById('ralphCompletion') || {}).value || '';
-  const max    = parseInt((document.getElementById('ralphMax') || {}).value || '25', 10);
+  const max = parseInt((document.getElementById('ralphMax') || {}).value || '25', 10);
   const budget = parseFloat((document.getElementById('ralphBudget') || {}).value || '5');
   if (!prompt.trim()) { toast(t('프롬프트가 비어 있음')); return; }
-  const r = await api('/api/ralph/start', { method: 'POST', body: {
-    prompt, assignee, completion, maxIterations: max, budgetUsd: budget,
-  }});
+  const r = await api('/api/ralph/start', {
+    method: 'POST', body: {
+      prompt, assignee, completion, maxIterations: max, budgetUsd: budget,
+    }
+  });
   if (!r.ok) { toast(r.error || 'failed'); return; }
   toast(`${t('시작됨')}: ${r.runId}`);
   _ralphSelect(r.runId);
@@ -21064,7 +21333,7 @@ function _ralphSelect(runId) {
   const host = document.getElementById('ralphLive');
   if (!host) return;
   if (state.data._ralphEs) {
-    try { state.data._ralphEs.close(); } catch (_) {}
+    try { state.data._ralphEs.close(); } catch (_) { }
     state.data._ralphEs = null;
   }
   host.innerHTML = `
@@ -21092,22 +21361,22 @@ function _ralphSelect(runId) {
       if (log) log.textContent = (line + '\n' + log.textContent).slice(0, 16000);
       if (tag === 'end') {
         if (stat) stat.textContent = `${t('종료')}: ${ev.payload.status}`;
-        try { es.close(); } catch (_) {}
+        try { es.close(); } catch (_) { }
         state.data._ralphEs = null;
       }
-    } catch (_) {}
+    } catch (_) { }
   });
   es.addEventListener('ping', () => { if (stat) stat.textContent = t('연결됨') + ' · ♥'; });
   es.onerror = () => {
     if (stat) stat.textContent = t('연결 끊김');
-    try { es.close(); } catch (_) {}
+    try { es.close(); } catch (_) { }
     state.data._ralphEs = null;
   };
 }
 
 async function _ralphCancel(runId) {
   if (!confirm(t('이 Ralph 루프를 중단할까요?'))) return;
-  const r = await api('/api/ralph/cancel', { method: 'POST', body: { runId }});
+  const r = await api('/api/ralph/cancel', { method: 'POST', body: { runId } });
   toast(r.ok ? t('취소 요청 전송됨') : (r.error || t('실패')));
 }
 
@@ -21119,11 +21388,11 @@ async function _ralphDuplicateRun(runId) {
   if (!r || !r.ok) { toast(r && r.error || t('실패'), 'err'); return; }
   const run = r.run || {};
   const fill = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
-  fill('ralphPrompt',     run.prompt);
-  fill('ralphAssignee',   run.assignee);
+  fill('ralphPrompt', run.prompt);
+  fill('ralphAssignee', run.assignee);
   fill('ralphCompletion', run.completion);
-  fill('ralphMax',        run.maxIter);
-  fill('ralphBudget',     run.budgetUsd);
+  fill('ralphMax', run.maxIter);
+  fill('ralphBudget', run.budgetUsd);
   // Scroll to start form
   const ta = document.getElementById('ralphPrompt');
   if (ta && ta.scrollIntoView) ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -21146,7 +21415,7 @@ VIEWS.securityScan = async () => {
 
   const summary = `
     <div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4">
-      ${['critical','high','medium','low','info'].map(s => `
+      ${['critical', 'high', 'medium', 'low', 'info'].map(s => `
         <div class="card p-3 text-center">
           <div class="text-[10px] uppercase" style="color:${sevColor[s]}">${sevEmoji[s]} ${s}</div>
           <div class="text-2xl font-bold mt-1 font-mono" style="color:${sevColor[s]}">${sev[s] || 0}</div>
@@ -21154,9 +21423,9 @@ VIEWS.securityScan = async () => {
     </div>`;
 
   const issueRows = issues.length ? issues.map(iss => `
-    <div class="card p-3 mb-2" style="border-left:3px solid ${sevColor[iss.severity]||'#888'};">
+    <div class="card p-3 mb-2" style="border-left:3px solid ${sevColor[iss.severity] || '#888'};">
       <div class="flex items-start gap-2">
-        <span>${sevEmoji[iss.severity]||'⚪'}</span>
+        <span>${sevEmoji[iss.severity] || '⚪'}</span>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1 flex-wrap">
             <span class="text-[11px] font-semibold">${escapeHtml(iss.title)}</span>
@@ -21209,7 +21478,7 @@ VIEWS.learner = async () => {
     <div class="flex items-center gap-2 text-[11px]">
       <span class="w-28 font-mono truncate" title="${escapeHtml(x.name)}">${escapeHtml(x.name)}</span>
       <div class="flex-1 h-3 rounded" style="background:rgba(255,255,255,0.06); position:relative;">
-        <div style="background:var(--accent);height:100%;border-radius:4px;width:${(x.count/maxTool*100).toFixed(0)}%;"></div>
+        <div style="background:var(--accent);height:100%;border-radius:4px;width:${(x.count / maxTool * 100).toFixed(0)}%;"></div>
       </div>
       <span class="w-10 text-right font-mono" style="color:var(--text-dim)">${x.count}</span>
     </div>`).join('');
@@ -21247,8 +21516,8 @@ VIEWS.learner = async () => {
     return '';
   }).join('') || `<div class="text-[11px]" style="color:var(--text-dim)">${t('learner_no_patterns', '아직 제안할 패턴이 충분히 누적되지 않았습니다.')}</div>`;
 
-  const lengthsTotal = (lb.small||0)+(lb.medium||0)+(lb.large||0)+(lb.huge||0);
-  const bar = (n) => lengthsTotal ? (n/lengthsTotal*100).toFixed(0) : 0;
+  const lengthsTotal = (lb.small || 0) + (lb.medium || 0) + (lb.large || 0) + (lb.huge || 0);
+  const bar = (n) => lengthsTotal ? (n / lengthsTotal * 100).toFixed(0) : 0;
 
   return `
     ${viewHeader('🎓 Learner', t('learner_subtitle', '최근 세션에서 반복되는 패턴을 자동 추출. AI 판단 없이 통계 기반.'), 'learner')}
@@ -21261,19 +21530,19 @@ VIEWS.learner = async () => {
       </div>
       <div class="card p-4">
         <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('learner_total_tokens', '누적 토큰')}</div>
-        <div class="text-2xl font-bold mt-1 font-mono" style="color:var(--accent)">${(stats.totalTokens||0).toLocaleString()}</div>
+        <div class="text-2xl font-bold mt-1 font-mono" style="color:var(--accent)">${(stats.totalTokens || 0).toLocaleString()}</div>
       </div>
       <div class="card p-4">
         <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('learner_length_dist', '세션 길이 분포')}</div>
         <div class="flex gap-1 h-4 rounded overflow-hidden" style="background:rgba(255,255,255,0.05);">
-          <div style="width:${bar(lb.small||0)}%;background:#4ade80" title="small ≤10: ${lb.small||0}"></div>
-          <div style="width:${bar(lb.medium||0)}%;background:#60a5fa" title="medium 10-50: ${lb.medium||0}"></div>
-          <div style="width:${bar(lb.large||0)}%;background:#a78bfa" title="large 50-200: ${lb.large||0}"></div>
-          <div style="width:${bar(lb.huge||0)}%;background:#f472b6" title="huge >200: ${lb.huge||0}"></div>
+          <div style="width:${bar(lb.small || 0)}%;background:#4ade80" title="small ≤10: ${lb.small || 0}"></div>
+          <div style="width:${bar(lb.medium || 0)}%;background:#60a5fa" title="medium 10-50: ${lb.medium || 0}"></div>
+          <div style="width:${bar(lb.large || 0)}%;background:#a78bfa" title="large 50-200: ${lb.large || 0}"></div>
+          <div style="width:${bar(lb.huge || 0)}%;background:#f472b6" title="huge >200: ${lb.huge || 0}"></div>
         </div>
         <div class="flex gap-2 text-[9px] mt-1" style="color:var(--text-dim)">
-          <span>🟢 ${lb.small||0} small</span><span>🔵 ${lb.medium||0} med</span>
-          <span>🟣 ${lb.large||0} large</span><span>🌸 ${lb.huge||0} huge</span>
+          <span>🟢 ${lb.small || 0} small</span><span>🔵 ${lb.medium || 0} med</span>
+          <span>🟣 ${lb.large || 0} large</span><span>🌸 ${lb.huge || 0} huge</span>
         </div>
       </div>
     </div>
@@ -21333,7 +21602,7 @@ VIEWS.computerUseLab = async () => {
       <div class="flex flex-wrap gap-1 mb-2">${examples}</div>
       <textarea id="cuPrompt" class="input w-full" rows="3" placeholder="${t('예: Open Finder and click Documents…')}"></textarea>
       <div class="flex flex-wrap items-center gap-2 mt-2">
-        <select id="cuModel" class="input">${(ex.models||[]).map(m => `<option>${m}</option>`).join('')}</select>
+        <select id="cuModel" class="input">${(ex.models || []).map(m => `<option>${m}</option>`).join('')}</select>
         <input id="cuW" class="input" type="number" value="1920" style="width:90px" title="width"/>
         <span>×</span>
         <input id="cuH" class="input" type="number" value="1080" style="width:90px" title="height"/>
@@ -21347,9 +21616,9 @@ VIEWS.computerUseLab = async () => {
       <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('최근 호출')}</div>
       ${items.map(h => `<div class="flex items-center gap-2 py-1 border-b border-[var(--border)] text-[11px]">
         <span class="mono">${h.model}</span>
-        <span class="flex-1 truncate">${escapeHtml(h.prompt||'')}</span>
+        <span class="flex-1 truncate">${escapeHtml(h.prompt || '')}</span>
         <span class="chip text-[10px]">${h.toolPlanCount} ${t('툴 호출')}</span>
-        <span class="text-[10px] text-[var(--text-dim)]">${(h.tokensIn+h.tokensOut).toLocaleString()} tok · $${(h.costUsd||0).toFixed(4)}</span>
+        <span class="text-[10px] text-[var(--text-dim)]">${(h.tokensIn + h.tokensOut).toLocaleString()} tok · $${(h.costUsd || 0).toFixed(4)}</span>
         ${h.error ? `<span class="chip chip-err text-[10px]">err</span>` : ''}
       </div>`).join('')}
     </div>` : ''}
@@ -21364,21 +21633,23 @@ async function _cuRun() {
   const out = document.getElementById('cuResult');
   if (out) out.innerHTML = `<div class="card p-4 text-center text-xs">${t('실행 중…')}</div>`;
   try {
-    const r = await api('/api/computer-use-lab/run', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt, model, screenSize: {width, height}, screenshotPath }) });
-    if (!r.ok) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(r.error||'')}</div>`; return; }
+    const r = await api('/api/computer-use-lab/run', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, model, screenSize: { width, height }, screenshotPath })
+    });
+    if (!r.ok) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(r.error || '')}</div>`; return; }
     out.innerHTML = `
       <div class="card p-4">
         <div class="flex flex-wrap gap-2 text-[11px] mb-2">
           <span class="chip">${escapeHtml(r.model)}</span>
           <span class="chip">${r.tokensIn}/${r.tokensOut} tok</span>
-          <span class="chip">$${(r.costUsd||0).toFixed(4)}</span>
+          <span class="chip">$${(r.costUsd || 0).toFixed(4)}</span>
           <span class="chip">${r.durationMs}ms</span>
         </div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mt-2 mb-1">${t('Tool Plan')} (${r.toolPlan.length})</div>
-        ${r.toolPlan.length ? r.toolPlan.map((p,i) => `
+        ${r.toolPlan.length ? r.toolPlan.map((p, i) => `
           <div class="card p-2 mb-1" style="background:rgba(0,0,0,0.2);">
-            <div class="text-[11px]"><span class="chip text-[9px]">${i+1}</span> <span class="font-semibold mono">${escapeHtml(p.action)}</span></div>
+            <div class="text-[11px]"><span class="chip text-[9px]">${i + 1}</span> <span class="font-semibold mono">${escapeHtml(p.action)}</span></div>
             <pre class="mono text-[10px] mt-1" style="white-space:pre-wrap;">${escapeHtml(JSON.stringify(p.params, null, 2))}</pre>
           </div>`).join('') : `<div class="empty text-xs">${t('툴 호출 없음 — 모델이 텍스트로만 응답')}</div>`}
         ${r.text ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mt-3 mb-1">${t('텍스트 응답')}</div><div class="text-xs">${escapeHtml(r.text)}</div>` : ''}
@@ -21401,7 +21672,7 @@ VIEWS.memoryLab = async () => {
       <div class="flex flex-wrap gap-1 mb-2">${examples}</div>
       <textarea id="mlPrompt" class="input w-full" rows="3" placeholder="${t('예: 내 이름은 Alex 이고 간결한 답변 선호. 기억해줘.')}"></textarea>
       <div class="flex items-center gap-2 mt-2">
-        <select id="mlModel" class="input">${(ex.models||[]).map(m => `<option>${m}</option>`).join('')}</select>
+        <select id="mlModel" class="input">${(ex.models || []).map(m => `<option>${m}</option>`).join('')}</select>
         <button class="btn-primary btn" onclick="_mlRun()">▶ ${t('실행')}</button>
       </div>
     </div>
@@ -21409,18 +21680,18 @@ VIEWS.memoryLab = async () => {
     ${(blocks.items && blocks.items.length) ? `
     <div class="card p-3 mb-3">
       <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">📦 ${t('관찰된 메모리 블록')} (${blocks.items.length})</div>
-      ${blocks.items.slice(0,20).map(b => `<div class="flex gap-2 py-1 border-b border-[var(--border)] text-[11px]">
-        <span class="mono font-semibold">${escapeHtml(b.key||'')}</span>
-        <span class="flex-1 truncate text-[var(--text-mute)]">${escapeHtml(b.value||'')}</span>
+      ${blocks.items.slice(0, 20).map(b => `<div class="flex gap-2 py-1 border-b border-[var(--border)] text-[11px]">
+        <span class="mono font-semibold">${escapeHtml(b.key || '')}</span>
+        <span class="flex-1 truncate text-[var(--text-mute)]">${escapeHtml(b.value || '')}</span>
       </div>`).join('')}
     </div>` : ''}
     ${items.length ? `
     <div class="card p-3 mb-3">
       <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('최근 호출')}</div>
       ${items.map(h => `<div class="py-1 border-b border-[var(--border)] text-[11px]">
-        <div class="flex items-center gap-2"><span class="mono">${h.model}</span><span class="flex-1 truncate">${escapeHtml(h.prompt||'')}</span>
-          <span class="chip text-[10px]">${(h.memoryEvents||[]).length} ${t('이벤트')}</span>
-          <span class="text-[10px] text-[var(--text-dim)]">$${(h.costUsd||0).toFixed(4)}</span></div>
+        <div class="flex items-center gap-2"><span class="mono">${h.model}</span><span class="flex-1 truncate">${escapeHtml(h.prompt || '')}</span>
+          <span class="chip text-[10px]">${(h.memoryEvents || []).length} ${t('이벤트')}</span>
+          <span class="text-[10px] text-[var(--text-dim)]">$${(h.costUsd || 0).toFixed(4)}</span></div>
       </div>`).join('')}
     </div>` : ''}
   `;
@@ -21431,21 +21702,23 @@ async function _mlRun() {
   const out = document.getElementById('mlResult');
   if (out) out.innerHTML = `<div class="card p-4 text-center text-xs">${t('실행 중…')}</div>`;
   try {
-    const r = await api('/api/memory-lab/run', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt, model }) });
-    if (!r.ok) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(r.error||'')}</div>`; return; }
+    const r = await api('/api/memory-lab/run', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, model })
+    });
+    if (!r.ok) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(r.error || '')}</div>`; return; }
     out.innerHTML = `
       <div class="card p-4">
         <div class="flex flex-wrap gap-2 text-[11px] mb-2">
           <span class="chip">${escapeHtml(r.model)}</span>
           <span class="chip">${r.tokensIn}/${r.tokensOut} tok</span>
-          <span class="chip">$${(r.costUsd||0).toFixed(4)}</span>
+          <span class="chip">$${(r.costUsd || 0).toFixed(4)}</span>
           <span class="chip">${r.durationMs}ms</span>
         </div>
         ${r.memoryEvents.length ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mt-2 mb-1">${t('메모리 이벤트')} (${r.memoryEvents.length})</div>
           ${r.memoryEvents.map(ev => `<div class="card p-2 mb-1" style="background:rgba(0,0,0,0.2);">
             <span class="chip chip-accent text-[10px]">${escapeHtml(ev.op)}</span>
-            <span class="mono text-[11px] ml-2">${escapeHtml(ev.key||'(no key)')}</span>
+            <span class="mono text-[11px] ml-2">${escapeHtml(ev.key || '(no key)')}</span>
             ${ev.value ? `<div class="text-[11px] mt-1" style="color:var(--text-mute);">${escapeHtml(ev.value)}</div>` : ''}
           </div>`).join('')}` : `<div class="empty text-xs">${t('메모리 이벤트 없음 — 모델이 메모리를 사용하지 않음')}</div>`}
         ${r.text ? `<div class="text-[11px] uppercase text-[var(--text-dim)] mt-3 mb-1">${t('응답')}</div><div class="text-xs">${escapeHtml(r.text)}</div>` : ''}
@@ -21466,8 +21739,8 @@ VIEWS.advisorLab = async () => {
       <div class="flex flex-wrap gap-1 mb-2">${examples}</div>
       <textarea id="alPrompt" class="input w-full" rows="3" placeholder="${t('동일 프롬프트가 두 모델에 보내지고 결과가 비교됩니다.')}"></textarea>
       <div class="flex items-center gap-2 mt-2 flex-wrap">
-        <label class="text-xs">${t('Executor')}: <select id="alExec" class="input">${(ex.executors||[]).map(m => `<option>${m}</option>`).join('')}</select></label>
-        <label class="text-xs">${t('Advisor')}: <select id="alAdv" class="input">${(ex.advisors||[]).map(m => `<option ${m==='claude-opus-4-7'?'selected':''}>${m}</option>`).join('')}</select></label>
+        <label class="text-xs">${t('Executor')}: <select id="alExec" class="input">${(ex.executors || []).map(m => `<option>${m}</option>`).join('')}</select></label>
+        <label class="text-xs">${t('Advisor')}: <select id="alAdv" class="input">${(ex.advisors || []).map(m => `<option ${m === 'claude-opus-4-7' ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
         <button class="btn-primary btn" onclick="_alRun()">▶ ${t('실행')}</button>
       </div>
     </div>
@@ -21477,8 +21750,8 @@ VIEWS.advisorLab = async () => {
       <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('최근 호출')}</div>
       ${items.map(h => `<div class="py-1 border-b border-[var(--border)] text-[11px] flex flex-wrap gap-2">
         <span class="mono">${h.executor}→${h.advisor}</span>
-        <span class="flex-1 truncate">${escapeHtml(h.prompt||'')}</span>
-        <span class="text-[10px] text-[var(--text-dim)]">$${(h.costUsd||0).toFixed(4)}</span>
+        <span class="flex-1 truncate">${escapeHtml(h.prompt || '')}</span>
+        <span class="text-[10px] text-[var(--text-dim)]">$${(h.costUsd || 0).toFixed(4)}</span>
         <span class="text-[10px] text-[var(--text-dim)]">${h.durationMs}ms</span>
       </div>`).join('')}
     </div>` : ''}
@@ -21491,9 +21764,11 @@ async function _alRun() {
   const out = document.getElementById('alResult');
   if (out) out.innerHTML = `<div class="card p-4 text-center text-xs">${t('실행 중 (executor → advisor)…')}</div>`;
   try {
-    const r = await api('/api/advisor-lab/run', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt, executor, advisor }) });
-    if (!r.ok) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(r.error||'')}${r.stage?` (${r.stage})`:''}</div>`; return; }
+    const r = await api('/api/advisor-lab/run', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, executor, advisor })
+    });
+    if (!r.ok) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(r.error || '')}${r.stage ? ` (${r.stage})` : ''}</div>`; return; }
     const e1 = r.executor, e2 = r.advisor, dl = r.delta;
     out.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
@@ -21501,20 +21776,20 @@ async function _alRun() {
           <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">⚡ ${t('Executor')}</div>
           <div class="font-semibold text-sm mb-2 mono">${escapeHtml(e1.model)}</div>
           <div class="flex gap-2 mb-2 text-[11px]"><span class="chip">${e1.tokensIn}/${e1.tokensOut} tok</span><span class="chip">$${e1.costUsd.toFixed(4)}</span><span class="chip">${e1.durationMs}ms</span></div>
-          <div class="text-xs" style="white-space:pre-wrap;">${escapeHtml(e1.response||'')}</div>
+          <div class="text-xs" style="white-space:pre-wrap;">${escapeHtml(e1.response || '')}</div>
         </div>
         <div class="card p-4" style="border-color:rgba(244,114,182,0.3);">
           <div class="text-[11px] uppercase" style="color:#f9a8d4;">🧭 ${t('Advisor')}</div>
           <div class="font-semibold text-sm mb-2 mono">${escapeHtml(e2.model)}</div>
           <div class="flex gap-2 mb-2 text-[11px]"><span class="chip">${e2.tokensIn}/${e2.tokensOut} tok</span><span class="chip">$${e2.costUsd.toFixed(4)}</span><span class="chip">${e2.durationMs}ms</span></div>
-          <div class="text-xs" style="white-space:pre-wrap;">${escapeHtml(e2.response||'')}</div>
+          <div class="text-xs" style="white-space:pre-wrap;">${escapeHtml(e2.response || '')}</div>
         </div>
       </div>
       <div class="card p-3 text-[11px]">
         <span class="font-semibold">${t('델타')}:</span>
-        <span class="ml-2">${t('토큰')}: ${dl.tokensDiff>0?'+':''}${dl.tokensDiff}</span>
-        <span class="ml-2">${t('비용')}: ${dl.costDiff>0?'+':''}$${dl.costDiff.toFixed(4)}</span>
-        <span class="ml-2">${t('지연')}: ${dl.latencyDiff>0?'+':''}${dl.latencyDiff}ms</span>
+        <span class="ml-2">${t('토큰')}: ${dl.tokensDiff > 0 ? '+' : ''}${dl.tokensDiff}</span>
+        <span class="ml-2">${t('비용')}: ${dl.costDiff > 0 ? '+' : ''}$${dl.costDiff.toFixed(4)}</span>
+        <span class="ml-2">${t('지연')}: ${dl.latencyDiff > 0 ? '+' : ''}${dl.latencyDiff}ms</span>
       </div>`;
   } catch (e) { out.innerHTML = `<div class="card p-4" style="color:#fca5a5;">${escapeHtml(e.message)}</div>`; }
 }
@@ -21526,16 +21801,16 @@ VIEWS.routines = async () => {
     <div class="mb-4 flex items-start justify-between gap-2 flex-wrap">
       <div>
         <h1 class="text-2xl font-bold">🔁 ${t('Claude Code Routines')}</h1>
-        <p class="text-sm text-[var(--text-mute)] mt-1">${t('Path:')} <code class="mono">${escapeHtml(r.dir||'~/.claude/scheduled-tasks')}</code></p>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${t('Path:')} <code class="mono">${escapeHtml(r.dir || '~/.claude/scheduled-tasks')}</code></p>
       </div>
       <button class="btn-primary btn" onclick="_routineEdit()">＋ ${t('새 루틴')}</button>
     </div>
     ${items.length ? `<div class="grid gap-2" style="grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));">
       ${items.map(it => `<div class="card p-3" style="background:rgba(167,139,250,0.04);">
-        <div class="font-semibold text-sm mono mb-1 truncate">${escapeHtml(it.name)} ${it.enabled?'':'<span class="chip chip-warn text-[9px]">disabled</span>'}</div>
-        <div class="text-[11px] text-[var(--text-mute)] line-clamp-2 mb-1" style="min-height:2em;">${escapeHtml(it.description||'')}</div>
-        <div class="text-[10px] text-[var(--text-dim)] mb-1">${t('스케줄')}: <span class="mono">${escapeHtml(it.schedule||'(none)')}</span></div>
-        <pre class="mono text-[10px]" style="background:rgba(0,0,0,0.3);padding:6px;border-radius:6px;max-height:80px;overflow:auto;">${escapeHtml(it.command||'(empty)')}</pre>
+        <div class="font-semibold text-sm mono mb-1 truncate">${escapeHtml(it.name)} ${it.enabled ? '' : '<span class="chip chip-warn text-[9px]">disabled</span>'}</div>
+        <div class="text-[11px] text-[var(--text-mute)] line-clamp-2 mb-1" style="min-height:2em;">${escapeHtml(it.description || '')}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mb-1">${t('스케줄')}: <span class="mono">${escapeHtml(it.schedule || '(none)')}</span></div>
+        <pre class="mono text-[10px]" style="background:rgba(0,0,0,0.3);padding:6px;border-radius:6px;max-height:80px;overflow:auto;">${escapeHtml(it.command || '(empty)')}</pre>
         <div class="flex gap-1 mt-2 flex-wrap">
           <button class="btn text-[10px]" onclick="_routineRun('${escapeHtml(it.name)}', false)">▶ ${t('실행')}</button>
           <button class="btn text-[10px]" onclick="_routineRun('${escapeHtml(it.name)}', true)">👁 ${t('Dry-run')}</button>
@@ -21558,7 +21833,7 @@ async function _routineEdit(name) {
     </div>
     <div class="p-5 overflow-y-auto" style="max-height:75vh;">
       <label class="block mb-2"><div class="text-xs font-semibold mb-1">${t('이름')} *</div>
-        <input id="rtName" class="input w-full mono" value="${escapeHtml(initial.name)}" ${name?'readonly':''} placeholder="my-routine"></label>
+        <input id="rtName" class="input w-full mono" value="${escapeHtml(initial.name)}" ${name ? 'readonly' : ''} placeholder="my-routine"></label>
       <label class="block mb-2"><div class="text-xs font-semibold mb-1">${t('설명')}</div>
         <input id="rtDesc" class="input w-full" value="${escapeHtml(initial.description)}"></label>
       <label class="block mb-2"><div class="text-xs font-semibold mb-1">${t('스케줄 (cron)')}</div>
@@ -21567,7 +21842,7 @@ async function _routineEdit(name) {
         <textarea id="rtCmd" class="input w-full mono" rows="3" placeholder="claude --print 'do the thing'">${escapeHtml(initial.command)}</textarea></label>
       <label class="block mb-2"><div class="text-xs font-semibold mb-1">${t('작업 디렉토리 (cwd)')}</div>
         <input id="rtCwd" class="input w-full mono" value="${escapeHtml(initial.cwd)}" placeholder="~/work/proj"></label>
-      <label class="flex items-center gap-2 mb-3"><input type="checkbox" id="rtEnabled" ${initial.enabled?'checked':''}/> <span class="text-xs">${t('활성')}</span></label>
+      <label class="flex items-center gap-2 mb-3"><input type="checkbox" id="rtEnabled" ${initial.enabled ? 'checked' : ''}/> <span class="text-xs">${t('활성')}</span></label>
       <div class="flex gap-2 pt-3 border-t border-[var(--border)]">
         <button class="btn-primary btn" onclick="_routineSave()">💾 ${t('저장')}</button>
         <button class="btn" onclick="closeModal()">${t('취소')}</button>
@@ -21586,21 +21861,21 @@ async function _routineSave() {
   };
   if (!body.name || !body.command) { toast(t('이름과 명령이 필요합니다'), 'err'); return; }
   try {
-    const r = await api('/api/routines/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const r = await api('/api/routines/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.ok) { toast(t('저장됨'), 'ok'); closeModal(); renderView(); }
-    else toast(t('저장 실패: ') + (r.error||''), 'err');
+    else toast(t('저장 실패: ') + (r.error || ''), 'err');
   } catch (e) { toast(t('저장 실패: ') + e.message, 'err'); }
 }
 async function _routineDelete(name) {
   if (!confirm(t('이 루틴을 삭제할까요?'))) return;
-  const r = await api('/api/routines/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+  const r = await api('/api/routines/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
   if (r.ok) { toast(t('삭제됨'), 'ok'); renderView(); }
-  else toast(t('삭제 실패: ') + (r.error||''), 'err');
+  else toast(t('삭제 실패: ') + (r.error || ''), 'err');
 }
 async function _routineRun(name, dryRun) {
   if (!dryRun && !confirm(t('이 루틴을 지금 실행할까요?'))) return;
   toast(dryRun ? t('Dry-run…') : t('실행 중…'), 'info');
-  const r = await api('/api/routines/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, dryRun}) });
+  const r = await api('/api/routines/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, dryRun }) });
   showModal(`
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
       <h2 class="text-lg font-bold">${dryRun ? '👁 ' : '▶ '}${escapeHtml(name)} ${r.ok ? '✓' : '✗'}</h2>
@@ -21624,7 +21899,7 @@ VIEWS.sessionReplay = async () => {
   if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}</div>`;
   const files = d.files || [];
   const sel = state.data._srSelected || '';
-  const fmt = (n) => n < 1024 ? n + 'B' : n < 1048576 ? (n/1024).toFixed(1) + 'KB' : (n/1048576).toFixed(2) + 'MB';
+  const fmt = (n) => n < 1024 ? n + 'B' : n < 1048576 ? (n / 1024).toFixed(1) + 'KB' : (n / 1048576).toFixed(2) + 'MB';
   const fmtTime = (ms) => new Date(ms).toLocaleString();
   const fileList = files.length
     ? files.map(f => `
@@ -21675,7 +21950,7 @@ function _srHighlight(idx) {
 }
 _KEYDOWN_HANDLERS.push((e) => {
   if (state.view !== 'sessionReplay') return;
-  if (['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName)) return;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement || {}).tagName)) return;
   const events = state.data._srEvents || [];
   if (!events.length) return;
   let cur = state.data._srCurIdx;
@@ -21698,16 +21973,16 @@ async function _srLoad(path) {
   if (!host) return;
   try {
     const r = await api('/api/session-replay/load?path=' + encodeURIComponent(path));
-    if (!r.ok) { host.innerHTML = `<div class="card p-4 text-[12px]" style="color:var(--danger)">${escapeHtml(r.error||'error')}</div>`; return; }
+    if (!r.ok) { host.innerHTML = `<div class="card p-4 text-[12px]" style="color:var(--danger)">${escapeHtml(r.error || 'error')}</div>`; return; }
     const events = r.events || [];
     // 토큰 누적 스파크라인 계산
     let acc = 0;
-    const points = events.map(e => { acc += (e.tokensIn||0) + (e.tokensOut||0); return acc; });
+    const points = events.map(e => { acc += (e.tokensIn || 0) + (e.tokensOut || 0); return acc; });
     const maxAcc = Math.max(1, ...points);
     const spark = points.length ? events.map((e, i) => {
       const x = (i / Math.max(1, points.length - 1)) * 600;
       const y = 40 - (points[i] / maxAcc) * 36;
-      return `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(' ') : '';
     // v2.33.8 — 각 이벤트 row 에 data-sr-idx 부여, J/K/숫자 키보드 네비
     state.data._srEvents = events;
@@ -21715,22 +21990,22 @@ async function _srLoad(path) {
     const evtRows = events.map((e, idx) => {
       const roleColor = e.role === 'assistant' ? '#60a5fa' : e.role === 'user' ? '#fbbf24' : '#9ca3af';
       const time = e.ts ? new Date(e.ts).toLocaleTimeString() : '';
-      const hasToolUse = (e.summary||'').includes('[tool_use:');
+      const hasToolUse = (e.summary || '').includes('[tool_use:');
       const bg = hasToolUse ? 'background:rgba(168, 139, 250, 0.08);' : '';
       return `
         <div class="text-[10px] flex gap-2 py-1 border-b border-[var(--border)] sr-event-row" data-sr-idx="${idx}" style="${bg}">
           <span class="font-mono flex-shrink-0" style="color:var(--text-dim);width:80px;">${time}</span>
           <span class="font-semibold flex-shrink-0" style="color:${roleColor};width:70px;">${escapeHtml(e.role || e.type || '-')}</span>
           <span class="flex-1 break-all">${escapeHtml(e.summary || e.operation || '')}</span>
-          <span class="flex-shrink-0 font-mono" style="color:var(--text-mute);">${e.tokensIn||0}↓ ${e.tokensOut||0}↑</span>
+          <span class="flex-shrink-0 font-mono" style="color:var(--text-mute);">${e.tokensIn || 0}↓ ${e.tokensOut || 0}↑</span>
         </div>`;
     }).join('');
     host.innerHTML = `
       <div class="card p-3 mb-3">
         <div class="grid grid-cols-3 gap-3 mb-2">
-          <div><div class="text-[10px]" style="color:var(--text-dim)">${t('이벤트')}</div><div class="text-lg font-semibold">${events.length}${r.truncated?'+':''}</div></div>
-          <div><div class="text-[10px]" style="color:var(--text-dim)">${t('토큰 입력')}</div><div class="text-lg font-semibold" style="color:#60a5fa">${(r.totalTokensIn||0).toLocaleString()}</div></div>
-          <div><div class="text-[10px]" style="color:var(--text-dim)">${t('토큰 출력')}</div><div class="text-lg font-semibold" style="color:#f472b6">${(r.totalTokensOut||0).toLocaleString()}</div></div>
+          <div><div class="text-[10px]" style="color:var(--text-dim)">${t('이벤트')}</div><div class="text-lg font-semibold">${events.length}${r.truncated ? '+' : ''}</div></div>
+          <div><div class="text-[10px]" style="color:var(--text-dim)">${t('토큰 입력')}</div><div class="text-lg font-semibold" style="color:#60a5fa">${(r.totalTokensIn || 0).toLocaleString()}</div></div>
+          <div><div class="text-[10px]" style="color:var(--text-dim)">${t('토큰 출력')}</div><div class="text-lg font-semibold" style="color:#f472b6">${(r.totalTokensOut || 0).toLocaleString()}</div></div>
         </div>
         ${spark ? `<svg viewBox="0 0 600 40" width="100%" height="40"><path d="${spark}" fill="none" stroke="var(--accent)" stroke-width="1.5" /></svg>` : ''}
         <div class="text-[10px] font-mono break-all" style="color:var(--text-dim)">${escapeHtml(r.path)}</div>
@@ -21748,7 +22023,7 @@ async function _srLoad(path) {
 // ────────────────────────────────────────────────────────────────
 VIEWS.rtk = async () => {
   const d = await api('/api/rtk/status');
-  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml(d.error||'')}</div>`;
+  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml(d.error || '')}</div>`;
   // 설치된 경우 gain/session 자동 로드 (VIEWS 가 반환 후 렌더 완료 시점에 실행)
   if (d.installed) {
     setTimeout(() => { _rtkFetchGain(); _rtkFetchSession(); }, 50);
@@ -21902,7 +22177,7 @@ function _rtkStartPolling(mode) {
         );
         if (state.view === 'rtk') renderView();
       }
-    } catch {}
+    } catch { }
   }, interval);
 }
 
@@ -22041,7 +22316,7 @@ function _renderCostRecommendations(rec) {
   if (!rec || !rec.ok) return '';
   const recs = rec.recommendations || [];
   if (!recs.length) return '';
-  const fmtUsd = (v) => '$' + (Number(v)||0).toFixed(2);
+  const fmtUsd = (v) => '$' + (Number(v) || 0).toFixed(2);
   const ruleLabel = (id) => ({
     haiku_for_short_prompts: t('Haiku 전환'),
     enable_prompt_caching: t('프롬프트 캐싱'),
@@ -22102,10 +22377,10 @@ VIEWS.costsTimeline = async () => {
     api('/api/cost-timeline/summary'),
     api('/api/costs/recommendations').catch(() => ({ ok: false })),
   ]);
-  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml(d.error||'')}</div>`;
+  if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml(d.error || '')}</div>`;
   const recsHtml = _renderCostRecommendations(rec);
 
-  const fmtUsd = (v) => '$' + (v||0).toFixed(4);
+  const fmtUsd = (v) => '$' + (v || 0).toFixed(4);
   const bucketMode = state.data._costsBucket || 'day';
   const allDays = d.days || [];
   const days = _costsBucket(allDays, bucketMode);
@@ -22130,21 +22405,21 @@ VIEWS.costsTimeline = async () => {
   const chart = days.length ? `
     <svg viewBox="0 0 ${chartW} ${chartH}" width="100%" height="${chartH}" preserveAspectRatio="none" style="font-family:inherit;">
       ${days.map((d, i) => {
-        const y = 15 + i * 18;
-        let x = 120;
-        const segs = Object.entries(d.sources || {}).sort((a,b) => b[1]-a[1]);
-        const totalW = 560 * (d.usd / maxDay);
-        return `
-          <text x="115" y="${y+10}" text-anchor="end" font-size="10" fill="var(--text-dim)">${d.day}</text>
+    const y = 15 + i * 18;
+    let x = 120;
+    const segs = Object.entries(d.sources || {}).sort((a, b) => b[1] - a[1]);
+    const totalW = 560 * (d.usd / maxDay);
+    return `
+          <text x="115" y="${y + 10}" text-anchor="end" font-size="10" fill="var(--text-dim)">${d.day}</text>
           ${segs.map(([src, usd]) => {
-            const w = totalW * (usd / d.usd);
-            const seg = `<rect x="${x}" y="${y}" width="${w}" height="${barH}" fill="${sourceColors[src]||'#888'}" opacity="0.85"><title>${sourceLabel(src)}: ${fmtUsd(usd)}</title></rect>`;
-            x += w;
-            return seg;
-          }).join('')}
-          <text x="${Math.max(125, x + 4)}" y="${y+10}" font-size="10" fill="var(--text-dim)">${fmtUsd(d.usd)}</text>
+      const w = totalW * (usd / d.usd);
+      const seg = `<rect x="${x}" y="${y}" width="${w}" height="${barH}" fill="${sourceColors[src] || '#888'}" opacity="0.85"><title>${sourceLabel(src)}: ${fmtUsd(usd)}</title></rect>`;
+      x += w;
+      return seg;
+    }).join('')}
+          <text x="${Math.max(125, x + 4)}" y="${y + 10}" font-size="10" fill="var(--text-dim)">${fmtUsd(d.usd)}</text>
         `;
-      }).join('')}
+  }).join('')}
     </svg>
   ` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 데이터가 없습니다. 플레이그라운드 탭을 사용하면 자동으로 축적됩니다.')}</div>`;
 
@@ -22154,9 +22429,9 @@ VIEWS.costsTimeline = async () => {
 
   const sourceRows = bySource.map(s => `
     <tr class="border-b border-[var(--border)]">
-      <td class="py-1 px-2"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sourceColors[s.source]||'#888'};margin-right:6px;"></span>${sourceLabel(s.source)}</td>
+      <td class="py-1 px-2"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sourceColors[s.source] || '#888'};margin-right:6px;"></span>${sourceLabel(s.source)}</td>
       <td class="py-1 px-2 text-right text-[11px] font-mono">${s.count}</td>
-      <td class="py-1 px-2 text-right text-[11px] font-mono">${(s.tokensIn||0).toLocaleString()} / ${(s.tokensOut||0).toLocaleString()}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${(s.tokensIn || 0).toLocaleString()} / ${(s.tokensOut || 0).toLocaleString()}</td>
       <td class="py-1 px-2 text-right text-[11px] font-mono font-semibold">${fmtUsd(s.usd)}</td>
     </tr>
   `).join('') || `<tr><td colspan="4" class="py-3 text-center text-[var(--text-dim)]">${t('아직 데이터가 없습니다')}</td></tr>`;
@@ -22171,10 +22446,10 @@ VIEWS.costsTimeline = async () => {
 
   const recentRows = recent.map(e => `
     <tr class="border-b border-[var(--border)]">
-      <td class="py-1 px-2 text-[10px] text-[var(--text-dim)] font-mono">${new Date(e.ts*1000).toLocaleString()}</td>
-      <td class="py-1 px-2"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${sourceColors[e.source]||'#888'};margin-right:4px;"></span>${sourceLabel(e.source)}</td>
+      <td class="py-1 px-2 text-[10px] text-[var(--text-dim)] font-mono">${new Date(e.ts * 1000).toLocaleString()}</td>
+      <td class="py-1 px-2"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${sourceColors[e.source] || '#888'};margin-right:4px;"></span>${sourceLabel(e.source)}</td>
       <td class="py-1 px-2 font-mono text-[10px]">${escapeHtml(e.model || '-')}</td>
-      <td class="py-1 px-2 text-right text-[11px] font-mono">${(e.tokensIn||0)} / ${(e.tokensOut||0)}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${(e.tokensIn || 0)} / ${(e.tokensOut || 0)}</td>
       <td class="py-1 px-2 text-right text-[11px] font-mono">${fmtUsd(e.usd)}</td>
     </tr>
   `).join('') || `<tr><td colspan="5" class="py-3 text-center text-[var(--text-dim)]">—</td></tr>`;
@@ -22208,13 +22483,13 @@ VIEWS.costsTimeline = async () => {
       <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
         <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">
           ${bucketMode === 'month' ? t('costs_month_header', '월별 비용 (소스별 스택)')
-            : bucketMode === 'week' ? t('costs_week_header', '주별 비용 (소스별 스택)')
-            : t('일별 비용 (최근 60일, 소스별 스택)')}
+      : bucketMode === 'week' ? t('costs_week_header', '주별 비용 (소스별 스택)')
+        : t('일별 비용 (최근 60일, 소스별 스택)')}
         </div>
         <div class="flex gap-1 text-[10px]">
-          <button class="btn ${bucketMode==='day'?'btn-primary':''}" onclick="_costsSetBucket('day')">${t('costs_bucket_day', '일')}</button>
-          <button class="btn ${bucketMode==='week'?'btn-primary':''}" onclick="_costsSetBucket('week')">${t('costs_bucket_week', '주')}</button>
-          <button class="btn ${bucketMode==='month'?'btn-primary':''}" onclick="_costsSetBucket('month')">${t('costs_bucket_month', '월')}</button>
+          <button class="btn ${bucketMode === 'day' ? 'btn-primary' : ''}" onclick="_costsSetBucket('day')">${t('costs_bucket_day', '일')}</button>
+          <button class="btn ${bucketMode === 'week' ? 'btn-primary' : ''}" onclick="_costsSetBucket('week')">${t('costs_bucket_week', '주')}</button>
+          <button class="btn ${bucketMode === 'month' ? 'btn-primary' : ''}" onclick="_costsSetBucket('month')">${t('costs_bucket_month', '월')}</button>
         </div>
       </div>
       ${chart}
@@ -22277,7 +22552,7 @@ VIEWS.usage = async () => {
   state.data.usage = d;
   const tk = d.tokens || {};
   const all = tk.all || {}, last30 = tk.last30d || {};
-  const fileMb = d.fileSize ? (d.fileSize / (1024*1024)).toFixed(2) : 0;
+  const fileMb = d.fileSize ? (d.fileSize / (1024 * 1024)).toFixed(2) : 0;
 
   return `
     <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
@@ -22293,12 +22568,12 @@ VIEWS.usage = async () => {
     <!-- 토큰 요약 -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
       ${[
-        ['전체 토큰', fmtTokens(all.total||0), '#d97757'],
-        ['입력', fmtTokens(all.input||0), '#86efac'],
-        ['출력', fmtTokens(all.output||0), '#7dd3fc'],
-        ['캐시 read', fmtTokens(all.cacheRead||0), '#a78bfa'],
-        ['캐시 create', fmtTokens(all.cacheCreate||0), '#fcd34d'],
-      ].map(([l,v,c]) => `
+      ['전체 토큰', fmtTokens(all.total || 0), '#d97757'],
+      ['입력', fmtTokens(all.input || 0), '#86efac'],
+      ['출력', fmtTokens(all.output || 0), '#7dd3fc'],
+      ['캐시 read', fmtTokens(all.cacheRead || 0), '#a78bfa'],
+      ['캐시 create', fmtTokens(all.cacheCreate || 0), '#fcd34d'],
+    ].map(([l, v, c]) => `
         <div class="card p-3">
           <div class="text-[10px] uppercase text-[var(--text-dim)]">${l}</div>
           <div class="text-2xl font-bold mono mt-1" style="color:${c}">${v}</div>
@@ -22306,18 +22581,18 @@ VIEWS.usage = async () => {
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-      ${statCard('전체 세션', all.sessions||0)}
-      ${statCard('최근 30일', `${fmtTokens(last30.total||0)} (${last30.sessions||0}세션)`, '#d97757')}
-      ${statCard('도구 호출 (전체)', (tk.byTool||[]).reduce((a,b)=>a+(b.calls||0),0))}
-      ${statCard('에이전트 위임', (tk.byAgent||[]).reduce((a,b)=>a+(b.calls||0),0), '#a78bfa')}
+      ${statCard('전체 세션', all.sessions || 0)}
+      ${statCard('최근 30일', `${fmtTokens(last30.total || 0)} (${last30.sessions || 0}세션)`, '#d97757')}
+      ${statCard('도구 호출 (전체)', (tk.byTool || []).reduce((a, b) => a + (b.calls || 0), 0))}
+      ${statCard('에이전트 위임', (tk.byAgent || []).reduce((a, b) => a + (b.calls || 0), 0), '#a78bfa')}
     </div>
 
     <!-- 일자별 토큰 -->
     <div class="card p-5 mb-4">
       <h3 class="font-semibold text-sm mb-3">🕒 일자별 토큰 사용 (최근 30일)</h3>
-      ${(tk.dailyTimeline||[]).length
-        ? `<div style="position:relative; height:260px;"><canvas id="usageTokenDaily"></canvas></div>`
-        : `<div class="empty text-xs">데이터 없음 (세션 재인덱스 필요할 수 있음)</div>`}
+      ${(tk.dailyTimeline || []).length
+      ? `<div style="position:relative; height:260px;"><canvas id="usageTokenDaily"></canvas></div>`
+      : `<div class="empty text-xs">데이터 없음 (세션 재인덱스 필요할 수 있음)</div>`}
     </div>
 
     <!-- 도구별 · 에이전트별 토큰 -->
@@ -22325,61 +22600,61 @@ VIEWS.usage = async () => {
       <div class="card p-5">
         <h3 class="font-semibold text-sm mb-3">🛠 도구별 토큰</h3>
         <div class="max-h-[360px] overflow-y-auto">
-          ${(tk.byTool||[]).map(r => {
-            const max = (tk.byTool[0]||{}).tokens || 1;
-            const pct = Math.max(2, Math.round((r.tokens||0)/max*100));
-            return `
+          ${(tk.byTool || []).map(r => {
+        const max = (tk.byTool[0] || {}).tokens || 1;
+        const pct = Math.max(2, Math.round((r.tokens || 0) / max * 100));
+        return `
               <div class="mb-2">
                 <div class="flex justify-between text-xs mb-1">
                   <span class="mono">${escapeHtml(r.tool)} <span class="text-[var(--text-dim)]">×${r.calls}</span></span>
-                  <span class="mono font-bold" style="color:#d97757">${fmtTokens(r.tokens||0)}</span>
+                  <span class="mono font-bold" style="color:#d97757">${fmtTokens(r.tokens || 0)}</span>
                 </div>
                 <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#d97757;"></div></div>
               </div>`;
-          }).join('') || '<div class="empty text-xs">데이터 없음</div>'}
+      }).join('') || '<div class="empty text-xs">데이터 없음</div>'}
         </div>
       </div>
       <div class="card p-5">
         <h3 class="font-semibold text-sm mb-3">🤝 에이전트별 토큰</h3>
         <div class="max-h-[360px] overflow-y-auto">
-          ${(tk.byAgent||[]).map(r => {
-            const max = (tk.byAgent[0]||{}).tokens || 1;
-            const pct = Math.max(2, Math.round((r.tokens||0)/max*100));
-            return `
+          ${(tk.byAgent || []).map(r => {
+        const max = (tk.byAgent[0] || {}).tokens || 1;
+        const pct = Math.max(2, Math.round((r.tokens || 0) / max * 100));
+        return `
               <div class="mb-2">
                 <div class="flex justify-between text-xs mb-1">
                   <span class="mono">${escapeHtml(r.name)} <span class="text-[var(--text-dim)]">×${r.calls}</span></span>
-                  <span class="mono font-bold" style="color:#a78bfa">${fmtTokens(r.tokens||0)}</span>
+                  <span class="mono font-bold" style="color:#a78bfa">${fmtTokens(r.tokens || 0)}</span>
                 </div>
                 <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#a78bfa;"></div></div>
               </div>`;
-          }).join('') || '<div class="empty text-xs">에이전트 위임 기록 없음</div>'}
+      }).join('') || '<div class="empty text-xs">에이전트 위임 기록 없음</div>'}
         </div>
       </div>
     </div>
 
     <!-- 프로젝트별 토큰 — v2.43.2: 전체 프로젝트, 클릭 시 상세 모달 -->
     <div class="card p-5 mb-4">
-      <h3 class="font-semibold text-sm mb-3">📁 ${t('프로젝트별 토큰')} <span class="text-[10px] text-[var(--text-dim)] font-normal">(${(tk.byProject||[]).length} ${t('프로젝트')} · ${t('행 클릭 → 세션별 상세')})</span></h3>
+      <h3 class="font-semibold text-sm mb-3">📁 ${t('프로젝트별 토큰')} <span class="text-[10px] text-[var(--text-dim)] font-normal">(${(tk.byProject || []).length} ${t('프로젝트')} · ${t('행 클릭 → 세션별 상세')})</span></h3>
       <div class="max-h-[420px] overflow-y-auto">
         <table class="data">
           <thead><tr><th>${t('프로젝트')}</th><th class="text-right">${t('세션')}</th><th class="text-right">${t('토큰')}</th><th class="w-[10px]"></th></tr></thead>
           <tbody>
-            ${(tk.byProject||[]).map(p => {
-              const cwd = p.cwd || p.key || '';
-              const name = p.name || cwd.split('/').pop() || cwd || '—';
-              const safeCwd = cwd.replace(/'/g, "\\'");
-              return `
+            ${(tk.byProject || []).map(p => {
+        const cwd = p.cwd || p.key || '';
+        const name = p.name || cwd.split('/').pop() || cwd || '—';
+        const safeCwd = cwd.replace(/'/g, "\\'");
+        return `
               <tr class="link-row" onclick="openProjectUsage('${escapeHtml(safeCwd)}')" title="${escapeHtml(cwd)}">
                 <td class="text-xs">
                   <div class="font-semibold">${escapeHtml(name)}</div>
                   <div class="mono text-[10px] text-[var(--text-dim)] truncate" style="max-width:520px;">${escapeHtml(cwd)}</div>
                 </td>
                 <td class="text-right mono text-xs">${p.sessions}</td>
-                <td class="text-right mono" style="color:#d97757">${fmtTokens(p.tokens||0)}</td>
+                <td class="text-right mono" style="color:#d97757">${fmtTokens(p.tokens || 0)}</td>
                 <td class="text-right text-xs text-[var(--text-dim)]">▶</td>
               </tr>`;
-            }).join('') || `<tr><td colspan="4" class="empty">${t('데이터 없음')}</td></tr>`}
+      }).join('') || `<tr><td colspan="4" class="empty">${t('데이터 없음')}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -22391,11 +22666,11 @@ VIEWS.usage = async () => {
       <table class="data">
         <thead><tr><th>첫 요청</th><th>프로젝트</th><th class="text-right">토큰</th><th class="text-right">시작</th></tr></thead>
         <tbody>
-          ${(tk.topSessions||[]).map(s => `
+          ${(tk.topSessions || []).map(s => `
             <tr class="link-row" onclick="openSessionDetail('${s.session_id}')">
-              <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt||'(요청 없음)').slice(0,120))}</td>
-              <td class="text-xs">${escapeHtml(s.project||'—')}</td>
-              <td class="text-right mono" style="color:#d97757">${fmtTokens(s.total_tokens||0)}</td>
+              <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt || '(요청 없음)').slice(0, 120))}</td>
+              <td class="text-xs">${escapeHtml(s.project || '—')}</td>
+              <td class="text-right mono" style="color:#d97757">${fmtTokens(s.total_tokens || 0)}</td>
               <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(s.started_at)}</td>
             </tr>`).join('') || `<tr><td colspan="4" class="empty">데이터 없음</td></tr>`}
         </tbody>
@@ -22408,14 +22683,14 @@ VIEWS.usage = async () => {
       <table class="data">
         <thead><tr><th>도구</th><th class="text-right">호출</th><th>분포</th></tr></thead>
         <tbody>
-          ${(d.topTools||[]).map((t,i) => {
-            const max = d.topTools[0].n; const pct = Math.round((t.n/max)*100);
-            return `<tr>
+          ${(d.topTools || []).map((t, i) => {
+        const max = d.topTools[0].n; const pct = Math.round((t.n / max) * 100);
+        return `<tr>
               <td class="mono text-xs">${escapeHtml(t.tool)}</td>
               <td class="text-right mono">${t.n}</td>
               <td style="width:50%;"><div class="h-2 rounded-full bg-white/5 overflow-hidden"><div style="width:${pct}%; height:100%; background:var(--grad);"></div></div></td>
             </tr>`;
-          }).join('')}
+      }).join('')}
         </tbody>
       </table>
     </div>` : ''}
@@ -22430,8 +22705,10 @@ AFTER.usage = () => {
       type: 'bar',
       data: {
         labels: tl.map(x => x.date.slice(5)),
-        datasets: [{ label: '토큰', data: tl.map(x => x.tokens),
-          backgroundColor: 'rgba(217,119,87,0.55)', borderColor: '#d97757', borderWidth: 1, borderRadius: 4 }]
+        datasets: [{
+          label: '토큰', data: tl.map(x => x.tokens),
+          backgroundColor: 'rgba(217,119,87,0.55)', borderColor: '#d97757', borderWidth: 1, borderRadius: 4
+        }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -22543,12 +22820,12 @@ async function openProjectUsage(cwd) {
           <h3 class="font-semibold text-sm mb-3">🕒 ${t('일자별 토큰')} <span class="text-[10px] text-[var(--text-dim)] font-normal">(${timeline.length} ${t('일')})</span></h3>
           <div class="flex items-end gap-1" style="height:80px;">
             ${(() => {
-              const maxV = Math.max(1, ...timeline.map(x => x.tokens || 0));
-              return timeline.map(x => {
-                const h = Math.max(2, Math.round((x.tokens || 0) / maxV * 78));
-                return `<div title="${escapeHtml(x.date)} · ${fmtTokens(x.tokens || 0)}" style="flex:1;background:#d97757;height:${h}px;border-radius:2px 2px 0 0;opacity:0.75;"></div>`;
-              }).join('');
-            })()}
+        const maxV = Math.max(1, ...timeline.map(x => x.tokens || 0));
+        return timeline.map(x => {
+          const h = Math.max(2, Math.round((x.tokens || 0) / maxV * 78));
+          return `<div title="${escapeHtml(x.date)} · ${fmtTokens(x.tokens || 0)}" style="flex:1;background:#d97757;height:${h}px;border-radius:2px 2px 0 0;opacity:0.75;"></div>`;
+        }).join('');
+      })()}
           </div>
         </div>` : ''}
 
@@ -22609,9 +22886,9 @@ VIEWS.memory = async () => {
     <div class="card p-3 mb-4 flex flex-wrap items-center gap-2">
       <input id="memQ" class="input max-w-[320px] text-xs" placeholder="${t('메모/내용 검색…')}" value="${escapeHtml(q)}"
              oninput="state.data.memoryFilter.q = this.value; clearTimeout(window._memDb); window._memDb = setTimeout(renderView, 180);" />
-      <button class="chip ${!type?'chip-accent':''}" onclick="state.data.memoryFilter.type=''; renderView();">${t('전체')} ${totalAll}</button>
+      <button class="chip ${!type ? 'chip-accent' : ''}" onclick="state.data.memoryFilter.type=''; renderView();">${t('전체')} ${totalAll}</button>
       ${allTypes.map(tp => `
-        <button class="chip ${tp===type?'chip-accent':''}" onclick="state.data.memoryFilter.type='${escapeHtml(tp)}'; renderView();">${escapeHtml(tp)}</button>
+        <button class="chip ${tp === type ? 'chip-accent' : ''}" onclick="state.data.memoryFilter.type='${escapeHtml(tp)}'; renderView();">${escapeHtml(tp)}</button>
       `).join('')}
       ${(q || type) ? `<span class="text-[11px] text-[var(--text-dim)] ml-auto">${totalShown} / ${totalAll}</span>` : ''}
     </div>
@@ -22627,7 +22904,7 @@ VIEWS.memory = async () => {
           ${p.items.map(it => `
             <div class="rounded bg-white/5 border border-[var(--border)] p-3">
               <div class="flex items-center gap-2 mb-1">
-                <span class="chip text-[10px]">${escapeHtml(it.type||'memo')}</span>
+                <span class="chip text-[10px]">${escapeHtml(it.type || 'memo')}</span>
                 <div class="font-semibold text-sm">${escapeHtml(it.name)}</div>
               </div>
               ${it.description ? `<div class="text-xs text-[var(--text-mute)] mb-1">${escapeHtml(it.description)}</div>` : ''}
@@ -22650,16 +22927,16 @@ VIEWS.tasks = async () => {
   const ordered = [manual || { id: 'dashboard-manual', taskCount: 0, completed: 0, inProgress: 0, tasks: [] }, ...others];
 
   const renderTaskRow = (sid, t) => {
-    const iconMap = { completed:'✅', in_progress:'🔄', pending:'⏳' };
-    const col = { completed:'#4ade80', in_progress:'#fbbf24', pending:'#9aa0aa' }[t.status] || '#9aa0aa';
+    const iconMap = { completed: '✅', in_progress: '🔄', pending: '⏳' };
+    const col = { completed: '#4ade80', in_progress: '#fbbf24', pending: '#9aa0aa' }[t.status] || '#9aa0aa';
     const canEdit = sid === 'dashboard-manual';
     return `
       <div class="group flex items-start gap-2 py-1 px-2 rounded hover:bg-white/5">
         ${canEdit
-          ? `<button class="p-0 bg-transparent border-0 cursor-pointer text-lg" title="상태 토글" onclick='toggleTaskStatus(${JSON.stringify(sid)}, ${JSON.stringify(t)})'>${iconMap[t.status]||'•'}</button>`
-          : `<span style="color:${col}">${iconMap[t.status]||'•'}</span>`}
+        ? `<button class="p-0 bg-transparent border-0 cursor-pointer text-lg" title="상태 토글" onclick='toggleTaskStatus(${JSON.stringify(sid)}, ${JSON.stringify(t)})'>${iconMap[t.status] || '•'}</button>`
+        : `<span style="color:${col}">${iconMap[t.status] || '•'}</span>`}
         <div class="flex-1 min-w-0">
-          <div class="text-sm ${t.status==='completed'?'line-through text-[var(--text-dim)]':''}">${escapeHtml(t.subject)}</div>
+          <div class="text-sm ${t.status === 'completed' ? 'line-through text-[var(--text-dim)]' : ''}">${escapeHtml(t.subject)}</div>
           ${t.description ? `<div class="text-[10px] text-[var(--text-mute)] line-clamp-2">${escapeHtml(t.description)}</div>` : ''}
         </div>
         ${canEdit ? `
@@ -22682,13 +22959,13 @@ VIEWS.tasks = async () => {
       </div>
     </div>
     ${ordered.map(s => {
-      const pct = s.taskCount ? Math.round((s.completed / s.taskCount) * 100) : 0;
-      const isManual = s.id === 'dashboard-manual';
-      return `
-      <div class="card p-4 mb-3" ${isManual?'style="border-color: rgba(217,119,87,0.35);"':''}>
+    const pct = s.taskCount ? Math.round((s.completed / s.taskCount) * 100) : 0;
+    const isManual = s.id === 'dashboard-manual';
+    return `
+      <div class="card p-4 mb-3" ${isManual ? 'style="border-color: rgba(217,119,87,0.35);"' : ''}>
         <div class="flex items-center justify-between mb-3">
           <div>
-            <div class="font-semibold text-sm mono">${isManual ? '<span class="chip chip-accent">수동</span> dashboard-manual' : escapeHtml(s.id.slice(0,8))+'…'}</div>
+            <div class="font-semibold text-sm mono">${isManual ? '<span class="chip chip-accent">수동</span> dashboard-manual' : escapeHtml(s.id.slice(0, 8)) + '…'}</div>
             ${s.updatedAt ? `<div class="text-[11px] text-[var(--text-mute)]">${fmtRel(s.updatedAt)}</div>` : ''}
           </div>
           <div class="text-right">
@@ -22698,7 +22975,7 @@ VIEWS.tasks = async () => {
         </div>
         ${s.tasks.length ? `<div class="space-y-1">${s.tasks.map(t => renderTaskRow(s.id, t)).join('')}</div>` : '<div class="empty text-xs">비어있음</div>'}
       </div>`;
-    }).join('')}
+  }).join('')}
   `;
 };
 
@@ -22721,14 +22998,14 @@ function openTaskEditor(sessionId, existing) {
       </div>
       <div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">진행 중 표시문 (activeForm)</div>
-        <input id="tkAF" class="input" value="${escapeHtml(e.activeForm||'')}" placeholder="예: README 작성 중" />
+        <input id="tkAF" class="input" value="${escapeHtml(e.activeForm || '')}" placeholder="예: README 작성 중" />
       </div>
       <div>
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">상태</div>
         <select id="tkStatus" class="input">
-          <option value="pending" ${e.status==='pending'?'selected':''}>⏳ 대기</option>
-          <option value="in_progress" ${e.status==='in_progress'?'selected':''}>🔄 진행 중</option>
-          <option value="completed" ${e.status==='completed'?'selected':''}>✅ 완료</option>
+          <option value="pending" ${e.status === 'pending' ? 'selected' : ''}>⏳ 대기</option>
+          <option value="in_progress" ${e.status === 'in_progress' ? 'selected' : ''}>🔄 진행 중</option>
+          <option value="completed" ${e.status === 'completed' ? 'selected' : ''}>✅ 완료</option>
         </select>
       </div>
     </div>
@@ -22748,7 +23025,7 @@ function openTaskEditor(sessionId, existing) {
     };
     if (!payload.subject) { toast('제목을 입력하세요', 'warn'); return; }
     const r = await api('/api/tasks/save', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     });
     if (r.ok) { toast('저장됨', 'ok'); closeModal(); renderView(); }
     else toast(errMsg(r), 'err');
@@ -22756,9 +23033,9 @@ function openTaskEditor(sessionId, existing) {
 }
 
 async function toggleTaskStatus(sessionId, t) {
-  const next = { pending:'in_progress', in_progress:'completed', completed:'pending' }[t.status] || 'pending';
+  const next = { pending: 'in_progress', in_progress: 'completed', completed: 'pending' }[t.status] || 'pending';
   const r = await api('/api/tasks/save', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId, id: t.id, subject: t.subject, description: t.description, activeForm: t.activeForm, status: next }),
   });
   if (r.ok) renderView();
@@ -22768,7 +23045,7 @@ async function toggleTaskStatus(sessionId, t) {
 async function deleteTask(sessionId, id) {
   if (!await confirmModal({ title: t('TODO 삭제'), message: t('TODO 를 삭제할까요?'), confirmLabel: t('삭제'), danger: true })) return;
   const r = await api('/api/tasks/delete', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId, id }),
   });
   if (r.ok) { toast('삭제됨', 'ok'); renderView(); }
@@ -22795,7 +23072,7 @@ VIEWS.team = async () => {
           </p>
           <div class="card p-3 text-left text-xs text-[var(--text-mute)] mb-4">
             <div class="flex items-center gap-2 mb-1.5">
-              <span class="w-2 h-2 rounded-full" style="background:${auth.cliInstalled?'var(--ok)':'var(--err)'}"></span>
+              <span class="w-2 h-2 rounded-full" style="background:${auth.cliInstalled ? 'var(--ok)' : 'var(--err)'}"></span>
               <span class="font-semibold">CLI ${auth.cliInstalled ? '설치됨' : '미설치'}</span>
             </div>
             <div class="flex items-center gap-2">
@@ -22803,7 +23080,7 @@ VIEWS.team = async () => {
               <span class="font-semibold">계정 미연결</span>
             </div>
           </div>
-          <button class="btn-primary btn" style="width:100%;justify-content:center;padding:0.6rem;" ${!auth.cliInstalled?'disabled style="width:100%;justify-content:center;padding:0.6rem;opacity:0.4;cursor:not-allowed;"':''}
+          <button class="btn-primary btn" style="width:100%;justify-content:center;padding:0.6rem;" ${!auth.cliInstalled ? 'disabled style="width:100%;justify-content:center;padding:0.6rem;opacity:0.4;cursor:not-allowed;"' : ''}
             onclick="(async()=>{
               this.disabled=true;this.innerHTML='⏳ 터미널에서 로그인 중…';
               try{const r=await api('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
@@ -22865,7 +23142,7 @@ VIEWS.team = async () => {
       </div>
     </div>
     <div class="card p-4 mt-4 text-xs text-[var(--text-mute)]">
-      <b>${t('참고')}:</b> ${escapeHtml(team.note||'')}<br>
+      <b>${t('참고')}:</b> ${escapeHtml(team.note || '')}<br>
       ${t('팀 멤버 목록·사용량·결제는')} <a href="https://claude.ai/settings/organization" target="_blank" rel="noopener noreferrer" style="color:var(--accent); text-decoration:underline;">claude.ai/settings/organization</a> ${t('에서 직접 관리합니다')}.
     </div>
   `;
@@ -22911,7 +23188,7 @@ VIEWS.openPorts = async () => {
   // sockets (mDNSResponder/identitysd/sharingd/...) that flood the
   // table with port 5353 and friends. Persist in localStorage.
   let inc = false;
-  try { inc = localStorage.getItem('cc.openPorts.includeSystem') === '1'; } catch (_) {}
+  try { inc = localStorage.getItem('cc.openPorts.includeSystem') === '1'; } catch (_) { }
   const r = await api('/api/ports/list' + (inc ? '?includeSystem=1' : ''));
   if (!r || !r.ok) {
     return `
@@ -22929,8 +23206,8 @@ VIEWS.openPorts = async () => {
         <h3 class="font-semibold text-sm">🔌 ${t('열린 포트')} (${ports.length})</h3>
         <div class="flex items-center gap-2">
           ${hidden > 0 && !inc
-            ? `<span class="chip text-[10px]" style="color:var(--text-dim);">${t('시스템 노이즈 숨김')}: ${hidden}</span>`
-            : ''}
+      ? `<span class="chip text-[10px]" style="color:var(--text-dim);">${t('시스템 노이즈 숨김')}: ${hidden}</span>`
+      : ''}
           <button class="btn text-xs" onclick="_pmToggleSystem()" title="${t('mDNSResponder/identitysd 등 시스템 노이즈 표시 토글')}">
             ${inc ? '👁 ' + t('시스템 포트 숨기기') : '👁 ' + t('시스템 포트 표시')}
           </button>
@@ -22946,9 +23223,9 @@ VIEWS.openPorts = async () => {
             </tr></thead>
             <tbody>
               ${ports.map(p => {
-                const sys = p.systemNoise ? ' style="opacity:0.55;"' : '';
-                const label = p.serviceLabel ? `<span class="chip text-[9px] ml-1" style="color:var(--text-dim);">${escapeHtml(p.serviceLabel)}</span>` : '';
-                return `
+        const sys = p.systemNoise ? ' style="opacity:0.55;"' : '';
+        const label = p.serviceLabel ? `<span class="chip text-[9px] ml-1" style="color:var(--text-dim);">${escapeHtml(p.serviceLabel)}</span>` : '';
+        return `
                 <tr${sys}>
                   <td class="mono text-xs">${escapeHtml(p.local_addr || '*')}:${p.local_port}${label}</td>
                   <td class="text-xs"><span class="chip">${escapeHtml((p.proto || '').toUpperCase())}</span></td>
@@ -22958,7 +23235,7 @@ VIEWS.openPorts = async () => {
                   <td class="text-xs text-[var(--text-mute)]">${escapeHtml(p.state || '')}</td>
                   <td class="text-right"><button class="btn text-xs" onclick="_pmKillPid(${p.pid}, 'SIGTERM')">${t('종료')}</button></td>
                 </tr>`;
-              }).join('')}
+      }).join('')}
             </tbody>
           </table>
         </div>
@@ -22970,8 +23247,8 @@ VIEWS.openPorts = async () => {
 // and re-render. Persisted across reloads via localStorage.
 window._pmToggleSystem = function () {
   let cur = false;
-  try { cur = localStorage.getItem('cc.openPorts.includeSystem') === '1'; } catch (_) {}
-  try { localStorage.setItem('cc.openPorts.includeSystem', cur ? '0' : '1'); } catch (_) {}
+  try { cur = localStorage.getItem('cc.openPorts.includeSystem') === '1'; } catch (_) { }
+  try { localStorage.setItem('cc.openPorts.includeSystem', cur ? '0' : '1'); } catch (_) { }
   _apiCacheInvalidate('/api/ports/list');
   if (typeof renderView === 'function') renderView();
 };
@@ -23010,14 +23287,14 @@ VIEWS.cliSessions = async () => {
             </tr></thead>
             <tbody>
               ${sess.map(s => {
-                const sid = s.sessionId || '';
-                const arEntry = arBySid[sid];
-                const arOn = !!(arEntry && arEntry.enabled);
-                const arState = arEntry ? (arEntry.state || '') : '';
-                const arBtn = arOn
-                  ? `<button class="btn text-xs" style="border-color:var(--ok);color:var(--ok);" onclick="_pmCancelAR('${escapeHtml(sid)}')" title="${t('Auto-Resume 중단')}">🔄 ${t('AR 중단')}${arState ? ' · '+escapeHtml(arState) : ''}</button>`
-                  : `<button class="btn text-xs" onclick="_pmInjectAR('${escapeHtml(sid)}', ${JSON.stringify(s.cwd || '').replace(/"/g, '&quot;')})" title="${t('Auto-Resume 주입')}">🔄 ${t('Auto-Resume 주입')}</button>`;
-                return `
+    const sid = s.sessionId || '';
+    const arEntry = arBySid[sid];
+    const arOn = !!(arEntry && arEntry.enabled);
+    const arState = arEntry ? (arEntry.state || '') : '';
+    const arBtn = arOn
+      ? `<button class="btn text-xs" style="border-color:var(--ok);color:var(--ok);" onclick="_pmCancelAR('${escapeHtml(sid)}')" title="${t('Auto-Resume 중단')}">🔄 ${t('AR 중단')}${arState ? ' · ' + escapeHtml(arState) : ''}</button>`
+      : `<button class="btn text-xs" onclick="_pmInjectAR('${escapeHtml(sid)}', ${JSON.stringify(s.cwd || '').replace(/"/g, '&quot;')})" title="${t('Auto-Resume 주입')}">🔄 ${t('Auto-Resume 주입')}</button>`;
+    return `
                 <tr>
                   <td class="mono text-[10px]">${escapeHtml(sid.slice(0, 8))}</td>
                   <td class="mono text-xs">${s.pid}</td>
@@ -23031,7 +23308,7 @@ VIEWS.cliSessions = async () => {
                     <button class="btn text-xs" onclick="_pmKillPid(${s.pid}, 'SIGTERM')">${t('종료')}</button>
                   </td>
                 </tr>`;
-              }).join('')}
+  }).join('')}
             </tbody>
           </table>
         </div>
@@ -23387,7 +23664,7 @@ function _ccrRenderAlias() {
         ${present ? `<span class="ml-2" style="color:var(--ok);">✓ ${t('이미 적용됨')}</span>` : `<span class="ml-2" style="color:var(--text-mute);">${t('아직 적용되지 않음')}</span>`}
       </div>
       <pre class="mono text-xs p-3 rounded whitespace-pre-wrap" style="background:var(--code-bg);">${_ccrEsc(snippet)}</pre>
-      <button class="btn text-xs mt-2" onclick="_ccrCopy(${JSON.stringify(snippet).replace(/"/g,'&quot;')}, this)">📋 ${t('복사')}</button>
+      <button class="btn text-xs mt-2" onclick="_ccrCopy(${JSON.stringify(snippet).replace(/"/g, '&quot;')}, this)">📋 ${t('복사')}</button>
       <div class="text-[11px] text-[var(--text-mute)] mt-3">${t('위 블록을 RC 파일에 추가한 뒤 새 터미널을 여세요.')}</div>
       <div class="text-[11px] text-[var(--text-mute)] mt-2">${t('다른 옵션')}: <code class="mono">${_ccrEsc(alt)}</code></div>
     </div>`;
@@ -23517,24 +23794,24 @@ window._ccrRefreshStatus = async () => {
 // AUTO-RESUME MANAGER (v2.49.0)
 // ────────────────────────────────────────────────────────────────
 const _ARM_STATE_LABEL = {
-  running:   '실행 중',
-  waiting:   '대기 중',
-  watching:  '감시 중',
-  done:      '정상 종료',
-  failed:    '실패',
+  running: '실행 중',
+  waiting: '대기 중',
+  watching: '감시 중',
+  done: '정상 종료',
+  failed: '실패',
   exhausted: '소진',
-  stopped:   '중지',
-  error:     '오류',
+  stopped: '중지',
+  error: '오류',
 };
 const _ARM_STATE_COLOR = {
-  running:   { bg: 'rgba(34,197,94,.15)',  fg: '#22c55e' },
-  waiting:   { bg: 'rgba(234,179,8,.18)',  fg: '#eab308' },
-  watching:  { bg: 'rgba(59,130,246,.15)', fg: '#3b82f6' },
-  done:      { bg: 'rgba(34,197,94,.15)',  fg: '#22c55e' },
-  failed:    { bg: 'rgba(239,68,68,.18)',  fg: '#ef4444' },
-  exhausted: { bg: 'rgba(148,163,184,.20)',fg: '#94a3b8' },
-  stopped:   { bg: 'rgba(148,163,184,.20)',fg: '#94a3b8' },
-  error:     { bg: 'rgba(239,68,68,.18)',  fg: '#ef4444' },
+  running: { bg: 'rgba(34,197,94,.15)', fg: '#22c55e' },
+  waiting: { bg: 'rgba(234,179,8,.18)', fg: '#eab308' },
+  watching: { bg: 'rgba(59,130,246,.15)', fg: '#3b82f6' },
+  done: { bg: 'rgba(34,197,94,.15)', fg: '#22c55e' },
+  failed: { bg: 'rgba(239,68,68,.18)', fg: '#ef4444' },
+  exhausted: { bg: 'rgba(148,163,184,.20)', fg: '#94a3b8' },
+  stopped: { bg: 'rgba(148,163,184,.20)', fg: '#94a3b8' },
+  error: { bg: 'rgba(239,68,68,.18)', fg: '#ef4444' },
 };
 
 function _armEtaText(nextAttemptAt) {
@@ -23571,8 +23848,8 @@ VIEWS.autoResumeManager = async () => {
   }
   const breakdownHtml = Object.keys(byState).length
     ? Object.entries(byState).map(([s, n]) =>
-        `<span class="mr-2 mb-1 inline-block">${_armStateChip(s)} <span class="mono text-xs">${n}</span></span>`
-      ).join('')
+      `<span class="mr-2 mb-1 inline-block">${_armStateChip(s)} <span class="mono text-xs">${n}</span></span>`
+    ).join('')
     : `<span class="text-xs text-[var(--text-mute)]">${t('활성 바인딩 없음')}</span>`;
 
   // Sort defensively client-side too: live first, then dead.
@@ -23595,7 +23872,7 @@ VIEWS.autoResumeManager = async () => {
       ? `<span class="badge text-[10px]" style="background:rgba(34,197,94,.15);color:#16a34a;">🟢 ${t('실행 중')}</span>`
       : `<span class="badge text-[10px]" style="background:rgba(148,163,184,.15);color:var(--text-mute);">⚪ ${t('종료됨')}</span>`;
     const termCell = termApp || pid
-      ? `<div class="mono text-[10px]">${escapeHtml(termApp || '-')}${pid ? ' <span class="text-[var(--text-mute)]">#'+escapeHtml(String(pid))+'</span>' : ''}</div><div class="mt-0.5">${liveChip}</div>`
+      ? `<div class="mono text-[10px]">${escapeHtml(termApp || '-')}${pid ? ' <span class="text-[var(--text-mute)]">#' + escapeHtml(String(pid)) + '</span>' : ''}</div><div class="mt-0.5">${liveChip}</div>`
       : `<div>${liveChip}</div>`;
     return `
       <tr data-sid="${escapeHtml(sid)}">
@@ -23684,14 +23961,14 @@ AFTER.autoResumeManager = () => {
 window._armOpenDetail = (sid) => {
   // Reuse existing session detail flow if available; otherwise show binding json.
   if (typeof showAutoResumeDetail === 'function') {
-    try { showAutoResumeDetail(sid); return; } catch {}
+    try { showAutoResumeDetail(sid); return; } catch { }
   }
   api('/api/auto_resume/get?sessionId=' + encodeURIComponent(sid))
     .then(r => {
       if (!r || !r.ok) return toast(t('세션 정보를 불러올 수 없습니다'), 'err');
       const txt = JSON.stringify(r.entry || {}, null, 2);
       // best-effort: log to console + clipboard so user can inspect
-      try { navigator.clipboard.writeText(txt); } catch {}
+      try { navigator.clipboard.writeText(txt); } catch { }
       toast(t('상세') + ': ' + sid.slice(0, 8), 'ok');
       console.log('[auto-resume detail]', r.entry);
     })
@@ -23769,9 +24046,9 @@ window._armApplyAdvice = async (payloadJson) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        sessionId:    payload.sessionId,
+        sessionId: payload.sessionId,
         pollInterval: payload.pollInterval,
-        maxAttempts:  payload.maxAttempts,
+        maxAttempts: payload.maxAttempts,
       }),
     });
     if (r && r.ok) {
@@ -23790,7 +24067,7 @@ window._armOpenAddDialog = async () => {
   try {
     const r = await api('/api/sessions-monitor/list').catch(() => null);
     live = ((r && r.sessions) || []).filter(s => (s.sessionId || s.session_id));
-  } catch (_) {}
+  } catch (_) { }
   window.__armSessions = live.map(s => ({
     sessionId: s.sessionId || s.session_id || '',
     cwd: s.cwd || '',
@@ -23876,7 +24153,7 @@ function _armRememberCwd(sid, cwd) {
       keys.slice(0, keys.length - 32).forEach(k => delete map[k]);
     }
     localStorage.setItem('cc.ar.cwds', JSON.stringify(map));
-  } catch (_) {}
+  } catch (_) { }
 }
 function _armRecallCwd(sid) {
   if (!sid) return '';
@@ -23887,14 +24164,14 @@ function _armRecallCwd(sid) {
 }
 
 window._armSubmitAddDialog = async () => {
-  const sid = (document.getElementById('armSid')||{}).value || '';
-  const cwd = (document.getElementById('armCwd')||{}).value || '';
-  const prompt = (document.getElementById('armPrompt')||{}).value || '';
-  const poll = parseInt((document.getElementById('armPoll')||{}).value || '300', 10);
-  const idle = parseInt((document.getElementById('armIdle')||{}).value || '90', 10);
-  const max = parseInt((document.getElementById('armMax')||{}).value || '12', 10);
-  const useContinue = !!(document.getElementById('armUseContinue')||{}).checked;
-  const allowUnbound = !!(document.getElementById('armAllowUnbound')||{}).checked;
+  const sid = (document.getElementById('armSid') || {}).value || '';
+  const cwd = (document.getElementById('armCwd') || {}).value || '';
+  const prompt = (document.getElementById('armPrompt') || {}).value || '';
+  const poll = parseInt((document.getElementById('armPoll') || {}).value || '300', 10);
+  const idle = parseInt((document.getElementById('armIdle') || {}).value || '90', 10);
+  const max = parseInt((document.getElementById('armMax') || {}).value || '12', 10);
+  const useContinue = !!(document.getElementById('armUseContinue') || {}).checked;
+  const allowUnbound = !!(document.getElementById('armAllowUnbound') || {}).checked;
   if (!sid.trim()) { toast(t('Session UUID 가 비어있음'), 'err'); return; }
   try {
     const r = await api('/api/auto_resume/set', {
@@ -24200,7 +24477,7 @@ VIEWS.system = async () => {
       ${bootCard}
       <div class="lc-card">
         <h3 class="lc-section-title">🖥 ${t('디바이스')}</h3>
-        ${Object.entries(devinfo).map(([k,v]) => `
+        ${Object.entries(devinfo).map(([k, v]) => `
           <div class="lc-meta-row"><span class="lc-meta-label">${escapeHtml(k)}</span><span class="lc-meta-value">${escapeHtml(v)}</span></div>
         `).join('')}
       </div>
@@ -24223,11 +24500,11 @@ VIEWS.system = async () => {
           <tbody>
             ${sess.map(s => `
               <tr>
-                <td><span class="pulse-dot ${s.alive?'':'off'} inline-block mr-1"></span><span class="mono text-xs">${s.pid||'—'}</span></td>
-                <td class="text-xs">${escapeHtml(s.project||'—')}</td>
-                <td class="mono text-[10px] text-[var(--text-mute)] truncate" style="max-width:300px;">${escapeHtml(s.workspace||'')}</td>
-                <td class="text-xs">${escapeHtml(s.kind||'')}</td>
-                <td class="mono text-xs">${escapeHtml(s.version||'')}</td>
+                <td><span class="pulse-dot ${s.alive ? '' : 'off'} inline-block mr-1"></span><span class="mono text-xs">${s.pid || '—'}</span></td>
+                <td class="text-xs">${escapeHtml(s.project || '—')}</td>
+                <td class="mono text-[10px] text-[var(--text-mute)] truncate" style="max-width:300px;">${escapeHtml(s.workspace || '')}</td>
+                <td class="text-xs">${escapeHtml(s.kind || '')}</td>
+                <td class="mono text-xs">${escapeHtml(s.version || '')}</td>
                 <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(s.startedAt)}</td>
                 <td class="text-right"><button class="btn text-xs" onclick="openSessionTerminal('${s.sessionId}')">${t('터미널')}</button></td>
               </tr>
@@ -24273,8 +24550,8 @@ function promptModal({ title, message, placeholder, defaultValue, confirmLabel, 
   return new Promise((resolve) => {
     const mid = 'pm-' + Math.random().toString(36).slice(2, 8);
     const inputTag = multiline
-      ? `<textarea id="${mid}-input" class="input w-full" rows="4" placeholder="${escapeHtml(placeholder||'')}">${escapeHtml(defaultValue||'')}</textarea>`
-      : `<input id="${mid}-input" class="input w-full" placeholder="${escapeHtml(placeholder||'')}" value="${escapeHtml(defaultValue||'')}">`;
+      ? `<textarea id="${mid}-input" class="input w-full" rows="4" placeholder="${escapeHtml(placeholder || '')}">${escapeHtml(defaultValue || '')}</textarea>`
+      : `<input id="${mid}-input" class="input w-full" placeholder="${escapeHtml(placeholder || '')}" value="${escapeHtml(defaultValue || '')}">`;
     showModal(`
       <div class="p-5">
         <div class="flex items-center justify-between mb-3">
@@ -24365,7 +24642,7 @@ function showEditModal({ title, raw, save, readOnly }) {
       </div>
     </div>
     <div class="p-5 flex-1 overflow-y-auto">
-      <textarea id="editModalText" class="input" style="min-height: 560px;" ${ro?'readonly':''}>${escapeHtml(raw||'')}</textarea>
+      <textarea id="editModalText" class="input" style="min-height: 560px;" ${ro ? 'readonly' : ''}>${escapeHtml(raw || '')}</textarea>
     </div>
   `);
   if (!ro && save) {
@@ -24388,11 +24665,11 @@ _KEYDOWN_HANDLERS.push((e) => {
 // ────────────────────────────────────────────────────────────────
 // ACTIONS
 // ────────────────────────────────────────────────────────────────
-async function reindex(force=false) {
+async function reindex(force = false) {
   const s = document.getElementById('liveStatus');
   s.innerHTML = '<span class="pulse-dot"></span><span>인덱싱 중…</span>';
   try {
-    const r = await api('/api/sessions/reindex', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ force }) });
+    const r = await api('/api/sessions/reindex', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force }) });
     toast(`인덱스 완료 — 갱신 ${r.indexed} / 스킵 ${r.skipped}`, 'ok');
     s.innerHTML = '<span class="pulse-dot"></span><span>연결됨</span>';
     renderView();
@@ -24442,7 +24719,7 @@ function _scheduleVersionPoll() {
       const v = await api('/api/version');
       if (!window.__bootedAt) return;
       const startedAtChanged = (v.serverStartedAt || 0) !== window.__bootedAt.serverStartedAt;
-      const versionChanged   = v.version && v.version !== window.__bootedAt.version;
+      const versionChanged = v.version && v.version !== window.__bootedAt.version;
       if (startedAtChanged || versionChanged) {
         clearInterval(window.__verPollTimer);
         _showRefreshBanner(window.__bootedAt.version, v.version, versionChanged);
@@ -24491,7 +24768,7 @@ async function loadCliFoot() {
       // restart later (server PID changes ⇒ serverStartedAt changes).
       if (!window.__bootedAt) {
         window.__bootedAt = {
-          version:        v.version,
+          version: v.version,
           serverStartedAt: v.serverStartedAt || 0,
         };
         _scheduleVersionPoll();
@@ -24505,24 +24782,24 @@ async function loadCliFoot() {
     const overallOk = cliOk && connOk;
     const badge = (ok, label) =>
       `<span class="inline-flex items-center gap-1 text-[10px]">
-        <span class="w-1.5 h-1.5 rounded-full" style="background:${ok?'var(--ok)':'var(--err)'}"></span>${label}
+        <span class="w-1.5 h-1.5 rounded-full" style="background:${ok ? 'var(--ok)' : 'var(--err)'}"></span>${label}
       </span>`;
     document.getElementById('cliStatus').innerHTML = `
       <div class="card p-2.5 hover-lift cursor-pointer" onclick="openCliStatusModal()">
         <div class="flex items-center justify-between mb-1">
           <span class="cli-body text-[11px] font-semibold">${overallOk ? 'Claude CLI 연결됨' : 'Claude CLI 점검'}</span>
-          <span class="w-2 h-2 rounded-full" style="background:${overallOk?'var(--ok)':'var(--warn)'}; box-shadow:0 0 8px ${overallOk?'rgba(74,222,128,0.6)':'rgba(251,191,36,0.6)'};"></span>
+          <span class="w-2 h-2 rounded-full" style="background:${overallOk ? 'var(--ok)' : 'var(--warn)'}; box-shadow:0 0 8px ${overallOk ? 'rgba(74,222,128,0.6)' : 'rgba(251,191,36,0.6)'};"></span>
         </div>
         <div class="cli-body flex items-center gap-2">
-          ${badge(cliOk, cliOk ? `CLI ${escapeHtml((auth.cliVersion||'').split(' ')[0]||'')}` : 'CLI 미설치')}
+          ${badge(cliOk, cliOk ? `CLI ${escapeHtml((auth.cliVersion || '').split(' ')[0] || '')}` : 'CLI 미설치')}
           ${badge(connOk, connOk ? '구독 인증' : '미로그인')}
         </div>
-        ${connOk ? `<div class="cli-body text-[10px] text-[var(--text-dim)] mt-1 truncate" title="${t('클릭으로 이메일 표시 전환')}" onclick="event.stopPropagation();_toggleShowFullEmail()" style="cursor:pointer;">${escapeHtml(auth.planLabel||'')} · ${_renderEmail(auth.email||'')}</div>` : ''}
+        ${connOk ? `<div class="cli-body text-[10px] text-[var(--text-dim)] mt-1 truncate" title="${t('클릭으로 이메일 표시 전환')}" onclick="event.stopPropagation();_toggleShowFullEmail()" style="cursor:pointer;">${escapeHtml(auth.planLabel || '')} · ${_renderEmail(auth.email || '')}</div>` : ''}
         <div class="flex gap-1 mt-1.5">
           ${connOk
-            ? `<button class="btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();switchAccount()" title="${t('다른 Claude 계정으로 전환')}">🔄 ${t('전환')}</button>
+        ? `<button class="btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();switchAccount()" title="${t('다른 Claude 계정으로 전환')}">🔄 ${t('전환')}</button>
                <button class="btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();doLogoutOnly()" title="${t('현재 계정 로그아웃')}">🚪 ${t('로그아웃')}</button>`
-            : `<button class="btn-primary btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();triggerLogin()">🚀 ${t('로그인')}</button>`}
+        : `<button class="btn-primary btn text-[9px] px-1.5 py-0.5 flex-1" onclick="event.stopPropagation();triggerLogin()">🚀 ${t('로그인')}</button>`}
         </div>
       </div>
     `;
@@ -24534,7 +24811,7 @@ async function loadCliFoot() {
 async function triggerLogin() {
   try {
     const r = await api('/api/auth/login', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({})
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
     });
     if (r.ok) {
       toast(r.message || '터미널을 확인하세요.', 'ok');
@@ -24578,16 +24855,16 @@ async function switchAccount() {
     document.getElementById('switchCurrentInfo').innerHTML = auth.connected
       ? `<div class="flex items-center gap-3">
            <div class="w-10 h-10 rounded-full grid place-items-center text-lg" style="background:var(--grad);">
-             ${escapeHtml((auth.displayName||auth.email||'?')[0].toUpperCase())}
+             ${escapeHtml((auth.displayName || auth.email || '?')[0].toUpperCase())}
            </div>
            <div>
              <div class="font-semibold">${escapeHtml(auth.displayName || '사용자')}</div>
              <div class="text-xs text-[var(--text-mute)]">${_renderEmail(auth.email)}</div>
-             <div class="text-[10px] text-[var(--text-dim)]">${escapeHtml(auth.planLabel||'')} ${auth.organizationRole ? '· ' + escapeHtml(auth.organizationRole) : ''}</div>
+             <div class="text-[10px] text-[var(--text-dim)]">${escapeHtml(auth.planLabel || '')} ${auth.organizationRole ? '· ' + escapeHtml(auth.organizationRole) : ''}</div>
            </div>
          </div>`
       : '<div class="text-[var(--text-mute)]">연결된 계정 없음</div>';
-  } catch {}
+  } catch { }
 }
 
 async function doSwitchLogin() {
@@ -24598,12 +24875,12 @@ async function doSwitchLogin() {
   try {
     // 1) 로그아웃
     await api('/api/auth/logout', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({})
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
     });
     btn.innerHTML = '⏳ 새 로그인 창 여는 중…';
     // 2) 로그인 트리거
     const r = await api('/api/auth/login', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({})
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
     });
     if (r.ok) {
       msg.innerHTML = '✅ 터미널에서 브라우저 인증을 완료하세요. 자동 감지됩니다.';
@@ -24625,13 +24902,13 @@ async function doLogoutOnly() {
   if (!await confirmModal({ title: t('로그아웃'), message: t('정말 로그아웃 하시겠습니까?'), confirmLabel: t('로그아웃'), danger: true })) return;
   try {
     const r = await api('/api/auth/logout', {
-      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({})
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
     });
     if (r.ok) {
       toast('로그아웃 되었습니다', 'ok');
       closeModal();
       // v2.33.2 — 다음 새로고침에 로그인 게이트가 다시 뜨도록 플래그 클리어
-      try { localStorage.removeItem('dashboard-entered'); } catch {}
+      try { localStorage.removeItem('dashboard-entered'); } catch { }
       await loadCliFoot();
     } else toast(errMsg(r), 'err');
   } catch (e) { toast(e.message, 'err'); }
@@ -24650,7 +24927,7 @@ function _pollAuthStatus() {
         await loadCliFoot();
         renderView();
       }
-    } catch {}
+    } catch { }
     if (attempts >= 24) {
       clearInterval(poll);
       toast('시간 초과 — 페이지를 새로고침 해주세요.', 'warn');
@@ -24665,7 +24942,7 @@ async function openCliStatusModal() {
   const claimed = auth.claimedPlanId || '';
   const planOptions = [
     `<option value="">— 선택 안 함 —</option>`,
-    ...plans.map(p => `<option value="${p.id}" ${p.id===claimed?'selected':''}>${escapeHtml(p.label)}${p.note?` · ${escapeHtml(t(p.note))}`:''}</option>`)
+    ...plans.map(p => `<option value="${p.id}" ${p.id === claimed ? 'selected' : ''}>${escapeHtml(p.label)}${p.note ? ` · ${escapeHtml(t(p.note))}` : ''}</option>`)
   ].join('');
   showModal(`
     <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
@@ -24692,8 +24969,8 @@ async function openCliStatusModal() {
           ${row('이름', auth.displayName)}
           ${row('billingType (로컬)', auth.billingType || '—')}
           ${row('조직 역할', auth.organizationRole)}
-          ${row('가입일', (auth.accountCreatedAt||'').slice(0,10))}
-          ${row('구독 시작', (auth.subscriptionCreatedAt||'').slice(0,10))}
+          ${row('가입일', (auth.accountCreatedAt || '').slice(0, 10))}
+          ${row('구독 시작', (auth.subscriptionCreatedAt || '').slice(0, 10))}
         </tbody></table>
         ${!auth.connected ? '<div class="text-xs text-[var(--text-mute)] mt-2">터미널에서 <code class="mono">claude login</code> 실행 후 새로고침.</div>' : ''}
       </div>
@@ -24716,7 +24993,7 @@ async function openCliStatusModal() {
 async function saveClaimedPlan() {
   const planId = document.getElementById('planSelect').value;
   const r = await api('/api/auth/claimed-plan', {
-    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ planId })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ planId })
   });
   if (r.ok) {
     toast(planId ? '플랜 저장됨' : '플랜 선택 해제됨', 'ok');
@@ -24733,11 +25010,11 @@ document.getElementById('btn-latest-features').onclick = async () => {
   btn.innerHTML = '<span>⏳</span><span>Claude 에게 조사 중… (~1분)</span>';
   try {
     const r = await api('/api/features/refresh', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({}),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
     });
     if (r.error) { toast(errMsg(r), 'err'); return; }
-    const n = (r.features||[]).length;
-    toast(n ? `✨ 신기능 ${n}개 발견! 좌측 '🆕 신기능' 탭 확인` : '새로운 기능 없음 (이미 최신)', n?'ok':'info');
+    const n = (r.features || []).length;
+    toast(n ? `✨ 신기능 ${n}개 발견! 좌측 '🆕 신기능' 탭 확인` : '새로운 기능 없음 (이미 최신)', n ? 'ok' : 'info');
     if (state.view === 'features') renderView();
     else go('features');
   } catch (e) { toast(e.message, 'err'); }
@@ -24755,7 +25032,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ── 테마 ──
-const _ALL_THEMES = ['dark','light','midnight','forest','sunset'];
+const _ALL_THEMES = ['dark', 'light', 'midnight', 'forest', 'sunset'];
 // v2.33.4 — 'auto' 는 prefers-color-scheme 따라가기 (dark ↔ light)
 function _resolveAutoTheme() {
   try {
@@ -24782,7 +25059,7 @@ function setTheme(th) {
   document.querySelectorAll('.theme-check').forEach(el => {
     el.style.display = el.getAttribute('data-theme') === th ? '' : 'none';
   });
-  try { localStorage.setItem('cc-theme', th); } catch {}
+  try { localStorage.setItem('cc-theme', th); } catch { }
   // auto 모드에서만 OS 변경 구독
   try {
     if (window._themeMql) { window._themeMql.onchange = null; window._themeMql = null; }
@@ -24791,7 +25068,7 @@ function setTheme(th) {
       mql.onchange = () => _applyTheme('auto');
       window._themeMql = mql;
     }
-  } catch {}
+  } catch { }
 }
 (function _initTheme() {
   try {
@@ -24818,7 +25095,7 @@ function setTheme(th) {
       if (saved !== 'light') document.documentElement.style.colorScheme = 'dark';
       else document.documentElement.style.colorScheme = 'light';
     }
-  } catch {}
+  } catch { }
 })();
 
 // ── 언어 (i18n) ──
@@ -24872,7 +25149,7 @@ function _translateDOM(root) {
   const dict = I18N[_curLang];
   if (!dict) return;
   if (!_domTranslateCache[_curLang]) {
-    const keys = Object.keys(dict).filter(k => _KO_RE.test(k)).sort((a,b) => b.length - a.length);
+    const keys = Object.keys(dict).filter(k => _KO_RE.test(k)).sort((a, b) => b.length - a.length);
     _domTranslateCache[_curLang] = { keys, patterns: _buildKeyPatterns(keys) };
   }
   const { keys, patterns } = _domTranslateCache[_curLang];
@@ -24906,7 +25183,7 @@ function _translateDOM(root) {
   // ── 2단계: 한글 텍스트 속성 치환 ──
   if (keys.length) {
     root.querySelectorAll('[placeholder],[title],[alt],[aria-label]').forEach(el => {
-      ['placeholder','title','alt','aria-label'].forEach(attr => {
+      ['placeholder', 'title', 'alt', 'aria-label'].forEach(attr => {
         const v = el.getAttribute(attr);
         if (v && _KO_RE.test(v)) {
           const nv = applyAll(v);
@@ -24955,7 +25232,7 @@ NAV.forEach(n => { _NAV_LABELS_KO[n.id] = n.label; });
 let _curLang = 'ko';
 function setLang(lang) {
   // 쿠키 설정 후 페이지 리로드 — 런타임 로더가 /api/locales/{lang}.json 을 다시 fetch
-  document.cookie = `cc-lang=${lang};path=/;max-age=${365*86400}`;
+  document.cookie = `cc-lang=${lang};path=/;max-age=${365 * 86400}`;
   location.reload();
 }
 // 현재 언어 감지 (쿠키 + ?lang= 쿼리 파라미터)
@@ -24963,9 +25240,9 @@ function setLang(lang) {
   const m = document.cookie.match(/cc-lang=(\w+)/);
   if (m) _curLang = m[1];
   const ql = new URLSearchParams(location.search).get('lang');
-  if (ql && ['en','zh'].includes(ql)) {
+  if (ql && ['en', 'zh'].includes(ql)) {
     _curLang = ql;
-    document.cookie = `cc-lang=${ql};path=/;max-age=${365*86400}`;
+    document.cookie = `cc-lang=${ql};path=/;max-age=${365 * 86400}`;
   }
   // 체크마크 동기화
   document.querySelectorAll('.lang-check').forEach(el => {
@@ -24988,8 +25265,8 @@ window._i18nReady = _loadLocale(_curLang).then(() => {
       }
     };
     // SVG 캔버스 + 코드 블록은 번역 불필요 — MutationObserver에서 제외
-    const _i18nSkipTags = new Set(['SVG','svg','CODE','code','PRE','pre','SCRIPT','STYLE','CANVAS']);
-    const _i18nSkipIds = new Set(['wfNodes','wfEdges','wfViewport','wfTutNodes','wfTutEdges','wfTutSvg','wfMinimap']);
+    const _i18nSkipTags = new Set(['SVG', 'svg', 'CODE', 'code', 'PRE', 'pre', 'SCRIPT', 'STYLE', 'CANVAS']);
+    const _i18nSkipIds = new Set(['wfNodes', 'wfEdges', 'wfViewport', 'wfTutNodes', 'wfTutEdges', 'wfTutSvg', 'wfMinimap']);
     const mo = new MutationObserver(muts => {
       for (const m of muts) {
         for (const node of m.addedNodes) {
@@ -25023,14 +25300,14 @@ function _toggleSidebar() {
     document.body.classList.toggle('sidebar-open', sb.classList.contains('open'));
   } else {
     document.body.classList.toggle('sb-collapsed');
-    try { localStorage.setItem('sb-collapsed', document.body.classList.contains('sb-collapsed') ? '1' : '0'); } catch {}
+    try { localStorage.setItem('sb-collapsed', document.body.classList.contains('sb-collapsed') ? '1' : '0'); } catch { }
   }
   _syncNavToggleVisibility();
 }
 document.getElementById('sbToggle').onclick = _toggleSidebar;
 document.getElementById('navToggle').onclick = _toggleSidebar;
 window.addEventListener('resize', _syncNavToggleVisibility);
-try { if (localStorage.getItem('sb-collapsed') === '1') document.body.classList.add('sb-collapsed'); } catch {}
+try { if (localStorage.getItem('sb-collapsed') === '1') document.body.classList.add('sb-collapsed'); } catch { }
 _syncNavToggleVisibility();
 document.getElementById('globalSearch').addEventListener('click', () => openSpotlight());
 document.getElementById('globalSearch').addEventListener('keydown', e => {
@@ -25211,8 +25488,8 @@ async function _flushPrefs() {
   try {
     const r = await fetch('/api/prefs/set', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({patch})
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patch })
     });
     const j = await r.json();
     if (j.ok) {
@@ -25229,16 +25506,16 @@ async function _flushPrefs() {
 function _applyPrefsToDOM(prefs) {
   if (!prefs) return;
   const ui = prefs.ui || {};
-  document.body.dataset.density       = ui.density   || 'comfortable';
-  document.body.dataset.fontSize      = ui.fontSize  || 'medium';
+  document.body.dataset.density = ui.density || 'comfortable';
+  document.body.dataset.fontSize = ui.fontSize || 'medium';
   document.body.dataset.reducedMotion = (ui.reducedMotion ? 'true' : 'false');
-  document.body.dataset.accent        = ui.accentColor || 'claude';
-  document.body.dataset.mascotHidden  = (ui.mascotEnabled === false ? 'true' : 'false');
+  document.body.dataset.accent = ui.accentColor || 'claude';
+  document.body.dataset.mascotHidden = (ui.mascotEnabled === false ? 'true' : 'false');
 }
 
 async function _bootPrefs() {
   try {
-    const r = await fetch('/api/prefs/get', {cache: 'no-store'});
+    const r = await fetch('/api/prefs/get', { cache: 'no-store' });
     const j = await r.json();
     if (j && j.ok) {
       window.CC_PREFS = j.prefs;
@@ -25255,52 +25532,52 @@ _bootPrefs();
 
 // ── Drawer renderer ────────────────────────────────────────────
 const _QS_SECTIONS = [
-  { id: 'ui',       icon: '🎨', label: 'UI · 외관' },
-  { id: 'ai',       icon: '🤖', label: 'AI 기본값' },
+  { id: 'ui', icon: '🎨', label: 'UI · 외관' },
+  { id: 'ai', icon: '🤖', label: 'AI 기본값' },
   { id: 'behavior', icon: '⚙️', label: '동작' },
   { id: 'workflow', icon: '🔀', label: '워크플로우 기본값' },
-  { id: 'current',  icon: '🔎', label: '현재 파라미터', readonly: true },
+  { id: 'current', icon: '🔎', label: '현재 파라미터', readonly: true },
 ];
 
 // ko labels per (section, key) — fall back to key when missing
 const _QS_LABELS = {
-  'ui.theme':            ['테마', 'auto/dark/light/midnight/forest/sunset'],
-  'ui.lang':             ['언어', 'ko/en/zh — 변경 시 페이지 새로고침'],
-  'ui.density':          ['밀도', '카드/창의 안쪽 여백'],
-  'ui.fontSize':         ['글자 크기', '본문 기본 폰트 크기'],
-  'ui.reducedMotion':    ['모션 감소', '애니메이션·전환을 거의 0으로'],
-  'ui.accentColor':      ['강조 색', '액티브 상태·버튼 강조 색'],
+  'ui.theme': ['테마', 'auto/dark/light/midnight/forest/sunset'],
+  'ui.lang': ['언어', 'ko/en/zh — 변경 시 페이지 새로고침'],
+  'ui.density': ['밀도', '카드/창의 안쪽 여백'],
+  'ui.fontSize': ['글자 크기', '본문 기본 폰트 크기'],
+  'ui.reducedMotion': ['모션 감소', '애니메이션·전환을 거의 0으로'],
+  'ui.accentColor': ['강조 색', '액티브 상태·버튼 강조 색'],
   'ui.sidebarCollapsed': ['사이드바 접힘', '데스크톱에서 사이드바 기본 접힘'],
-  'ui.mascotEnabled':    ['마스코트 표시', '우하단 점프 캐릭터'],
-  'ui.compactSidebar':   ['컴팩트 사이드바', '카테고리 라벨 숨김'],
+  'ui.mascotEnabled': ['마스코트 표시', '우하단 점프 캐릭터'],
+  'ui.compactSidebar': ['컴팩트 사이드바', '카테고리 라벨 숨김'],
 
-  'ai.defaultProvider':  ['기본 프로바이더', '예: claude:sonnet, openai:gpt-4.1, ollama:llama3.1'],
-  'ai.effort':           ['Effort', 'low / medium / high — 추론 깊이'],
-  'ai.temperature':      ['Temperature', '0.0 결정적 ↔ 2.0 다양'],
-  'ai.topP':             ['Top-p', '핵 샘플링 누적 확률'],
-  'ai.maxOutputTokens':  ['Max output tokens', '응답 최대 토큰'],
-  'ai.thinkingBudget':   ['Thinking budget', '확장 사고 예산 (0 = 비활성)'],
+  'ai.defaultProvider': ['기본 프로바이더', '예: claude:sonnet, openai:gpt-4.1, ollama:llama3.1'],
+  'ai.effort': ['Effort', 'low / medium / high — 추론 깊이'],
+  'ai.temperature': ['Temperature', '0.0 결정적 ↔ 2.0 다양'],
+  'ai.topP': ['Top-p', '핵 샘플링 누적 확률'],
+  'ai.maxOutputTokens': ['Max output tokens', '응답 최대 토큰'],
+  'ai.thinkingBudget': ['Thinking budget', '확장 사고 예산 (0 = 비활성)'],
   'ai.extendedThinking': ['Extended thinking', 'Claude 확장 사고 모드'],
-  'ai.streamResponses':  ['스트리밍 응답', 'SSE 토큰 스트리밍'],
-  'ai.fallbackChain':    ['폴백 체인 사용', '실패 시 다음 프로바이더로 자동 폴백'],
+  'ai.streamResponses': ['스트리밍 응답', 'SSE 토큰 스트리밍'],
+  'ai.fallbackChain': ['폴백 체인 사용', '실패 시 다음 프로바이더로 자동 폴백'],
 
-  'behavior.autoResume':         ['Auto-Resume', '한도 도달 시 자동 재개 워커'],
-  'behavior.notifySlack':        ['Slack 알림', '워크플로우 완료/실패 알림'],
-  'behavior.notifyDiscord':      ['Discord 알림', '워크플로우 완료/실패 알림'],
-  'behavior.telemetryRefresh':   ['텔레메트리 갱신(초)', '0 = 비활성'],
-  'behavior.confirmSpawn':       ['세션 spawn 전 확인', 'CLI 세션 시작 직전 모달'],
-  'behavior.autosaveWorkflows':  ['워크플로우 자동 저장', '편집 시 디바운스 저장'],
-  'behavior.liveTickerSeconds':  ['라이브 티커(초)', '실시간 상태 폴링 주기'],
-  'behavior.soundOnComplete':    ['완료 알림 소리', '워크플로우 종료 시 비프'],
-  'behavior.openLastTab':        ['마지막 탭 자동 열기', '재방문 시 직전 탭 복원'],
-  'behavior.autoStartOllama':    ['Ollama 자동 시작', '대시보드 부팅 시 ollama serve 자동 실행 (끄면 메모리 절감)'],
+  'behavior.autoResume': ['Auto-Resume', '한도 도달 시 자동 재개 워커'],
+  'behavior.notifySlack': ['Slack 알림', '워크플로우 완료/실패 알림'],
+  'behavior.notifyDiscord': ['Discord 알림', '워크플로우 완료/실패 알림'],
+  'behavior.telemetryRefresh': ['텔레메트리 갱신(초)', '0 = 비활성'],
+  'behavior.confirmSpawn': ['세션 spawn 전 확인', 'CLI 세션 시작 직전 모달'],
+  'behavior.autosaveWorkflows': ['워크플로우 자동 저장', '편집 시 디바운스 저장'],
+  'behavior.liveTickerSeconds': ['라이브 티커(초)', '실시간 상태 폴링 주기'],
+  'behavior.soundOnComplete': ['완료 알림 소리', '워크플로우 종료 시 비프'],
+  'behavior.openLastTab': ['마지막 탭 자동 열기', '재방문 시 직전 탭 복원'],
+  'behavior.autoStartOllama': ['Ollama 자동 시작', '대시보드 부팅 시 ollama serve 자동 실행 (끄면 메모리 절감)'],
 
-  'workflow.defaultIterations':     ['기본 반복 횟수', 'Repeat 노드 기본값'],
+  'workflow.defaultIterations': ['기본 반복 횟수', 'Repeat 노드 기본값'],
   'workflow.defaultRepeatDelaySec': ['반복 간격(초)', '반복 간 대기'],
-  'workflow.dryRunByDefault':       ['Dry-run 기본', '실행 시 dry-run 토글 기본 ON'],
-  'workflow.showMinimap':           ['미니맵 표시', '캔버스 우하단 미니맵'],
-  'workflow.snapToGrid':            ['그리드 스냅', '노드 이동 시 격자 정렬'],
-  'workflow.gridSize':              ['그리드 크기(px)', '8~64'],
+  'workflow.dryRunByDefault': ['Dry-run 기본', '실행 시 dry-run 토글 기본 ON'],
+  'workflow.showMinimap': ['미니맵 표시', '캔버스 우하단 미니맵'],
+  'workflow.snapToGrid': ['그리드 스냅', '노드 이동 시 격자 정렬'],
+  'workflow.gridSize': ['그리드 크기(px)', '8~64'],
 };
 
 function _qsLabelHint(section, key) {
@@ -25412,8 +25689,8 @@ function _qsRenderSection(section) {
   const cur = (window.CC_PREFS && window.CC_PREFS[section]) || {};
   if (!schema) return '<div class="qs-section-desc">스키마 로딩 실패</div>';
   const sectionDesc = {
-    ui:       '테마·언어·밀도·강조 색 등 외관 관련 설정. 즉시 적용됩니다.',
-    ai:       'AI 호출의 기본 파라미터. 워크플로우 노드와 챗봇이 이 값을 시작점으로 사용합니다.',
+    ui: '테마·언어·밀도·강조 색 등 외관 관련 설정. 즉시 적용됩니다.',
+    ai: 'AI 호출의 기본 파라미터. 워크플로우 노드와 챗봇이 이 값을 시작점으로 사용합니다.',
     behavior: '대시보드의 기본 동작·알림·폴링 주기.',
     workflow: '워크플로우 에디터의 기본값. 새 노드 생성 시 이 값으로 prefill 됩니다.',
   }[section] || '';
@@ -25428,13 +25705,11 @@ function _qsRenderRow(section, key, def, value) {
     control = `<div class="qs-toggle ${value ? 'on' : ''}" data-section="${section}" data-key="${key}" role="switch" aria-checked="${!!value}" tabindex="0"></div>`;
   } else if (def.kind === 'enum') {
     if (def.choices.length <= 4) {
-      control = `<div class="qs-seg" data-section="${section}" data-key="${key}">${
-        def.choices.map(c => `<button class="${c === value ? 'on' : ''}" data-val="${_qsEscape(c)}">${_qsEscape(c)}</button>`).join('')
-      }</div>`;
+      control = `<div class="qs-seg" data-section="${section}" data-key="${key}">${def.choices.map(c => `<button class="${c === value ? 'on' : ''}" data-val="${_qsEscape(c)}">${_qsEscape(c)}</button>`).join('')
+        }</div>`;
     } else {
-      control = `<select data-section="${section}" data-key="${key}">${
-        def.choices.map(c => `<option value="${_qsEscape(c)}" ${c === value ? 'selected' : ''}>${_qsEscape(c)}</option>`).join('')
-      }</select>`;
+      control = `<select data-section="${section}" data-key="${key}">${def.choices.map(c => `<option value="${_qsEscape(c)}" ${c === value ? 'selected' : ''}>${_qsEscape(c)}</option>`).join('')
+        }</select>`;
     }
   } else if (def.kind === 'int' || def.kind === 'float') {
     const step = def.kind === 'float' ? '0.05' : '1';
@@ -25509,7 +25784,7 @@ function _qsBindControls(section) {
 // prefs, runtime info, and quick links to inspection endpoints.
 function _qsRenderCurrentParams() {
   const prefs = window.CC_PREFS || {};
-  const defs  = window.CC_PREFS_DEFAULTS || null;
+  const defs = window.CC_PREFS_DEFAULTS || null;
   const sections = ['ui', 'ai', 'behavior', 'workflow'];
   const rows = [];
   for (const sec of sections) {
@@ -25542,13 +25817,13 @@ function _qsRenderCurrentParams() {
   ].map(([k, v]) => `<tr><td colspan="2">${k}</td><td colspan="2"><code>${v}</code></td></tr>`).join('');
   // Fire-and-forget: refresh runtime info on first render.
   try {
-    fetch('/api/version', {cache: 'no-store'}).then(r => r.json()).then(j => {
+    fetch('/api/version', { cache: 'no-store' }).then(r => r.json()).then(j => {
       window.__VERSION_CACHE = j || {};
       // Re-render only if pane is still open.
       const dr = document.getElementById('qsDrawer');
       if (dr && dr.dataset.section === 'current') _qsRefreshSection('current');
-    }).catch(() => {});
-  } catch {}
+    }).catch(() => { });
+  } catch { }
   // QQ230 — third arg `noopener,noreferrer` keeps the new tab from
   // sharing a process with the dashboard (Chrome can recycle its
   // renderer independently) and strips referrer headers.
@@ -25581,18 +25856,18 @@ function _qsRenderCurrentParams() {
 function _qsApplyAndPersist(section, key, value) {
   setPref(section, key, value);
   // Side-effects for keys that need immediate behavior beyond data-* attrs
-  if (section === 'ui' && key === 'theme')  setTheme(value);
-  if (section === 'ui' && key === 'lang' && value !== _curLang)  setLang(value);
+  if (section === 'ui' && key === 'theme') setTheme(value);
+  if (section === 'ui' && key === 'lang' && value !== _curLang) setLang(value);
   if (section === 'ui' && key === 'sidebarCollapsed') {
     document.body.classList.toggle('sb-collapsed', !!value);
-    try { localStorage.setItem('sb-collapsed', value ? '1' : '0'); } catch {}
+    try { localStorage.setItem('sb-collapsed', value ? '1' : '0'); } catch { }
     if (typeof _syncNavToggleVisibility === 'function') _syncNavToggleVisibility();
   }
 }
 
 async function _qsResetSection(section) {
   if (!confirm((typeof t === 'function' ? t('이 섹션의 모든 값을 기본값으로 되돌릴까요?') : 'Reset this section?'))) return;
-  const r = await fetch('/api/prefs/reset', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({section})});
+  const r = await fetch('/api/prefs/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section }) });
   const j = await r.json();
   if (j.ok) {
     window.CC_PREFS = j.prefs;
@@ -25603,7 +25878,7 @@ async function _qsResetSection(section) {
 
 async function _qsResetAll() {
   if (!confirm((typeof t === 'function' ? t('모든 빠른 설정을 초기화할까요? 이 작업은 되돌릴 수 없습니다.') : 'Reset all Quick Settings? This cannot be undone.'))) return;
-  const r = await fetch('/api/prefs/reset', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})});
+  const r = await fetch('/api/prefs/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
   const j = await r.json();
   if (j.ok) {
     window.CC_PREFS = j.prefs;
@@ -25638,7 +25913,7 @@ _KEYDOWN_HANDLERS.push((e) => {
   if (typeof _origSetTheme === 'function') {
     window.setTheme = function (th) {
       _origSetTheme(th);
-      if (window.CC_PREFS) setPref('ui', 'theme', th, {skipApply: true});
+      if (window.CC_PREFS) setPref('ui', 'theme', th, { skipApply: true });
     };
   }
   const _origSetLang = window.setLang;
@@ -25648,9 +25923,9 @@ _KEYDOWN_HANDLERS.push((e) => {
       try {
         navigator.sendBeacon && navigator.sendBeacon(
           '/api/prefs/set',
-          new Blob([JSON.stringify({patch: {ui: {lang}}})], {type: 'application/json'})
+          new Blob([JSON.stringify({ patch: { ui: { lang } } })], { type: 'application/json' })
         );
-      } catch {}
+      } catch { }
       _origSetLang(lang);
     };
   }
@@ -25686,13 +25961,13 @@ function showLoginGate(auth) {
             <div class="card p-4 mb-4">
               <div class="flex items-center gap-3">
                 <div class="w-11 h-11 rounded-full grid place-items-center text-lg font-bold flex-shrink-0" style="background:var(--grad);color:#0a0a0f;">
-                  ${escapeHtml((auth.displayName||auth.email||'?')[0].toUpperCase())}
+                  ${escapeHtml((auth.displayName || auth.email || '?')[0].toUpperCase())}
                 </div>
                 <div class="min-w-0">
                   <div class="font-semibold text-sm truncate">${escapeHtml(auth.displayName) || _renderEmail(auth.email)}</div>
                   <div class="text-xs text-[var(--text-mute)] truncate">${_renderEmail(auth.email)}</div>
                   <div class="flex items-center gap-2 mt-0.5">
-                    <span class="chip chip-ok text-[9px]">${escapeHtml(auth.planLabel||'연결됨')}</span>
+                    <span class="chip chip-ok text-[9px]">${escapeHtml(auth.planLabel || '연결됨')}</span>
                     ${auth.subscriptionType ? `<span class="chip text-[9px]">${escapeHtml(auth.subscriptionType)}</span>` : ''}
                   </div>
                 </div>
@@ -25716,18 +25991,18 @@ function showLoginGate(auth) {
       btn.disabled = true;
       btn.innerHTML = '⏳ 로그아웃 중…';
       try {
-        await api('/api/auth/logout', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+        await api('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
         btn.innerHTML = '⏳ 새 로그인 창 여는 중…';
-        const r = await api('/api/auth/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+        const r = await api('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
         if (r.ok) {
           msg.innerHTML = '✅ 터미널에서 브라우저 인증을 완료하세요.';
           btn.innerHTML = '🔄 로그인 확인 중…';
           _pollAuthAndReload();
         } else {
-          msg.innerHTML = '❌ ' + escapeHtml(r.error||'실패');
+          msg.innerHTML = '❌ ' + escapeHtml(r.error || '실패');
           btn.disabled = false; btn.innerHTML = '🔄 Switch Account';
         }
-      } catch(e) {
+      } catch (e) {
         msg.innerHTML = '❌ ' + escapeHtml(e.message);
         btn.disabled = false; btn.innerHTML = '🔄 Switch Account';
       }
@@ -25745,7 +26020,7 @@ function showLoginGate(auth) {
           <div style="padding:2rem;">
             <div style="margin-bottom:1.5rem;">
               <div class="flex items-center gap-2 mb-2">
-                <span class="w-2 h-2 rounded-full" style="background:${cliOk?'var(--ok)':'var(--err)'}"></span>
+                <span class="w-2 h-2 rounded-full" style="background:${cliOk ? 'var(--ok)' : 'var(--err)'}"></span>
                 <span class="text-xs font-semibold">${cliOk ? 'Claude CLI 설치됨' : 'Claude CLI 미설치'}</span>
                 ${cliOk && auth.cliVersion ? `<span class="chip text-[10px]">${escapeHtml(auth.cliVersion.split(' ')[0])}</span>` : ''}
               </div>
@@ -25762,7 +26037,7 @@ function showLoginGate(auth) {
               <p class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(auth.reason || 'Claude 계정에 로그인되지 않았습니다.')}</p>
             </div>
             <button id="gateLoginBtn" class="btn-primary btn" style="width:100%;justify-content:center;padding:0.7rem;font-size:0.9rem;"
-              ${!cliOk?'disabled style="width:100%;justify-content:center;padding:0.7rem;font-size:0.9rem;opacity:0.4;cursor:not-allowed;"':''}>
+              ${!cliOk ? 'disabled style="width:100%;justify-content:center;padding:0.7rem;font-size:0.9rem;opacity:0.4;cursor:not-allowed;"' : ''}>
               🚀 Claude 로그인
             </button>
             <div id="gateMsg" class="text-xs text-center mt-3 text-[var(--text-mute)]" style="min-height:1.2rem;"></div>
@@ -25780,16 +26055,16 @@ function showLoginGate(auth) {
         loginBtn.innerHTML = '⏳ 터미널에서 로그인 창 여는 중…';
         const msg = document.getElementById('gateMsg');
         try {
-          const r = await api('/api/auth/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+          const r = await api('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
           if (r.ok) {
             msg.innerHTML = '✅ 터미널에서 브라우저 인증을 완료하세요.';
             loginBtn.innerHTML = '🔄 로그인 확인 중…';
             _pollAuthAndReload();
           } else {
-            msg.innerHTML = '❌ ' + escapeHtml(r.error||'실패');
+            msg.innerHTML = '❌ ' + escapeHtml(r.error || '실패');
             loginBtn.disabled = false; loginBtn.innerHTML = '🚀 Claude 로그인';
           }
-        } catch(e) {
+        } catch (e) {
           msg.innerHTML = '❌ ' + escapeHtml(e.message);
           loginBtn.disabled = false; loginBtn.innerHTML = '🚀 Claude 로그인';
         }
@@ -25810,7 +26085,7 @@ function _pollAuthAndReload() {
         if (msg) msg.innerHTML = '🎉 로그인 성공! 대시보드를 불러옵니다…';
         setTimeout(() => location.reload(), 600);
       }
-    } catch {}
+    } catch { }
     if (attempts >= 36) { // 3분
       clearInterval(poll);
       const msg = document.getElementById('gateMsg');
@@ -25828,15 +26103,15 @@ function enterDashboard() {
   const headerEl = contentEl.querySelector('header');
   if (headerEl) headerEl.style.display = '';
   // v2.33.2 — 한 번 진입했음을 기록해 다음 새로고침 시 게이트 스킵
-  try { localStorage.setItem('dashboard-entered', '1'); } catch {}
+  try { localStorage.setItem('dashboard-entered', '1'); } catch { }
   // 챗 창 드래그 + 마스코트 초기화 (1회)
   if (!_chatDragInit) {
-    try { _makeDraggable(document.getElementById('chatWin')); } catch {}
+    try { _makeDraggable(document.getElementById('chatWin')); } catch { }
     _initMascot();
     _chatDragInit = true;
   }
   // 신기능 데이터 미리 로드 (검색용)
-  cachedApi('/api/features/list', 120000).then(r => { state.data.features = r; }).catch(() => {});
+  cachedApi('/api/features/list', 120000).then(r => { state.data.features = r; }).catch(() => { });
   loadCliFoot();
   renderView();
 }
@@ -25915,7 +26190,7 @@ function _initMascot() {
     startX = t.clientX; startY = t.clientY;
     const r = el.getBoundingClientRect();
     origL = r.left; origT = r.top;
-    try { e.preventDefault(); } catch (_) {}
+    try { e.preventDefault(); } catch (_) { }
   }, { passive: false });
   document.addEventListener('touchmove', (e) => {
     if (!_mascotDragging) return;
@@ -25927,11 +26202,11 @@ function _initMascot() {
     const maxL = window.innerWidth - (el.offsetWidth || 70);
     const maxT = window.innerHeight - (el.offsetHeight || 63);
     el.style.left = Math.max(0, Math.min(origL + dx, maxL)) + 'px';
-    el.style.top  = Math.max(0, Math.min(origT + dy, maxT)) + 'px';
+    el.style.top = Math.max(0, Math.min(origT + dy, maxT)) + 'px';
     el.style.right = 'auto'; el.style.bottom = 'auto';
     if (dx < -2) el.classList.add('facing-left');
     else if (dx > 2) el.classList.remove('facing-left');
-    try { e.preventDefault(); } catch (_) {}
+    try { e.preventDefault(); } catch (_) { }
   }, { passive: false });
   document.addEventListener('touchend', (e) => {
     if (!_mascotDragging) return;
@@ -25941,7 +26216,7 @@ function _initMascot() {
       toggleChat();
       // 합성 mouse 이벤트가 click/mousedown/mouseup 로 연달아 발행되어
       // toggleChat 이 재호출되는 것을 막는다.
-      try { e.preventDefault(); } catch (_) {}
+      try { e.preventDefault(); } catch (_) { }
     } else {
       _startMascotWander();
     }
@@ -25960,8 +26235,18 @@ function _initMascot() {
 
   // Paint the v3.99.26 sprite mascot into the wrapper + any inline
   // mascots already in the DOM (chat-window title bar).
+  _mascotPickRandomVariant(true, false);
   _mascotSetState('idle');
   _mascotPaintInline('#chatTitleMascot');
+
+  // Rotate mascot friends over time so different characters appear.
+  if (_mascotVariantTimer) clearInterval(_mascotVariantTimer);
+  _mascotVariantTimer = setInterval(() => {
+    if (_mascotDragging || _mascotOnChat || _mascotOnModal) return;
+    if (document.hidden) return;
+    if (document.body.dataset.mascotHidden === 'true') return;
+    _mascotPickRandomVariant(false, false);
+  }, 12000);
 
   _startMascotWander();
   _mascotBubbleTimer = setInterval(_showRandomBubble, 15000);
@@ -25975,23 +26260,23 @@ function _initMascot() {
 //   - chat send/recv (working on send, done on receive, error on failure)
 //   - global error handler (window.onerror) — see _bindMascotErrorFeed
 function _mascotMarkWorking() { _mascotSetState('working'); }
-function _mascotMarkDone()    { _mascotSetState('done'); }
-function _mascotMarkError()   { _mascotSetState('error'); }
-function _mascotMarkIdle()    { _mascotSetState('idle'); }
+function _mascotMarkDone() { _mascotSetState('done'); }
+function _mascotMarkError() { _mascotSetState('error'); }
+function _mascotMarkIdle() { _mascotSetState('idle'); }
 
 function _bindMascotErrorFeed() {
   // Hard errors → error pose. Re-uses the existing global handler if
   // one is registered; we wrap rather than replace.
   const prev = window.onerror;
   window.onerror = function (...args) {
-    try { _mascotMarkError(); } catch {}
+    try { _mascotMarkError(); } catch { }
     if (typeof prev === 'function') return prev.apply(this, args);
     return false;
   };
   // Rejected fetches / promises hit unhandledrejection.
-  window.addEventListener('unhandledrejection', () => { try { _mascotMarkError(); } catch {} });
+  window.addEventListener('unhandledrejection', () => { try { _mascotMarkError(); } catch { } });
 }
-try { _bindMascotErrorFeed(); } catch {}
+try { _bindMascotErrorFeed(); } catch { }
 
 // 화면 여기저기 자유 이동
 function _startMascotWander() {
@@ -26050,41 +26335,208 @@ function _mascotWanderStep() {
 //   done    → 미소 (smile arc + sparkle)
 //   error   → 경고/놀람 (wide shocked eyes + alert marks)
 const _MASCOT_W = 16;
-const _MASCOT_BASE = [
-  '...WW......WW...', '...We......eW...', '...rR......Rr...', '....RRRRRRRR....',
-  '...RRRRRRRRRR...', '..RrRRRRRRRRrR..', '.RRRRRRRRRRRRRR.', '.RRRRRRRRRRRRRR.',
-  '.Rr.OOOOOOOO.rR.', '....OoOOOOoO....', '....OeOOOOeO....', '....OOOOOOOO....',
-  '....OooooooO....', '...rROOOOOORr...', '...L..L..L..L...', '..LL........LL..',
-];
-const _MASCOT_FACES = {
-  idle: {},
-  working: {
-    0:  's..WW......WW..s',
-    3:  '.s..RRRRRRRR..s.',
-    10: '....OeeOOeeO....',
-    12: '....OeeeeeeO....',
-  },
-  done: {
-    0:  'S..WW......WW..S',
-    12: '....OOOOOOOO....',
-    13: '...rReeeeeeRr...',
-  },
-  error: {
-    0:  '.S.WW......WW.S.',
-    1:  '.S.We......eW.S.',
-    10: '....OWeeeeWO....',
-    12: '....OOeeeeOO....',
-  },
-};
+// ═══════════════════════════════════════════════════════════════════
+// Mascot Sprite System v2 — full independent sprites per variant
+// Each variant is a complete 16×16 pixel grid (no base + overlay).
+// ═══════════════════════════════════════════════════════════════════
 const _MASCOT_PALETTE = {
-  R: '#db3b2b', r: '#9c2417',
-  O: '#ef8330', o: '#c5611c',
-  e: '#1a1410', W: '#fff5e8', L: '#f2a93b',
-  s: '#cdbfac', S: '#ffd27a',
+  O: '#d4845a', o: '#b06540',
+  e: '#1a1410', W: '#ffffff',
+  B: '#78a9e3', b: '#2d5a8c',
+  Y: '#e8b84a', y: '#c49030',
+  T: '#b0b0b0', t: '#666666',
+  K: '#4a4540', k: '#3a3530',
+  P: '#6b5b9a', p: '#4a3a70',
+  X: '#e03030', x: '#a02020',
+  G: '#6a8a50', g: '#4a6a38',
+  H: '#8b7b40', h: '#6b5b30',
+  F: '#e8a878', f: '#c08060',
+  R: '#c94848', r: '#9c3030',
+  S: '#d4d4d4', s: '#999999',
 };
+// 9 mascot friends — each is a full 16×16 sprite
+const _MASCOT_SPRITES = {
+  idea: [
+    '......YYY.......',
+    '.....YyyyY......',
+    '.....YYYYY......',
+    '......TtT.......',
+    '................',
+    '..........OO....',
+    '........OOOOOO..',
+    '.......OOOOOOO..',
+    '...OO..OOOOOOO..',
+    '...OO.OeOOOeOO..',
+    '.......OOOOOOO..',
+    '.......OOOOOOO..',
+    '.......OOOOOOO..',
+    '......OO.OO.OO..',
+    '......OO.OO.OO..',
+    '................',
+  ],
+  basic: [
+    '................',
+    '................',
+    '................',
+    '................',
+    '....OOOOOOOO....',
+    '..OO.OOOOOO.OO..',
+    '....OOOOOOOO....',
+    '....OOOOOOOO....',
+    '....OeOOOOeO....',
+    '....OOOOOOOO....',
+    '....OOOOOOOO....',
+    '....OOOOOOOO....',
+    '....OO.OO.OO....',
+    '....WW.WW.WW....',
+    '....WW....WW....',
+    '................',
+  ],
+  bird: [
+    '................',
+    '.......BBB......',
+    '......BBBBB.....',
+    '......BeBBB.....',
+    '......BBBBB.....',
+    '.......bBb......',
+    '..........OO....',
+    '........OOOOOO..',
+    '.......OOOOOOO..',
+    '...OO..OOOOOOO..',
+    '...OO.OeOOOeOO..',
+    '.......OOOOOOO..',
+    '.......OOOOOOO..',
+    '......OO.OO.OO..',
+    '......OO.OO.OO..',
+    '................',
+  ],
+  sparkle: [
+    '......yS........',
+    '.....Sy.S.......',
+    '......Se........',
+    '......et........',
+    '......et........',
+    '..........RR....',
+    '........RRRRRR..',
+    '.......RRRRRRR..',
+    '...RR..RRRRRRR..',
+    '...RR.ReRRReRR..',
+    '.......RRRRRRR..',
+    '.......RRRRRRR..',
+    '.......RRRRRRR..',
+    '......RR.RR.RR..',
+    '......WW.WW.WW..',
+    '................',
+  ],
+  worker: [
+    '................',
+    '.....yYYYYy.....',
+    '....YYYYYYYY....',
+    '....YYYhYYYY....',
+    '....yyyyyyyy....',
+    '....OOOOOOOO....',
+    '..OO.OOOOOO.OO..',
+    '....OOOOOOOO....',
+    '....OeOOOOeO.tt.',
+    '....OOOOOOOO.tTt',
+    '....OOOOOOOO..t.',
+    '....OOOOOOOO....',
+    '....OO.OO.OO....',
+    '....OO.OO.OO....',
+    '................',
+    '................',
+  ],
+  cool: [
+    '................',
+    '................',
+    '..........OO....',
+    '........OOOOOO..',
+    '.......OOOOOOO..',
+    '.......OOOOOOO..',
+    '...OO..OOOOOOO..',
+    '...OO.OeOOOeOO..',
+    '.......OOOOOOO..',
+    '.......OOOOOOO..',
+    '.......OOOOOOPP.',
+    '.......OOOOOOpPW',
+    '.......OOOOOOO..',
+    '......OO.OO.OO..',
+    '......OO.OO.OO..',
+    '................',
+  ],
+  pirate: [
+    '...KKKKKKKk.....',
+    '..KKKKKKKKKk....',
+    '..KKkKKkKKKk....',
+    '..KKeKKeKKKK....',
+    '..KKKKKKKKKK....',
+    '...kKKKhKKk.....',
+    '....OOOOOOOO....',
+    '..OO.OOOOOO.OO..',
+    '....OOOOOOOO....',
+    '....OOOOOOOO.Pp.',
+    '....OOOOOOOO.pYy',
+    '....OOOOOOOO....',
+    '...OO.OO.OO.OO..',
+    '...OO.OO.OO.OO..',
+    '................',
+    '................',
+  ],
+  error: [
+    '................',
+    '................',
+    '........Tt......',
+    '................',
+    '....XXXX.XXXX...',
+    '....X..X.X..X...',
+    '....XXXX.XXXX...',
+    '................',
+    '..OOOOOOOOOOO...',
+    '..OeOeOOOeOeO.o',
+    '..OOOOOOOOOOO...',
+    '..eeeeeeeeeee...',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+  headset: [
+    '................',
+    '....bbbbbbb.....',
+    '...bBBBBBBBb....',
+    '..bB.......Bb...',
+    '..bB.OOOOO.Bb...',
+    '..BB.OOOOO.BB...',
+    '..BB.OOOOO.BB...',
+    '..BBOOOOOOOOBB..',
+    '....OeOOOOeO....',
+    '....OeOOOOeO....',
+    '....OOOOOOOO....',
+    '..OO.OOOOOO.OO..',
+    '....OOOOOOOO....',
+    '....OO.OO.OO....',
+    '....OO.OO.OO....',
+    '................',
+  ],
+};
+const _MASCOT_VARIANT_IDS = Object.keys(_MASCOT_SPRITES);
+const _MASCOT_RANDOM_POOL = _MASCOT_VARIANT_IDS.filter((id) => id !== 'error');
+let _mascotVariant = 'idea';
+let _mascotVariantTimer = null;
+function _mascotPickRandomVariant(force, includeClassic) {
+  const pool = _MASCOT_RANDOM_POOL;
+  if (!pool.length) return;
+  let next = pool[Math.floor(Math.random() * pool.length)];
+  if (!force && pool.length > 1 && next === _mascotVariant) {
+    next = pool[(pool.indexOf(next) + 1) % pool.length];
+  }
+  _mascotVariant = next;
+  if (typeof _mascotState === 'string') _mascotSetState(_mascotState);
+}
 function _mascotSpriteRows(state) {
-  const ovr = _MASCOT_FACES[state] || _MASCOT_FACES.idle;
-  return _MASCOT_BASE.map((row, i) => (ovr[i] !== undefined ? ovr[i] : row));
+  // For error state, force error sprite
+  if (state === 'error') return _MASCOT_SPRITES.error;
+  return _MASCOT_SPRITES[_mascotVariant] || _MASCOT_SPRITES.basic;
 }
 function _mascotBuildSvg(state, animate) {
   const rows = _mascotSpriteRows(state);
@@ -26094,7 +26546,7 @@ function _mascotBuildSvg(state, animate) {
     for (let x = 0; x < row.length; x++) {
       const ch = row[x];
       if (ch === '.') continue;
-      const fill = _MASCOT_PALETTE[ch] || '#db3b2b';
+      const fill = _MASCOT_PALETTE[ch] || '#d4845a';
       cells.push(`<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${fill}"/>`);
     }
   }
@@ -26103,7 +26555,7 @@ function _mascotBuildSvg(state, animate) {
       .lc-mb{animation:lc-mb-bob .8s ease-in-out infinite;transform-origin:8px 16px}
       @keyframes lc-mb-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-0.6px)}}
     </style>` : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" style="width:100%;height:100%;image-rendering:pixelated;">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" style="width:100%;height:100%;image-rendering:pixelated;background:transparent;">
     ${animStyle}<g class="${animate ? 'lc-mb' : ''}">${cells.join('')}</g></svg>`;
 }
 let _mascotState = 'idle';
@@ -26115,6 +26567,7 @@ function _mascotSetState(state, opts) {
   const host = document.getElementById('mascotSprite');
   if (host) {
     host.setAttribute('data-state', state);
+    host.setAttribute('data-variant', _mascotVariant);
     host.innerHTML = _mascotBuildSvg(state, true);
   }
   // Inline mascots (chat window title, etc.) inherit the main state by
@@ -26280,6 +26733,7 @@ function _showRandomBubble() {
   if (document.hidden) return;
   const bubble = document.getElementById('mascotBubble');
   if (!bubble) return;
+  _mascotPickRandomVariant(false, false);
   const msg = t(_mascotBubbles[Math.floor(Math.random() * _mascotBubbles.length)]);
   bubble.textContent = msg;
   bubble.style.display = 'block';
@@ -26331,7 +26785,7 @@ function toggleChat() {
     win.classList.add('chat-win-enter');
     _chatOpen = true;
     // v3.99.25 — sync mode toggle UI now that elements are visible.
-    try { if (typeof _applyChatModeUI === 'function') _applyChatModeUI(); } catch {}
+    try { if (typeof _applyChatModeUI === 'function') _applyChatModeUI(); } catch { }
     // iOS 자동 줌/포커스 화면 튐 방지를 위해 모바일은 포커스 지연 길게 + 조건부
     const focusDelay = isMobile ? 350 : 100;
     setTimeout(() => {
@@ -26408,7 +26862,7 @@ function _chatStopWaitBubble() {
   // 자동 말풍선 루프 재시작
   if (typeof _showRandomBubble === 'function') {
     if (typeof _mascotBubbleTimer !== 'undefined') {
-      try { clearInterval(_mascotBubbleTimer); } catch {}
+      try { clearInterval(_mascotBubbleTimer); } catch { }
     }
     window._mascotBubbleTimer = setInterval(_showRandomBubble, 15000);
   }
@@ -26447,7 +26901,7 @@ function _applyChatModeUI() {
 
 function toggleChatMode() {
   window._chatMode = (window._chatMode === 'orch') ? 'help' : 'orch';
-  try { localStorage.setItem('chatMode', window._chatMode); } catch {}
+  try { localStorage.setItem('chatMode', window._chatMode); } catch { }
   _applyChatModeUI();
   // Re-greet to clarify the active mode.
   const msgs = document.getElementById('chatMessages');
@@ -26464,7 +26918,7 @@ function toggleChatMode() {
 }
 
 // Apply on first load (after DOM is parsed). Safe to call multiple times.
-try { setTimeout(_applyChatModeUI, 0); } catch {}
+try { setTimeout(_applyChatModeUI, 0); } catch { }
 
 async function sendChat() {
   const input = document.getElementById('chatInput');
@@ -26472,7 +26926,7 @@ async function sendChat() {
   if (!msg || _chatStreaming) return;
   input.value = '';
   _chatStreaming = true;
-  try { _mascotMarkWorking(); } catch {}
+  try { _mascotMarkWorking(); } catch { }
   _appendChatMsg('user', escapeHtml(msg));
   _chatHistory.push({ role: 'user', text: msg });
 
@@ -26491,9 +26945,9 @@ async function sendChat() {
       _chatStopWaitBubble();
       if (r.error) {
         bubble.innerHTML = `<span style="color:var(--err);">${escapeHtml(r.error)}</span>`;
-        try { _mascotMarkError(); } catch {}
+        try { _mascotMarkError(); } catch { }
       } else {
-        try { _mascotMarkDone(); } catch {}
+        try { _mascotMarkDone(); } catch { }
         const plan = (r.plan || []).map((s, i) =>
           `<div class="text-[10px] mono" style="color:var(--text-dim)">${i + 1}. ${escapeHtml((s.assignee || '?') + ' — ' + (s.task || ''))}</div>`
         ).join('');
@@ -26512,7 +26966,7 @@ async function sendChat() {
       }
     } catch (e) {
       _chatStopWaitBubble();
-      try { _mascotMarkError(); } catch {}
+      try { _mascotMarkError(); } catch { }
       bubble.innerHTML = `<span style="color:var(--err);">오케스트레이터 호출 실패: ${escapeHtml(e.message || String(e))}</span>`;
     } finally {
       _chatStopWaitBubble();
@@ -26535,7 +26989,7 @@ async function sendChat() {
     let res;
     try {
       res = await fetch('/api/chat/stream', { method: 'POST', headers: _chatHeaders, body: _chatBody });
-    } catch(e) { res = null; }
+    } catch (e) { res = null; }
 
     if (!res || res.status === 404 || res.status === 405) {
       // 폴백: 일반 chat API (fetch 직접 사용)
@@ -26550,12 +27004,12 @@ async function sendChat() {
           if (r.navigate) {
             const navItem = NAV.find(n => n.id === r.navigate);
             const label = navItem ? navItem.label : r.navigate;
-            navBtn = `<button class="btn text-[10px] mt-2" onclick="go('${r.navigate}');toggleChat();">${navItem?navItem.icon+' ':''} ${escapeHtml(label)} 탭으로 이동</button>`;
+            navBtn = `<button class="btn text-[10px] mt-2" onclick="go('${r.navigate}');toggleChat();">${navItem ? navItem.icon + ' ' : ''} ${escapeHtml(label)} 탭으로 이동</button>`;
           }
-          bubble.innerHTML = escapeHtml(r.answer||'').replace(/\n/g,'<br>') + navBtn;
+          bubble.innerHTML = escapeHtml(r.answer || '').replace(/\n/g, '<br>') + navBtn;
           _chatHistory.push({ role: 'assistant', text: r.answer || '' });
         }
-      } catch(e2) {
+      } catch (e2) {
         _chatStopWaitBubble();
         bubble.innerHTML = `<span style="color:var(--err);">오류: ${escapeHtml(e2.message)}</span>`;
       }
@@ -26605,18 +27059,18 @@ async function sendChat() {
               if (navigate) {
                 const ni = NAV.find(n => n.id === navigate);
                 const nl = ni ? ni.label : navigate;
-                doneNavBtn = `<button class="btn text-[10px] mt-2" onclick="go('${navigate}');toggleChat();">${ni?ni.icon+' ':''} ${escapeHtml(nl)} 탭으로 이동</button>`;
+                doneNavBtn = `<button class="btn text-[10px] mt-2" onclick="go('${navigate}');toggleChat();">${ni ? ni.icon + ' ' : ''} ${escapeHtml(nl)} 탭으로 이동</button>`;
               }
               bubble.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>') + doneNavBtn;
               _chatHistory.push({ role: 'assistant', text: fullText });
               _chatStreaming = false;
             } else if (evtType === 'error') {
               _chatStopWaitBubble();
-              bubble.innerHTML = `<span style="color:var(--err);">${escapeHtml(data.error||'오류')}</span>`;
+              bubble.innerHTML = `<span style="color:var(--err);">${escapeHtml(data.error || '오류')}</span>`;
               _chatStreaming = false;
               return;
             }
-          } catch {}
+          } catch { }
           evtType = null;
         }
       }
@@ -26627,7 +27081,7 @@ async function sendChat() {
     if (navigate) {
       const navItem = NAV.find(n => n.id === navigate);
       const label = navItem ? navItem.label : navigate;
-      navBtn = `<button class="btn text-[10px] mt-2" onclick="go('${navigate}');toggleChat();">${navItem?navItem.icon+' ':''} ${escapeHtml(label)} 탭으로 이동</button>`;
+      navBtn = `<button class="btn text-[10px] mt-2" onclick="go('${navigate}');toggleChat();">${navItem ? navItem.icon + ' ' : ''} ${escapeHtml(label)} 탭으로 이동</button>`;
     }
     bubble.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>') + navBtn;
     _chatHistory.push({ role: 'assistant', text: fullText });
@@ -26729,30 +27183,30 @@ function closeSpotlight() {
 
 // 탭 연관 키워드 — 검색어와 탭을 연결
 const _NAV_KEYWORDS = {
-  features: ['신기능','design','디자인','artifact','아티팩트','mcp','tool use','vision','비전','web search','웹검색','extended thinking','코드 실행','batch','배치','citation','인용','prompt caching','캐싱','streaming','스트리밍','computer use','컴퓨터','pdf','파일','업로드','image','이미지','model context protocol','agent','에이전트','sub-agent','서브에이전트','hooks','훅','skills','스킬','max','opus','sonnet','haiku','claude 4','glasswing','routines'],
-  overview: ['개요','대시보드','점수','스코어','최적화','score','optimization','홈','home'],
-  projects: ['프로젝트','project','CLAUDE.md','설정','세팅','폴더'],
-  analytics: ['통계','analytics','그래프','chart','타임라인','timeline','도구 분포'],
-  aiEval: ['ai 평가','진단','evaluation','종합','분석','우선순위'],
-  sessions: ['세션','session','히스토리','history','대화','검색'],
-  agents: ['에이전트','agent','그래프','graph','상호작용','위임','delegation'],
-  projectAgents: ['서브에이전트','sub-agent','역할','role','프리셋','preset'],
-  skills: ['스킬','skill','사용자 정의'],
-  commands: ['슬래시','slash','명령어','command','/'],
-  hooks: ['훅','hook','이벤트','event','자동화','automation','pre-commit','post'],
-  permissions: ['권한','permission','허용','allow','차단','deny','보안','security'],
-  mcp: ['mcp','커넥터','connector','서버','server','외부 도구','slack','github','database','db','postgres','sqlite'],
-  plugins: ['플러그인','plugin','확장','extension','마켓'],
-  settings: ['설정','settings','json','환경','config','설정 파일'],
-  claudemd: ['claude.md','마크다운','markdown','지침','규칙','메모리'],
-  usage: ['사용량','비용','cost','usage','토큰','token','billing','결제'],
-  metrics: ['메트릭','metric','토큰','시계열'],
-  memory: ['메모리','memory','기억','자동 기억'],
-  tasks: ['태스크','task','todo','할 일'],
-  team: ['팀','team','조직','organization','워크스페이스','멤버'],
-  system: ['시스템','system','디바이스','device','상태'],
-  statusline: ['상태라인','statusline','키바인딩','keybinding','단축키','shortcut'],
-  mcp: ['mcp','커넥터','connector','외부 도구','slack','github','database'],
+  features: ['신기능', 'design', '디자인', 'artifact', '아티팩트', 'mcp', 'tool use', 'vision', '비전', 'web search', '웹검색', 'extended thinking', '코드 실행', 'batch', '배치', 'citation', '인용', 'prompt caching', '캐싱', 'streaming', '스트리밍', 'computer use', '컴퓨터', 'pdf', '파일', '업로드', 'image', '이미지', 'model context protocol', 'agent', '에이전트', 'sub-agent', '서브에이전트', 'hooks', '훅', 'skills', '스킬', 'max', 'opus', 'sonnet', 'haiku', 'claude 4', 'glasswing', 'routines'],
+  overview: ['개요', '대시보드', '점수', '스코어', '최적화', 'score', 'optimization', '홈', 'home'],
+  projects: ['프로젝트', 'project', 'CLAUDE.md', '설정', '세팅', '폴더'],
+  analytics: ['통계', 'analytics', '그래프', 'chart', '타임라인', 'timeline', '도구 분포'],
+  aiEval: ['ai 평가', '진단', 'evaluation', '종합', '분석', '우선순위'],
+  sessions: ['세션', 'session', '히스토리', 'history', '대화', '검색'],
+  agents: ['에이전트', 'agent', '그래프', 'graph', '상호작용', '위임', 'delegation'],
+  projectAgents: ['서브에이전트', 'sub-agent', '역할', 'role', '프리셋', 'preset'],
+  skills: ['스킬', 'skill', '사용자 정의'],
+  commands: ['슬래시', 'slash', '명령어', 'command', '/'],
+  hooks: ['훅', 'hook', '이벤트', 'event', '자동화', 'automation', 'pre-commit', 'post'],
+  permissions: ['권한', 'permission', '허용', 'allow', '차단', 'deny', '보안', 'security'],
+  mcp: ['mcp', '커넥터', 'connector', '서버', 'server', '외부 도구', 'slack', 'github', 'database', 'db', 'postgres', 'sqlite'],
+  plugins: ['플러그인', 'plugin', '확장', 'extension', '마켓'],
+  settings: ['설정', 'settings', 'json', '환경', 'config', '설정 파일'],
+  claudemd: ['claude.md', '마크다운', 'markdown', '지침', '규칙', '메모리'],
+  usage: ['사용량', '비용', 'cost', 'usage', '토큰', 'token', 'billing', '결제'],
+  metrics: ['메트릭', 'metric', '토큰', '시계열'],
+  memory: ['메모리', 'memory', '기억', '자동 기억'],
+  tasks: ['태스크', 'task', 'todo', '할 일'],
+  team: ['팀', 'team', '조직', 'organization', '워크스페이스', '멤버'],
+  system: ['시스템', 'system', '디바이스', 'device', '상태'],
+  statusline: ['상태라인', 'statusline', '키바인딩', 'keybinding', '단축키', 'shortcut'],
+  mcp: ['mcp', '커넥터', 'connector', '외부 도구', 'slack', 'github', 'database'],
 };
 
 // v2.33.4 — spotlight 보조 데이터 lazy cache (프로젝트/세션/프롬프트/워크플로우)
@@ -26777,7 +27231,7 @@ async function _ensureSpotlightCache() {
       const inp = document.getElementById('spotlightInput');
       _renderSpotlightResults(inp ? inp.value : '');
     }
-  } catch {}
+  } catch { }
 }
 
 function _getSpotlightItems(query) {
@@ -26806,7 +27260,7 @@ function _getSpotlightItems(query) {
   for (const n of NAV) {
     if (!allModes && !_navInMode(n)) continue;
     const keywords = (_NAV_KEYWORDS[n.id] || []).join(' ');
-    const text = `${n.label} ${n.desc||''} ${n.id} ${keywords}`;
+    const text = `${n.label} ${n.desc || ''} ${n.id} ${keywords}`;
     const s = _score(text, q);
     if (s > 0) {
       scored.push({ item: { type: 'nav', id: n.id, icon: n.icon, label: n.label, desc: n.desc || '', group: n.group }, score: s });
@@ -26817,10 +27271,10 @@ function _getSpotlightItems(query) {
   const feats = state.data.features || {};
   const allFeats = [...(feats.builtin || []), ...(feats.dynamic || [])];
   for (const f of allFeats) {
-    const text = `${f.label||''} ${f.summary||''} ${f.id||''} ${(f.keywords||[]).join(' ')}`;
+    const text = `${f.label || ''} ${f.summary || ''} ${f.id || ''} ${(f.keywords || []).join(' ')}`;
     const s = _score(text, q);
     if (s > 0 && q) {
-      scored.push({ item: { type: 'feature', id: f.id, icon: f.icon||'✨', label: f.label, desc: f.summary||'', feat: f }, score: s + 5 }); // 정확한 매칭 보너스
+      scored.push({ item: { type: 'feature', id: f.id, icon: f.icon || '✨', label: f.label, desc: f.summary || '', feat: f }, score: s + 5 }); // 정확한 매칭 보너스
     }
   }
 
@@ -26868,10 +27322,10 @@ function _getSpotlightItems(query) {
   if (q && _spotlightCache.prompts) {
     for (const p of _spotlightCache.prompts) {
       const name = p.title || p.name || p.id || '';
-      const text = `${name} ${(p.tags||[]).join(' ')} ${(p.body||'').slice(0,100)}`;
+      const text = `${name} ${(p.tags || []).join(' ')} ${(p.body || '').slice(0, 100)}`;
       const s = _score(text, q);
       if (s > 0) scored.push({
-        item: { type: 'prompt', id: p.id, icon: '📝', label: name, desc: (p.body||'').slice(0, 60) },
+        item: { type: 'prompt', id: p.id, icon: '📝', label: name, desc: (p.body || '').slice(0, 60) },
         score: s - 2,
       });
     }
@@ -26884,7 +27338,7 @@ function _getSpotlightItems(query) {
       const text = `${name} ${w.description || ''}`;
       const s = _score(text, q);
       if (s > 0) scored.push({
-        item: { type: 'workflow', id: w.id, icon: '🔀', label: name, desc: w.description || `${(w.nodes||[]).length} nodes` },
+        item: { type: 'workflow', id: w.id, icon: '🔀', label: name, desc: w.description || `${(w.nodes || []).length} nodes` },
         score: s - 2,
       });
     }
@@ -26903,22 +27357,21 @@ function _renderSpotlightResults(query) {
     return;
   }
   el.innerHTML = items.map((it, i) => `
-    <div class="spotlight-item ${i===_spotlightIdx?'active':''}" data-idx="${i}"
+    <div class="spotlight-item ${i === _spotlightIdx ? 'active' : ''}" data-idx="${i}"
       onclick="_spotlightSelect(${i})" onmouseenter="_spotlightIdx=${i};_highlightSpotlight()">
       <span class="sl-icon">${it.icon}</span>
       <div>
         <div class="sl-label">${escapeHtml(it.label)}</div>
         ${it.desc ? `<div class="sl-desc">${escapeHtml(it.desc)}</div>` : ''}
       </div>
-      ${
-        it.type==='nav'     ? `<span class="sl-kbd">${t('이동')}</span>` :
-        it.type==='feature' ? `<span class="sl-kbd">${t('신기능')}</span>` :
-        it.type==='project' ? `<span class="sl-kbd">${t('프로젝트')}</span>` :
-        it.type==='session' ? `<span class="sl-kbd">${t('세션')}</span>` :
-        it.type==='prompt'  ? `<span class="sl-kbd">${t('프롬프트')}</span>` :
-        it.type==='workflow'? `<span class="sl-kbd">${t('워크플로우')}</span>` :
-        `<span class="sl-kbd">${t('실행')}</span>`
-      }
+      ${it.type === 'nav' ? `<span class="sl-kbd">${t('이동')}</span>` :
+      it.type === 'feature' ? `<span class="sl-kbd">${t('신기능')}</span>` :
+        it.type === 'project' ? `<span class="sl-kbd">${t('프로젝트')}</span>` :
+          it.type === 'session' ? `<span class="sl-kbd">${t('세션')}</span>` :
+            it.type === 'prompt' ? `<span class="sl-kbd">${t('프롬프트')}</span>` :
+              it.type === 'workflow' ? `<span class="sl-kbd">${t('워크플로우')}</span>` :
+                `<span class="sl-kbd">${t('실행')}</span>`
+    }
     </div>
   `).join('');
 }
@@ -26939,20 +27392,20 @@ function _spotlightSelect(idx) {
     go(item.id);
   } else if (item.type === 'feature' && item.feat) {
     go('features');
-    setTimeout(() => { try { openFeatureWindow(item.feat); } catch {} }, 300);
+    setTimeout(() => { try { openFeatureWindow(item.feat); } catch { } }, 300);
   } else if (item.type === 'project' && item.cwd) {
     go('projects');
-    setTimeout(() => { try { openProjectDetail(item.cwd); } catch {} }, 300);
+    setTimeout(() => { try { openProjectDetail(item.cwd); } catch { } }, 300);
   } else if (item.type === 'session' && item.sessionId) {
     go('sessions');
-    setTimeout(() => { try { openSessionDetail(item.sessionId); } catch {} }, 300);
+    setTimeout(() => { try { openSessionDetail(item.sessionId); } catch { } }, 300);
   } else if (item.type === 'prompt') {
     go('promptLibrary');
   } else if (item.type === 'workflow' && item.id) {
     location.hash = '#/workflows';
-    setTimeout(() => { try { location.hash = '#/workflows?id=' + encodeURIComponent(item.id); } catch {} }, 300);
+    setTimeout(() => { try { location.hash = '#/workflows?id=' + encodeURIComponent(item.id); } catch { } }, 300);
   } else if (item.fn) {
-    try { eval(item.fn); } catch {}
+    try { eval(item.fn); } catch { }
   }
 }
 
@@ -26986,7 +27439,7 @@ _KEYDOWN_HANDLERS.push((e) => {
   if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
     const ae = document.activeElement;
     const tag = (ae && ae.tagName) || '';
-    const inField = ['INPUT','TEXTAREA','SELECT'].includes(tag) || (ae && ae.isContentEditable);
+    const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || (ae && ae.isContentEditable);
     if (!inField && !_spotlightOpen) {
       e.preventDefault();
       openSpotlight();
@@ -26999,7 +27452,7 @@ _KEYDOWN_HANDLERS.push((e) => {
   }
   // '?' — global shortcut help (workflow tab has its own handler with priority)
   if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    const inInput = ['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName);
+    const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement || {}).tagName);
     if (!inInput && !document.querySelector('#shortcutHelpModal')) {
       if (state.view !== 'workflows') {
         e.preventDefault();
@@ -27017,30 +27470,38 @@ function _openShortcutHelp() {
   const mac = /Mac/i.test(navigator.platform);
   const MOD = mac ? '⌘' : 'Ctrl';
   const groups = [
-    { title: t('내비게이션'), items: [
-      { k: [MOD, 'K'], d: t('모든 탭·프로젝트·세션 검색') },
-      { k: ['Alt', '←'], d: t('이전 탭') },
-      { k: ['Alt', '→'], d: t('다음 탭') },
-      { k: ['Esc'], d: t('모달 / 플라이아웃 닫기') },
-      { k: ['?'], d: t('이 도움말 열기') },
-    ]},
-    { title: t('워크플로우 캔버스'), items: [
-      { k: [MOD, 'Z'], d: t('실행 취소') },
-      { k: [MOD, 'C'], d: t('노드 복사') },
-      { k: [MOD, 'V'], d: t('노드 붙여넣기') },
-      { k: ['Alt', 'C'], d: t('편집기 카테고리 접기/펴기') },
-      { k: ['Shift', t('클릭')], d: t('노드 다중 선택') },
-      { k: ['?'], d: t('워크플로우 전용 단축키') },
-    ]},
-    { title: t('사이드바'), items: [
-      { k: [t('햄버거')], d: t('사이드바 접기/펼치기') },
-      { k: [t('hover')], d: t('카테고리 → 서브탭 flyout') },
-      { k: [t('클릭')], d: t('카테고리 고정 open') },
-    ]},
-    { title: t('기타'), items: [
-      { k: [t('⌘K')], d: t('빠른 액션: 재인덱스·챗봇·CLI 상태') },
-      { k: ['Enter', 'Space'], d: t('포커스된 항목 실행') },
-    ]},
+    {
+      title: t('내비게이션'), items: [
+        { k: [MOD, 'K'], d: t('모든 탭·프로젝트·세션 검색') },
+        { k: ['Alt', '←'], d: t('이전 탭') },
+        { k: ['Alt', '→'], d: t('다음 탭') },
+        { k: ['Esc'], d: t('모달 / 플라이아웃 닫기') },
+        { k: ['?'], d: t('이 도움말 열기') },
+      ]
+    },
+    {
+      title: t('워크플로우 캔버스'), items: [
+        { k: [MOD, 'Z'], d: t('실행 취소') },
+        { k: [MOD, 'C'], d: t('노드 복사') },
+        { k: [MOD, 'V'], d: t('노드 붙여넣기') },
+        { k: ['Alt', 'C'], d: t('편집기 카테고리 접기/펴기') },
+        { k: ['Shift', t('클릭')], d: t('노드 다중 선택') },
+        { k: ['?'], d: t('워크플로우 전용 단축키') },
+      ]
+    },
+    {
+      title: t('사이드바'), items: [
+        { k: [t('햄버거')], d: t('사이드바 접기/펼치기') },
+        { k: [t('hover')], d: t('카테고리 → 서브탭 flyout') },
+        { k: [t('클릭')], d: t('카테고리 고정 open') },
+      ]
+    },
+    {
+      title: t('기타'), items: [
+        { k: [t('⌘K')], d: t('빠른 액션: 재인덱스·챗봇·CLI 상태') },
+        { k: ['Enter', 'Space'], d: t('포커스된 항목 실행') },
+      ]
+    },
   ];
   const kbd = (keys) => keys.map(k => `<kbd style="display:inline-block;min-width:24px;text-align:center;padding:2px 7px;border-radius:5px;background:var(--card-hi);border:1px solid var(--border);font-size:0.78rem;font-family:'JetBrains Mono',monospace;">${escapeHtml(k)}</kbd>`).join(' + ');
   const rowsHtml = groups.map(g => `
@@ -27106,7 +27567,7 @@ function _setupFocusTrap(modalEl) {
 
 function _sendBrowserNotification(title, body) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  try { new Notification(title, { body, icon: '/favicon.ico' }); } catch(e) { /* silent */ }
+  try { new Notification(title, { body, icon: '/favicon.ico' }); } catch (e) { /* silent */ }
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -27158,7 +27619,7 @@ async function _ollamaCreateCustomModel() {
     } else {
       toast(errMsg(r) || t('모델 생성 실패'), 'err');
     }
-  } catch(e) {
+  } catch (e) {
     toast(t('모델 생성 실패') + ': ' + String(e), 'err');
   }
 }
@@ -27170,7 +27631,7 @@ async function _ollamaCreateCustomModel() {
 
 // initCostCharts wrapper — adds the stacked bar after the original runs.
 const _origInitCostCharts = window.initCostCharts;
-window.initCostCharts = async function() {
+window.initCostCharts = async function () {
   if (_origInitCostCharts) await _origInitCostCharts();
   // 스택 바 차트 추가 — 원본에서 캐시한 데이터 재사용 (이중 API 호출 제거)
   try {
@@ -27181,7 +27642,7 @@ window.initCostCharts = async function() {
     const byProvider = costs.byProvider || [];
     const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-mute').trim() || '#a0a0a8';
     const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || 'rgba(255,255,255,0.07)';
-    const providerColors = ['#d97757','#7dd3fc','#4ade80','#c084fc','#fbbf24','#f87171','#a78bfa','#38bdf8'];
+    const providerColors = ['#d97757', '#7dd3fc', '#4ade80', '#c084fc', '#fbbf24', '#f87171', '#a78bfa', '#38bdf8'];
     const providerNames = byProvider.map(p => p.provider);
     const ctxStacked = document.getElementById('costStackedBar');
     if (!ctxStacked || !providerNames.length || !daily.length) return;
@@ -27211,7 +27672,7 @@ window.initCostCharts = async function() {
         }
       }
     });
-  } catch(e) { /* silent */ }
+  } catch (e) { /* silent */ }
 };
 
 // ────────────────────────────────────────────────────────────────
@@ -27312,7 +27773,7 @@ function _wfRemoveGroup(gid) {
 
 // 그룹 렌더링을 기존 _wfRenderCanvas 에 추가
 const _origWfRenderCanvas = _wfRenderCanvas;
-const _wfRenderCanvasSync = function() {
+const _wfRenderCanvasSync = function () {
   _origWfRenderCanvas();
   _wfRenderGroups();
 };
@@ -27323,7 +27784,7 @@ const _wfRenderCanvasSync = function() {
 // updates. For paths that genuinely need an immediate DOM, call
 // _wfRenderCanvasNow() directly.
 let _wfRenderRafId = 0;
-window._wfRenderCanvas = function() {
+window._wfRenderCanvas = function () {
   if (_wfRenderRafId) return;
   _wfRenderRafId = requestAnimationFrame(() => {
     _wfRenderRafId = 0;
@@ -27340,13 +27801,13 @@ function _wfRenderGroups() {
   // 기존 그룹 요소 제거
   nodesG.querySelectorAll('.wf-group').forEach(el => el.remove());
   __wfGroups.forEach(g => {
-    const nodes = (g.nodeIds || []).map(nid => (__wf.current.nodes||[]).find(n => n.id === nid)).filter(Boolean);
+    const nodes = (g.nodeIds || []).map(nid => (__wf.current.nodes || []).find(n => n.id === nid)).filter(Boolean);
     if (!nodes.length) return;
     const pad = 20;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     nodes.forEach(n => {
       minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
-      maxX = Math.max(maxX, n.x + (WF_NODE_W||180)); maxY = Math.max(maxY, n.y + (WF_NODE_H||60));
+      maxX = Math.max(maxX, n.x + (WF_NODE_W || 180)); maxY = Math.max(maxY, n.y + (WF_NODE_H || 60));
     });
     const gEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     gEl.classList.add('wf-group');
@@ -27450,7 +27911,7 @@ async function _wfDiffVersions() {
         </div>
       </div>
     `);
-  } catch(e) {
+  } catch (e) {
     showModal(`
       <div class="p-5">
         <h2 class="text-lg font-semibold mb-3">🔍 ${t('버전 비교')}</h2>
@@ -27489,7 +27950,7 @@ async function _wfDiffVersions() {
 
 (async function boot() {
   // 로케일 사전이 준비된 뒤 UI 를 렌더링 — 깜빡임 최소화
-  try { await window._i18nReady; } catch {}
+  try { await window._i18nReady; } catch { }
   state.view = (location.hash.replace(/^#\//, '') || 'overview');
   if (!NAV.find(n => n.id === state.view)) state.view = 'overview';
   // Sync the mode <select> with the persisted value before first paint.
@@ -27501,7 +27962,7 @@ async function _wfDiffVersions() {
   // v2.33.2 — 이미 한 번 진입했고 연결돼 있으면 게이트 스킵하고 바로 대시보드로.
   // 첫 방문 OR 연결 끊김 OR 서버 실패 시에만 로그인 게이트 표시.
   let alreadyEntered = false;
-  try { alreadyEntered = localStorage.getItem('dashboard-entered') === '1'; } catch {}
+  try { alreadyEntered = localStorage.getItem('dashboard-entered') === '1'; } catch { }
   try {
     const auth = await api('/api/auth/status');
     if (alreadyEntered && auth.connected) {
@@ -27509,7 +27970,7 @@ async function _wfDiffVersions() {
     } else {
       showLoginGate(auth);
     }
-  } catch(e) {
+  } catch (e) {
     // 서버 접근 실패 — 플래그와 무관하게 게이트로 안내
     showLoginGate({ connected: false, cliInstalled: false, reason: '서버 연결 실패: ' + e.message });
   }
@@ -27573,13 +28034,13 @@ async function _wfDiffVersions() {
           }
         });
         observer.observe({ type: 'longtask', buffered: false });
-      } catch (e) {}
+      } catch (e) { }
     }
     rafId = requestAnimationFrame(tick);
   }
   function hide() {
     if (rafId) cancelAnimationFrame(rafId), rafId = 0;
-    if (observer) try { observer.disconnect(); } catch(e) {}
+    if (observer) try { observer.disconnect(); } catch (e) { }
     observer = null;
     if (el) el.remove(), el = null;
   }
@@ -27588,10 +28049,10 @@ async function _wfDiffVersions() {
     if (mod && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
       e.preventDefault();
       on = !on;
-      try { localStorage.setItem('cc.perfHud', on ? '1' : '0'); } catch (_) {}
+      try { localStorage.setItem('cc.perfHud', on ? '1' : '0'); } catch (_) { }
       if (on) show(); else hide();
     }
   });
   // Restore previous state.
-  try { if (localStorage.getItem('cc.perfHud') === '1') { on = true; show(); } } catch (_) {}
+  try { if (localStorage.getItem('cc.perfHud') === '1') { on = true; show(); } } catch (_) { }
 })();

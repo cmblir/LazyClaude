@@ -1,1396 +1,4191 @@
 <!doctype html>
 <html lang="ko">
+
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>LazyClaude — 최적화 대시보드</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>LazyClaude — 최적화 대시보드</title>
 
-<!-- v2.35.0 — PWA install support: manifest + theme + iOS apple-touch + favicons -->
-<link rel="manifest" href="/manifest.json" />
-<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
-<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="LazyClaude" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="application-name" content="LazyClaude" />
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-180.png" />
-<link rel="mask-icon" href="/favicon.svg" color="#E07C4C" />
+  <!-- v2.35.0 — PWA install support: manifest + theme + iOS apple-touch + favicons -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LazyClaude" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="LazyClaude" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-180.png" />
+  <link rel="mask-icon" href="/favicon.svg" color="#E07C4C" />
 
-<!-- Open Graph / discovery -->
-<meta property="og:title" content="LazyClaude" />
-<meta property="og:description" content="Local-first command center for ~/.claude with an n8n-style multi-AI workflow engine." />
-<meta property="og:image" content="/icons/icon-512.png" />
-<meta name="description" content="Local-first command center for ~/.claude with an n8n-style multi-AI workflow engine." />
+  <!-- Open Graph / discovery -->
+  <meta property="og:title" content="LazyClaude" />
+  <meta property="og:description"
+    content="Local-first command center for ~/.claude with an n8n-style multi-AI workflow engine." />
+  <meta property="og:image" content="/icons/icon-512.png" />
+  <meta name="description"
+    content="Local-first command center for ~/.claude with an n8n-style multi-AI workflow engine." />
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-<!-- HH3 (v2.66.22) — non-blocking font loads. The browser still
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <!-- HH3 (v2.66.22) — non-blocking font loads. The browser still
      downloads the CSS, but `media=print` keeps it out of the
      critical render path; the onload swap re-enables it once
      the bytes are in. System fallback (`-apple-system, ...`)
      paints immediately so the user sees text instead of FOIT. -->
-<link rel="preload" as="style" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" onload="this.rel='stylesheet';this.onload=null">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" media="print" onload="this.media='all'">
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" onload="this.rel='stylesheet';this.onload=null">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
-<noscript>
-  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-</noscript>
-<!-- GG1 (v2.66.19) — replaced cdn.tailwindcss.com (1MB JIT runtime that
+  <link rel="preload" as="style"
+    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+    onload="this.rel='stylesheet';this.onload=null">
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" media="print"
+    onload="this.media='all'">
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+    onload="this.rel='stylesheet';this.onload=null">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+    media="print" onload="this.media='all'">
+  <noscript>
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+      rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  </noscript>
+  <!-- GG1 (v2.66.19) — replaced cdn.tailwindcss.com (1MB JIT runtime that
      re-compiles on every DOM mutation) with a pre-built 26KB stylesheet.
      Single biggest workflow-tab lag fix. Rebuild via:
        /tmp/tailwindcss-v3 -c tools/tailwind.config.js \
          -i tools/tailwind.input.css -o dist/vendor/tailwind.css --minify -->
-<link rel="stylesheet" href="/vendor/tailwind.css">
-<!-- HH2 (v2.66.21) — vendor libs are now LAZY-LOADED on first use, not on
+  <link rel="stylesheet" href="/vendor/tailwind.css">
+  <!-- HH2 (v2.66.21) — vendor libs are now LAZY-LOADED on first use, not on
      page boot. Saves ~900KB of parse + execute cost when the user
      never opens the chart/graph/markdown-rendering tabs.
      `_loadVendor('chart')`, `_loadVendor('vis')`, `_loadVendor('marked')`
      return a Promise that resolves after the script tag loads. Marked
      is small (35KB) but loaded on demand for symmetry. -->
-<!-- Marked is small (35KB) and used inside template strings (e.g.
+  <!-- Marked is small (35KB) and used inside template strings (e.g.
      `marked.parse(raw)` in CLAUDE.md preview); keep it page-boot
      with `defer` so it's available without a top-level await. -->
-<script src="/vendor/marked.min.js" defer></script>
-<script>
-window._loadVendor = (() => {
-  const URLS = {
-    chart:  '/vendor/chart.umd.min.js',
-    vis:    '/vendor/vis-network.min.js',
-    marked: '/vendor/marked.min.js',
-  };
-  const CHECKS = {
-    chart:  () => typeof Chart !== 'undefined',
-    vis:    () => typeof vis !== 'undefined' && !!vis.Network,
-    marked: () => typeof marked !== 'undefined',
-  };
-  const cache = {};
-  return function (key) {
-    if (CHECKS[key] && CHECKS[key]()) return Promise.resolve();
-    if (cache[key]) return cache[key];
-    cache[key] = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = URLS[key];
-      s.async = false;
-      s.onload = () => resolve();
-      s.onerror = (e) => { delete cache[key]; reject(e); };
-      document.head.appendChild(s);
-    });
-    return cache[key];
-  };
-})();
-</script>
-<style>
-  :root, body.theme-dark {
-    --bg: #000000;
-    --bg-soft: #0a0a0a;
-    --card: rgba(255, 255, 255, 0.025);
-    --card-hi: rgba(255, 255, 255, 0.05);
-    --border: rgba(255, 255, 255, 0.07);
-    --border-hi: rgba(255, 255, 255, 0.14);
-    --text: #f5f5f5;
-    --text-mute: #a0a0a8;
-    --text-dim: #6b6b72;
-    --accent: #d97757;
-    --accent-2: #c96442;
-    --cyan: #7dd3fc;
-    --ok: #4ade80;
-    --warn: #fbbf24;
-    --err: #f87171;
-    --grad: linear-gradient(135deg, #d97757 0%, #c96442 100%);
-    --grad-soft: linear-gradient(135deg, rgba(217,119,87,0.12), rgba(201,100,66,0.08));
-    --code-bg: rgba(0,0,0,0.3);
-  }
-  body.theme-light {
-    --bg: #f5f5f0;
-    --bg-soft: #eeeee8;
-    --card: rgba(0, 0, 0, 0.03);
-    --card-hi: rgba(0, 0, 0, 0.06);
-    --border: rgba(0, 0, 0, 0.1);
-    --border-hi: rgba(0, 0, 0, 0.18);
-    --text: #1a1a1a;
-    --text-mute: #3f3f46;
-    --text-dim: #5a5a62;
-    --accent: #9e4422;
-    --accent-2: #853814;
-    --cyan: #075985;
-    --ok: #166534;
-    --warn: #854d0e;
-    --err: #991b1b;
-    --grad: linear-gradient(135deg, #d97757 0%, #c96442 100%);
-    --grad-soft: linear-gradient(135deg, rgba(217,119,87,0.1), rgba(201,100,66,0.06));
-    --code-bg: rgba(0,0,0,0.05);
-  }
-  body.theme-light { -webkit-font-smoothing: auto; }
-  body.theme-light::before { background: none !important; }
-  /* 테마 전환 애니메이션 */
-  body.theme-switching::after {
-    content:''; position:fixed; inset:0; z-index:9999; pointer-events:none;
-    background: var(--bg);
-    animation: themeSweep 0.5s ease-out forwards;
-  }
-  @keyframes themeSweep {
-    0% { clip-path: inset(0 0 100% 0); opacity:1; }
-    100% { clip-path: inset(0 0 0 0); opacity:0; }
-  }
-  /* 라이트 모드 — 포괄적 오버라이드 */
-  body.theme-light .feat-win { border-color: rgba(0,0,0,0.12); }
-  body.theme-light .btn-primary { color: #fff; }
-  body.theme-light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
-  body.theme-light .chat-bubble-user { color: #fff; }
-  body.theme-light .chat-bubble-bot { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); }
-  body.theme-light .modal-backdrop { background: rgba(0,0,0,0.35); }
-  body.theme-light #sidebar { background: #e8e8e2 !important; border-color: rgba(0,0,0,0.1); }
-  body.theme-light .nav-item.active { background: rgba(217,119,87,0.15) !important; border-color: rgba(217,119,87,0.3) !important; color: var(--text) !important; }
-  body.theme-light .nav-item:hover { background: rgba(0,0,0,0.04); }
-  body.theme-light .card { background: rgba(255,255,255,0.6); border-color: rgba(0,0,0,0.08); }
-  body.theme-light .hover-lift:hover { background: rgba(255,255,255,0.8); }
-  body.theme-light .chip { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.1); color: var(--text-mute); }
-  /* WCAG AA — bump chip text colors past 4.5 ratio on tinted backgrounds. */
-  body.theme-light .chip-ok { background: rgba(22,163,74,0.1); border-color: rgba(22,163,74,0.25); color: #166534; }
-  body.theme-light .chip-warn { background: rgba(202,138,4,0.1); border-color: rgba(202,138,4,0.25); color: #854d0e; }
-  body.theme-light .chip-err { background: rgba(220,38,38,0.1); border-color: rgba(220,38,38,0.25); color: #b91c1c; }
-  /* WCAG AA — remap low-contrast inline-style colors used inside the SPA
+  <script src="/vendor/marked.min.js" defer></script>
+  <script>
+    window._loadVendor = (() => {
+      const URLS = {
+        chart: '/vendor/chart.umd.min.js',
+        vis: '/vendor/vis-network.min.js',
+        marked: '/vendor/marked.min.js',
+      };
+      const CHECKS = {
+        chart: () => typeof Chart !== 'undefined',
+        vis: () => typeof vis !== 'undefined' && !!vis.Network,
+        marked: () => typeof marked !== 'undefined',
+      };
+      const cache = {};
+      return function (key) {
+        if (CHECKS[key] && CHECKS[key]()) return Promise.resolve();
+        if (cache[key]) return cache[key];
+        cache[key] = new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = URLS[key];
+          s.async = false;
+          s.onload = () => resolve();
+          s.onerror = (e) => { delete cache[key]; reject(e); };
+          document.head.appendChild(s);
+        });
+        return cache[key];
+      };
+    })();
+  </script>
+  <style>
+    :root,
+    body.theme-dark {
+      --bg: #000000;
+      --bg-soft: #0a0a0a;
+      --card: rgba(255, 255, 255, 0.025);
+      --card-hi: rgba(255, 255, 255, 0.05);
+      --border: rgba(255, 255, 255, 0.07);
+      --border-hi: rgba(255, 255, 255, 0.14);
+      --text: #f5f5f5;
+      --text-mute: #a0a0a8;
+      --text-dim: #6b6b72;
+      --accent: #d97757;
+      --accent-2: #c96442;
+      --cyan: #7dd3fc;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --grad: linear-gradient(135deg, #d97757 0%, #c96442 100%);
+      --grad-soft: linear-gradient(135deg, rgba(217, 119, 87, 0.12), rgba(201, 100, 66, 0.08));
+      --code-bg: rgba(0, 0, 0, 0.3);
+    }
+
+    body.theme-light {
+      --bg: #f5f5f0;
+      --bg-soft: #eeeee8;
+      --card: rgba(0, 0, 0, 0.03);
+      --card-hi: rgba(0, 0, 0, 0.06);
+      --border: rgba(0, 0, 0, 0.1);
+      --border-hi: rgba(0, 0, 0, 0.18);
+      --text: #1a1a1a;
+      --text-mute: #3f3f46;
+      --text-dim: #5a5a62;
+      --accent: #9e4422;
+      --accent-2: #853814;
+      --cyan: #075985;
+      --ok: #166534;
+      --warn: #854d0e;
+      --err: #991b1b;
+      --grad: linear-gradient(135deg, #d97757 0%, #c96442 100%);
+      --grad-soft: linear-gradient(135deg, rgba(217, 119, 87, 0.1), rgba(201, 100, 66, 0.06));
+      --code-bg: rgba(0, 0, 0, 0.05);
+    }
+
+    body.theme-light {
+      -webkit-font-smoothing: auto;
+    }
+
+    body.theme-light::before {
+      background: none !important;
+    }
+
+    /* 테마 전환 애니메이션 */
+    body.theme-switching::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      background: var(--bg);
+      animation: themeSweep 0.5s ease-out forwards;
+    }
+
+    @keyframes themeSweep {
+      0% {
+        clip-path: inset(0 0 100% 0);
+        opacity: 1;
+      }
+
+      100% {
+        clip-path: inset(0 0 0 0);
+        opacity: 0;
+      }
+    }
+
+    /* 라이트 모드 — 포괄적 오버라이드 */
+    body.theme-light .feat-win {
+      border-color: rgba(0, 0, 0, 0.12);
+    }
+
+    body.theme-light .btn-primary {
+      color: #fff;
+    }
+
+    body.theme-light ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    body.theme-light .chat-bubble-user {
+      color: #fff;
+    }
+
+    body.theme-light .chat-bubble-bot {
+      background: rgba(0, 0, 0, 0.04);
+      border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    body.theme-light .modal-backdrop {
+      background: rgba(0, 0, 0, 0.35);
+    }
+
+    body.theme-light #sidebar {
+      background: #e8e8e2 !important;
+      border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    body.theme-light .nav-item.active {
+      background: rgba(217, 119, 87, 0.15) !important;
+      border-color: rgba(217, 119, 87, 0.3) !important;
+      color: var(--text) !important;
+    }
+
+    body.theme-light .nav-item:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    body.theme-light .card {
+      background: rgba(255, 255, 255, 0.6);
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    body.theme-light .hover-lift:hover {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    body.theme-light .chip {
+      background: rgba(0, 0, 0, 0.06);
+      border-color: rgba(0, 0, 0, 0.1);
+      color: var(--text-mute);
+    }
+
+    /* WCAG AA — bump chip text colors past 4.5 ratio on tinted backgrounds. */
+    body.theme-light .chip-ok {
+      background: rgba(22, 163, 74, 0.1);
+      border-color: rgba(22, 163, 74, 0.25);
+      color: #166534;
+    }
+
+    body.theme-light .chip-warn {
+      background: rgba(202, 138, 4, 0.1);
+      border-color: rgba(202, 138, 4, 0.25);
+      color: #854d0e;
+    }
+
+    body.theme-light .chip-err {
+      background: rgba(220, 38, 38, 0.1);
+      border-color: rgba(220, 38, 38, 0.25);
+      color: #b91c1c;
+    }
+
+    /* WCAG AA — remap low-contrast inline-style colors used inside the SPA
      for state badges. These are inline styles emitted by app.js and cannot
      be overridden by class rules without !important; the substring match
      on the style attribute is intentional. */
-  body.theme-light [style*="color:#f87171"] { color: #b91c1c !important; }     /* red-400 → red-700  */
-  body.theme-light [style*="color:#a78bfa"] { color: #6d28d9 !important; }     /* purple-400 → 700  */
-  body.theme-light [style*="color:#ca8a04"] { color: #854d0e !important; }     /* yellow-600 → 800  */
-  body.theme-light [style*="color:#9ca3af"] { color: #4b5563 !important; }     /* gray-400 → 600    */
-  body.theme-light [style*="color:#67e8f9"] { color: #0e7490 !important; }     /* cyan-300 → 700    */
-  body.theme-light [style*="color:#0284c7"] { color: #075985 !important; }     /* sky-600 → 800     */
-  body.theme-light [style*="color:#22d3ee"] { color: #0e7490 !important; }     /* cyan-400 → 700    */
-  body.theme-light [style*="color:#38bdf8"] { color: #075985 !important; }     /* sky-400 → 800     */
-  body.theme-light [style*="color:#fcd34d"] { color: #854d0e !important; }     /* amber-300 → 800   */
-  body.theme-light [style*="color:#fca5a5"] { color: #991b1b !important; }     /* red-300 → 800     */
-  body.theme-light [style*="color:#86efac"] { color: #166534 !important; }     /* green-300 → 800   */
-  body.theme-light [style*="color:#60a5fa"] { color: #1d4ed8 !important; }     /* blue-400 → 700    */
-  body.theme-light [style*="color:#7dd3fc"] { color: #075985 !important; }     /* sky-300 → 800     */
-  body.theme-light [style*="color:#93c5fd"] { color: #1e40af !important; }     /* blue-300 → 800    */
-  body.theme-light [style*="color:#16a34a"] { color: #14532d !important; }     /* green-600 → 900   */
-  body.theme-light [style*="color:#dc2626"] { color: #991b1b !important; }     /* red-600 → 800     */
-  body.theme-light [style*="color:#a16207"] { color: #713f12 !important; }     /* yellow-700 → 900  */
-  /* Same overrides but matching `color: #...` with a space (some emit
+    body.theme-light [style*="color:#f87171"] {
+      color: #b91c1c !important;
+    }
+
+    /* red-400 → red-700  */
+    body.theme-light [style*="color:#a78bfa"] {
+      color: #6d28d9 !important;
+    }
+
+    /* purple-400 → 700  */
+    body.theme-light [style*="color:#ca8a04"] {
+      color: #854d0e !important;
+    }
+
+    /* yellow-600 → 800  */
+    body.theme-light [style*="color:#9ca3af"] {
+      color: #4b5563 !important;
+    }
+
+    /* gray-400 → 600    */
+    body.theme-light [style*="color:#67e8f9"] {
+      color: #0e7490 !important;
+    }
+
+    /* cyan-300 → 700    */
+    body.theme-light [style*="color:#0284c7"] {
+      color: #075985 !important;
+    }
+
+    /* sky-600 → 800     */
+    body.theme-light [style*="color:#22d3ee"] {
+      color: #0e7490 !important;
+    }
+
+    /* cyan-400 → 700    */
+    body.theme-light [style*="color:#38bdf8"] {
+      color: #075985 !important;
+    }
+
+    /* sky-400 → 800     */
+    body.theme-light [style*="color:#fcd34d"] {
+      color: #854d0e !important;
+    }
+
+    /* amber-300 → 800   */
+    body.theme-light [style*="color:#fca5a5"] {
+      color: #991b1b !important;
+    }
+
+    /* red-300 → 800     */
+    body.theme-light [style*="color:#86efac"] {
+      color: #166534 !important;
+    }
+
+    /* green-300 → 800   */
+    body.theme-light [style*="color:#60a5fa"] {
+      color: #1d4ed8 !important;
+    }
+
+    /* blue-400 → 700    */
+    body.theme-light [style*="color:#7dd3fc"] {
+      color: #075985 !important;
+    }
+
+    /* sky-300 → 800     */
+    body.theme-light [style*="color:#93c5fd"] {
+      color: #1e40af !important;
+    }
+
+    /* blue-300 → 800    */
+    body.theme-light [style*="color:#16a34a"] {
+      color: #14532d !important;
+    }
+
+    /* green-600 → 900   */
+    body.theme-light [style*="color:#dc2626"] {
+      color: #991b1b !important;
+    }
+
+    /* red-600 → 800     */
+    body.theme-light [style*="color:#a16207"] {
+      color: #713f12 !important;
+    }
+
+    /* yellow-700 → 900  */
+    /* Same overrides but matching `color: #...` with a space (some emit
      code paths set via cssText / template literals leave a space). */
-  body.theme-light [style*="color: #f87171"] { color: #b91c1c !important; }
-  body.theme-light [style*="color: #a78bfa"] { color: #6d28d9 !important; }
-  body.theme-light [style*="color: #ca8a04"] { color: #854d0e !important; }
-  body.theme-light [style*="color: #67e8f9"] { color: #0e7490 !important; }
-  body.theme-light [style*="color: #16a34a"] { color: #14532d !important; }
-  body.theme-light [style*="color: #0284c7"] { color: #075985 !important; }
-  body.theme-light [style*="color: #dc2626"] { color: #991b1b !important; }
-  body.theme-light [style*="color: #fca5a5"] { color: #991b1b !important; }
-  body.theme-light [style*="color: #fcd34d"] { color: #854d0e !important; }
-  body.theme-light [style*="color: #86efac"] { color: #166534 !important; }
-  body.theme-light [style*="color: #9ca3af"] { color: #4b5563 !important; }
-  /* gray-text token for "..." idle marker */
-  body.theme-light [style*="color:#9aa0aa"] { color: #4b5563 !important; }
-  body.theme-light [style*="color: #9aa0aa"] { color: #4b5563 !important; }
-  /* When inline styles are touched by JS (animation-delay etc.), browsers
+    body.theme-light [style*="color: #f87171"] {
+      color: #b91c1c !important;
+    }
+
+    body.theme-light [style*="color: #a78bfa"] {
+      color: #6d28d9 !important;
+    }
+
+    body.theme-light [style*="color: #ca8a04"] {
+      color: #854d0e !important;
+    }
+
+    body.theme-light [style*="color: #67e8f9"] {
+      color: #0e7490 !important;
+    }
+
+    body.theme-light [style*="color: #16a34a"] {
+      color: #14532d !important;
+    }
+
+    body.theme-light [style*="color: #0284c7"] {
+      color: #075985 !important;
+    }
+
+    body.theme-light [style*="color: #dc2626"] {
+      color: #991b1b !important;
+    }
+
+    body.theme-light [style*="color: #fca5a5"] {
+      color: #991b1b !important;
+    }
+
+    body.theme-light [style*="color: #fcd34d"] {
+      color: #854d0e !important;
+    }
+
+    body.theme-light [style*="color: #86efac"] {
+      color: #166534 !important;
+    }
+
+    body.theme-light [style*="color: #9ca3af"] {
+      color: #4b5563 !important;
+    }
+
+    /* gray-text token for "..." idle marker */
+    body.theme-light [style*="color:#9aa0aa"] {
+      color: #4b5563 !important;
+    }
+
+    body.theme-light [style*="color: #9aa0aa"] {
+      color: #4b5563 !important;
+    }
+
+    /* When inline styles are touched by JS (animation-delay etc.), browsers
      re-serialise hex to rgb(). Mirror the worst-offender colours here. */
-  body.theme-light [style*="rgb(248, 113, 113)"] { color: #b91c1c !important; }   /* red-400 */
-  body.theme-light [style*="rgb(167, 139, 250)"] { color: #6d28d9 !important; }   /* purple-400 */
-  body.theme-light [style*="rgb(202, 138, 4)"]   { color: #854d0e !important; }   /* yellow-600 */
-  body.theme-light [style*="rgb(103, 232, 249)"] { color: #0e7490 !important; }   /* cyan-300 */
-  body.theme-light [style*="rgb(2, 132, 199)"]   { color: #075985 !important; }   /* sky-600 */
-  body.theme-light [style*="rgb(22, 163, 74)"]   { color: #14532d !important; }   /* green-600 */
-  body.theme-light [style*="rgb(96, 165, 250)"]  { color: #1d4ed8 !important; }   /* blue-400 */
-  body.theme-light [style*="rgb(125, 211, 252)"] { color: #075985 !important; }   /* sky-300 */
-  body.theme-light [style*="rgb(252, 211, 77)"]  { color: #854d0e !important; }   /* amber-300 */
-  body.theme-light [style*="rgb(252, 165, 165)"] { color: #991b1b !important; }   /* red-300 */
-  body.theme-light [style*="rgb(134, 239, 172)"] { color: #166534 !important; }   /* green-300 */
-  body.theme-light [style*="rgb(154, 160, 170)"] { color: #4b5563 !important; }   /* mute */
-  body.theme-light .btn { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.12); color: var(--text); }
-  body.theme-light .btn:hover { background: rgba(0,0,0,0.1); }
-  body.theme-light .btn-ghost:hover { background: rgba(0,0,0,0.06); }
-  body.theme-light .input { background: rgba(255,255,255,0.7); border-color: rgba(0,0,0,0.12); color: var(--text); }
-  body.theme-light .input:focus { border-color: var(--accent); }
-  body.theme-light table.data th { color: var(--text-mute); border-color: rgba(0,0,0,0.08); }
-  body.theme-light table.data td { border-color: rgba(0,0,0,0.05); }
-  body.theme-light table.data tr:hover td { background: rgba(0,0,0,0.02); }
-  body.theme-light .tag-tool { background: rgba(217,119,87,0.12); color: #b85535; }
-  body.theme-light .gradient-text { color: #b85535; }
-  body.theme-light .shimmer { background: linear-gradient(90deg, rgba(0,0,0,0.04), rgba(0,0,0,0.08), rgba(0,0,0,0.04)); background-size: 200% 100%; }
-  body.theme-light .mascot-bubble { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.12); color: var(--text); }
-  body.theme-light .mascot-bubble::after { border-top-color: rgba(0,0,0,0.12); }
-  body.theme-light .settings-item:hover { background: rgba(0,0,0,0.05); }
-  body.theme-light #settingsDropdown { background: #eaeae4; border-color: rgba(0,0,0,0.12); box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
-  body.theme-light .spotlight-item:hover, body.theme-light .spotlight-item.active { background: rgba(0,0,0,0.05); }
-  body.theme-light .prose-claude code { background: rgba(0,0,0,0.06); }
-  body.theme-light .prose-claude pre { background: #f0f0ea; border-color: rgba(0,0,0,0.08); }
-  /* v2.33.2 — 모든 테마에서 선명하게 보이는 공용 코드 박스 (guide 탭, 등) */
-  .code-terminal { background: #0b1220 !important; color: #7ee2b8 !important; border: 1px solid rgba(126,226,184,0.18); }
-  body.theme-light .code-terminal { background: #0b1220 !important; color: #a7f3d0 !important; }
-  /* v2.33.2 — 보라색 태그 chip 의 light theme 대비 개선 */
-  body.theme-light .chip-violet { background: rgba(139,92,246,0.14) !important; color: #6d28d9 !important; border-color: rgba(139,92,246,0.28) !important; }
-  /* v2.33.3 — light theme WCAG AA (4.5:1) batch overrides
+    body.theme-light [style*="rgb(248, 113, 113)"] {
+      color: #b91c1c !important;
+    }
+
+    /* red-400 */
+    body.theme-light [style*="rgb(167, 139, 250)"] {
+      color: #6d28d9 !important;
+    }
+
+    /* purple-400 */
+    body.theme-light [style*="rgb(202, 138, 4)"] {
+      color: #854d0e !important;
+    }
+
+    /* yellow-600 */
+    body.theme-light [style*="rgb(103, 232, 249)"] {
+      color: #0e7490 !important;
+    }
+
+    /* cyan-300 */
+    body.theme-light [style*="rgb(2, 132, 199)"] {
+      color: #075985 !important;
+    }
+
+    /* sky-600 */
+    body.theme-light [style*="rgb(22, 163, 74)"] {
+      color: #14532d !important;
+    }
+
+    /* green-600 */
+    body.theme-light [style*="rgb(96, 165, 250)"] {
+      color: #1d4ed8 !important;
+    }
+
+    /* blue-400 */
+    body.theme-light [style*="rgb(125, 211, 252)"] {
+      color: #075985 !important;
+    }
+
+    /* sky-300 */
+    body.theme-light [style*="rgb(252, 211, 77)"] {
+      color: #854d0e !important;
+    }
+
+    /* amber-300 */
+    body.theme-light [style*="rgb(252, 165, 165)"] {
+      color: #991b1b !important;
+    }
+
+    /* red-300 */
+    body.theme-light [style*="rgb(134, 239, 172)"] {
+      color: #166534 !important;
+    }
+
+    /* green-300 */
+    body.theme-light [style*="rgb(154, 160, 170)"] {
+      color: #4b5563 !important;
+    }
+
+    /* mute */
+    body.theme-light .btn {
+      background: rgba(0, 0, 0, 0.05);
+      border-color: rgba(0, 0, 0, 0.12);
+      color: var(--text);
+    }
+
+    body.theme-light .btn:hover {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    body.theme-light .btn-ghost:hover {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    body.theme-light .input {
+      background: rgba(255, 255, 255, 0.7);
+      border-color: rgba(0, 0, 0, 0.12);
+      color: var(--text);
+    }
+
+    body.theme-light .input:focus {
+      border-color: var(--accent);
+    }
+
+    body.theme-light table.data th {
+      color: var(--text-mute);
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    body.theme-light table.data td {
+      border-color: rgba(0, 0, 0, 0.05);
+    }
+
+    body.theme-light table.data tr:hover td {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    body.theme-light .tag-tool {
+      background: rgba(217, 119, 87, 0.12);
+      color: #b85535;
+    }
+
+    body.theme-light .gradient-text {
+      color: #b85535;
+    }
+
+    body.theme-light .shimmer {
+      background: linear-gradient(90deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.04));
+      background-size: 200% 100%;
+    }
+
+    body.theme-light .mascot-bubble {
+      background: rgba(255, 255, 255, 0.9);
+      border-color: rgba(0, 0, 0, 0.12);
+      color: var(--text);
+    }
+
+    body.theme-light .mascot-bubble::after {
+      border-top-color: rgba(0, 0, 0, 0.12);
+    }
+
+    body.theme-light .settings-item:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    body.theme-light #settingsDropdown {
+      background: #eaeae4;
+      border-color: rgba(0, 0, 0, 0.12);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    }
+
+    body.theme-light .spotlight-item:hover,
+    body.theme-light .spotlight-item.active {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    body.theme-light .prose-claude code {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    body.theme-light .prose-claude pre {
+      background: #f0f0ea;
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    /* v2.33.2 — 모든 테마에서 선명하게 보이는 공용 코드 박스 (guide 탭, 등) */
+    .code-terminal {
+      background: #0b1220 !important;
+      color: #7ee2b8 !important;
+      border: 1px solid rgba(126, 226, 184, 0.18);
+    }
+
+    body.theme-light .code-terminal {
+      background: #0b1220 !important;
+      color: #a7f3d0 !important;
+    }
+
+    /* v2.33.2 — 보라색 태그 chip 의 light theme 대비 개선 */
+    body.theme-light .chip-violet {
+      background: rgba(139, 92, 246, 0.14) !important;
+      color: #6d28d9 !important;
+      border-color: rgba(139, 92, 246, 0.28) !important;
+    }
+
+    /* v2.33.3 — light theme WCAG AA (4.5:1) batch overrides
      흰/크림 배경 위에서 pastel/accent 텍스트 색이 흐려지는 문제 일괄 수정. */
-  body.theme-light .text-\[\#c4b5fd\],
-  body.theme-light [style*="#c4b5fd"] { color: #6d28d9 !important; }
-  body.theme-light .text-\[\#4ade80\] { color: #166534 !important; }
-  body.theme-light .text-\[\#f87171\] { color: #b91c1c !important; }
-  body.theme-light .text-\[\#fbbf24\] { color: #a16207 !important; }
-  body.theme-light .text-\[\#fcd34d\] { color: #854d0e !important; }
-  body.theme-light .text-\[\#f5b997\] { color: #9e3a1a !important; }
-  body.theme-light .text-\[\#86efac\] { color: #166534 !important; }
-  body.theme-light .text-\[\#fca5a5\] { color: #991b1b !important; }
-  body.theme-light .text-\[var\(--accent\)\] { color: #853814 !important; }
-  body.theme-light .gradient-text { color: #853814 !important; }
-  body.theme-light .tag-tool { color: #9e3a1a !important; }
-  body.theme-light .pulse-dot { background: #15803d; }
-  /* inline style pastel color overrides — 위 클래스로 안 잡히는 구간(chip/뱃지 내부) */
-  body.theme-light [style*="color:#4ade80"],
-  body.theme-light [style*="color: #4ade80"] { color: #166534 !important; }
-  body.theme-light [style*="color:#86efac"],
-  body.theme-light [style*="color: #86efac"] { color: #166534 !important; }
-  body.theme-light [style*="color:#f87171"],
-  body.theme-light [style*="color: #f87171"] { color: #b91c1c !important; }
-  body.theme-light [style*="color:#fca5a5"],
-  body.theme-light [style*="color: #fca5a5"] { color: #991b1b !important; }
-  body.theme-light [style*="color:#fbbf24"],
-  body.theme-light [style*="color: #fbbf24"] { color: #854d0e !important; }
-  body.theme-light [style*="color:#fcd34d"],
-  body.theme-light [style*="color: #fcd34d"] { color: #854d0e !important; }
-  body.theme-light [style*="color:#c4b5fd"],
-  body.theme-light [style*="color: #c4b5fd"] { color: #6d28d9 !important; }
-  body.theme-light [style*="color:#a78bfa"],
-  body.theme-light [style*="color: #a78bfa"] { color: #5b21b6 !important; }
-  body.theme-light [style*="color:#d97757"],
-  body.theme-light [style*="color: #d97757"] { color: #853814 !important; }
-  body.theme-light .empty { color: var(--text-dim); }
-  body.theme-light #sidebar-foot { border-color: rgba(0,0,0,0.08); }
+    body.theme-light .text-\[\#c4b5fd\],
+    body.theme-light [style*="#c4b5fd"] {
+      color: #6d28d9 !important;
+    }
 
-  /* ─── Task 4: 커스텀 테마 — midnight / forest / sunset ─── */
-  body.theme-midnight {
-    --bg: #0b0f1a;
-    --bg-soft: #101828;
-    --card: rgba(100,140,255,0.04);
-    --card-hi: rgba(100,140,255,0.08);
-    --border: rgba(100,140,255,0.1);
-    --border-hi: rgba(100,140,255,0.2);
-    --text: #e0e6f0;
-    --text-mute: #8898b8;
-    --text-dim: #5a6a88;
-    --accent: #6b8aff;
-    --accent-2: #4e6ee0;
-    --cyan: #7dd3fc;
-    --ok: #4ade80;
-    --warn: #fbbf24;
-    --err: #f87171;
-    --grad: linear-gradient(135deg, #6b8aff 0%, #4e6ee0 100%);
-    --grad-soft: linear-gradient(135deg, rgba(107,138,255,0.12), rgba(78,110,224,0.08));
-    --code-bg: rgba(0,0,0,0.35);
-    color-scheme: dark;
-  }
-  body.theme-midnight #sidebar { background: #0e1425 !important; border-color: rgba(100,140,255,0.1); }
-  body.theme-midnight .nav-item.active { background: rgba(107,138,255,0.15) !important; border-color: rgba(107,138,255,0.3) !important; }
-  body.theme-midnight .btn-primary { color: #fff; }
-  body.theme-midnight .chat-bubble-user { color: #fff; }
+    body.theme-light .text-\[\#4ade80\] {
+      color: #166534 !important;
+    }
 
-  body.theme-forest {
-    --bg: #0a1410;
-    --bg-soft: #0f1e16;
-    --card: rgba(80,200,120,0.04);
-    --card-hi: rgba(80,200,120,0.08);
-    --border: rgba(80,200,120,0.1);
-    --border-hi: rgba(80,200,120,0.2);
-    --text: #dff0e4;
-    --text-mute: #88b898;
-    --text-dim: #5a8868;
-    --accent: #50c878;
-    --accent-2: #3aad5e;
-    --cyan: #7dd3fc;
-    --ok: #4ade80;
-    --warn: #fbbf24;
-    --err: #f87171;
-    --grad: linear-gradient(135deg, #50c878 0%, #3aad5e 100%);
-    --grad-soft: linear-gradient(135deg, rgba(80,200,120,0.12), rgba(58,173,94,0.08));
-    --code-bg: rgba(0,0,0,0.35);
-    color-scheme: dark;
-  }
-  body.theme-forest #sidebar { background: #0d1a14 !important; border-color: rgba(80,200,120,0.1); }
-  body.theme-forest .nav-item.active { background: rgba(80,200,120,0.15) !important; border-color: rgba(80,200,120,0.3) !important; }
-  body.theme-forest .btn-primary { color: #fff; }
-  body.theme-forest .chat-bubble-user { color: #fff; }
+    body.theme-light .text-\[\#f87171\] {
+      color: #b91c1c !important;
+    }
 
-  body.theme-sunset {
-    --bg: #1a0f0a;
-    --bg-soft: #241410;
-    --card: rgba(255,150,80,0.04);
-    --card-hi: rgba(255,150,80,0.08);
-    --border: rgba(255,150,80,0.1);
-    --border-hi: rgba(255,150,80,0.2);
-    --text: #f5e0d0;
-    --text-mute: #c8a888;
-    --text-dim: #8a6a50;
-    --accent: #ff9650;
-    --accent-2: #e07830;
-    --cyan: #7dd3fc;
-    --ok: #4ade80;
-    --warn: #fbbf24;
-    --err: #f87171;
-    --grad: linear-gradient(135deg, #ff9650 0%, #e07830 100%);
-    --grad-soft: linear-gradient(135deg, rgba(255,150,80,0.12), rgba(224,120,48,0.08));
-    --code-bg: rgba(0,0,0,0.35);
-    color-scheme: dark;
-  }
-  body.theme-sunset #sidebar { background: #1e1210 !important; border-color: rgba(255,150,80,0.1); }
-  body.theme-sunset .nav-item.active { background: rgba(255,150,80,0.15) !important; border-color: rgba(255,150,80,0.3) !important; }
-  body.theme-sunset .btn-primary { color: #fff; }
-  body.theme-sunset .chat-bubble-user { color: #fff; }
+    body.theme-light .text-\[\#fbbf24\] {
+      color: #a16207 !important;
+    }
 
-  /* ─── Task 9: 노드 그룹핑 ─── */
-  .wf-group-box { fill: rgba(167,139,250,0.06); stroke: rgba(167,139,250,0.3); stroke-width: 1.5; stroke-dasharray: 6 3; rx: 16; ry: 16; cursor: move; }
-  .wf-group-box:hover { fill: rgba(167,139,250,0.1); }
-  .wf-group-label { fill: var(--text-mute); font-size: 11px; font-weight: 600; pointer-events: none; }
-  .wf-group-toggle { cursor: pointer; fill: var(--text-mute); font-size: 14px; }
-  .wf-group-toggle:hover { fill: var(--text); }
-  .wf-node.multi-selected .wf-node-body { stroke: #a78bfa; stroke-width: 2.5; stroke-dasharray: 4 2; }
+    body.theme-light .text-\[\#fcd34d\] {
+      color: #854d0e !important;
+    }
 
-  /* ─── Task 1: 모바일 반응형 — 모달 전체 화면 ─── */
-  @media (max-width: 768px) {
-    .modal-backdrop { padding: 0 !important; }
-    .modal { max-width: 100vw !important; width: 100vw !important; max-height: 100vh !important; height: 100vh !important; border-radius: 0 !important; }
-    .modal-wide { max-width: 100vw !important; width: 100vw !important; height: 100vh !important; max-height: 100vh !important; }
-  }
+    body.theme-light .text-\[\#f5b997\] {
+      color: #9e3a1a !important;
+    }
 
-  /* ─── Task 2: 포커스 트랩 시각 ─── */
-  .modal-backdrop:focus-within .modal { box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 2px var(--accent); }
-  *, *::before, *::after { box-sizing: border-box; }
-  html { color-scheme: dark; }
-  body.theme-light { color-scheme: light; }
-  html, body { background: var(--bg); color: var(--text); margin: 0; height: 100%; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-font-smoothing: antialiased; }
-  body::before {
-    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-    background:
-      radial-gradient(55% 40% at 0% 0%, rgba(217,119,87,0.04), transparent 60%),
-      radial-gradient(40% 35% at 100% 100%, rgba(255,255,255,0.02), transparent 60%);
-  }
-  /* R3 (v2.66.4) — thinner default scrollbars; chrome behaviour stays for
+    body.theme-light .text-\[\#86efac\] {
+      color: #166534 !important;
+    }
+
+    body.theme-light .text-\[\#fca5a5\] {
+      color: #991b1b !important;
+    }
+
+    body.theme-light .text-\[var\(--accent\)\] {
+      color: #853814 !important;
+    }
+
+    body.theme-light .gradient-text {
+      color: #853814 !important;
+    }
+
+    body.theme-light .tag-tool {
+      color: #9e3a1a !important;
+    }
+
+    body.theme-light .pulse-dot {
+      background: #15803d;
+    }
+
+    /* inline style pastel color overrides — 위 클래스로 안 잡히는 구간(chip/뱃지 내부) */
+    body.theme-light [style*="color:#4ade80"],
+    body.theme-light [style*="color: #4ade80"] {
+      color: #166534 !important;
+    }
+
+    body.theme-light [style*="color:#86efac"],
+    body.theme-light [style*="color: #86efac"] {
+      color: #166534 !important;
+    }
+
+    body.theme-light [style*="color:#f87171"],
+    body.theme-light [style*="color: #f87171"] {
+      color: #b91c1c !important;
+    }
+
+    body.theme-light [style*="color:#fca5a5"],
+    body.theme-light [style*="color: #fca5a5"] {
+      color: #991b1b !important;
+    }
+
+    body.theme-light [style*="color:#fbbf24"],
+    body.theme-light [style*="color: #fbbf24"] {
+      color: #854d0e !important;
+    }
+
+    body.theme-light [style*="color:#fcd34d"],
+    body.theme-light [style*="color: #fcd34d"] {
+      color: #854d0e !important;
+    }
+
+    body.theme-light [style*="color:#c4b5fd"],
+    body.theme-light [style*="color: #c4b5fd"] {
+      color: #6d28d9 !important;
+    }
+
+    body.theme-light [style*="color:#a78bfa"],
+    body.theme-light [style*="color: #a78bfa"] {
+      color: #5b21b6 !important;
+    }
+
+    body.theme-light [style*="color:#d97757"],
+    body.theme-light [style*="color: #d97757"] {
+      color: #853814 !important;
+    }
+
+    body.theme-light .empty {
+      color: var(--text-dim);
+    }
+
+    body.theme-light #sidebar-foot {
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    /* ─── Task 4: 커스텀 테마 — midnight / forest / sunset ─── */
+    body.theme-midnight {
+      --bg: #0b0f1a;
+      --bg-soft: #101828;
+      --card: rgba(100, 140, 255, 0.04);
+      --card-hi: rgba(100, 140, 255, 0.08);
+      --border: rgba(100, 140, 255, 0.1);
+      --border-hi: rgba(100, 140, 255, 0.2);
+      --text: #e0e6f0;
+      --text-mute: #8898b8;
+      --text-dim: #5a6a88;
+      --accent: #6b8aff;
+      --accent-2: #4e6ee0;
+      --cyan: #7dd3fc;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --grad: linear-gradient(135deg, #6b8aff 0%, #4e6ee0 100%);
+      --grad-soft: linear-gradient(135deg, rgba(107, 138, 255, 0.12), rgba(78, 110, 224, 0.08));
+      --code-bg: rgba(0, 0, 0, 0.35);
+      color-scheme: dark;
+    }
+
+    body.theme-midnight #sidebar {
+      background: #0e1425 !important;
+      border-color: rgba(100, 140, 255, 0.1);
+    }
+
+    body.theme-midnight .nav-item.active {
+      background: rgba(107, 138, 255, 0.15) !important;
+      border-color: rgba(107, 138, 255, 0.3) !important;
+    }
+
+    body.theme-midnight .btn-primary {
+      color: #fff;
+    }
+
+    body.theme-midnight .chat-bubble-user {
+      color: #fff;
+    }
+
+    body.theme-forest {
+      --bg: #0a1410;
+      --bg-soft: #0f1e16;
+      --card: rgba(80, 200, 120, 0.04);
+      --card-hi: rgba(80, 200, 120, 0.08);
+      --border: rgba(80, 200, 120, 0.1);
+      --border-hi: rgba(80, 200, 120, 0.2);
+      --text: #dff0e4;
+      --text-mute: #88b898;
+      --text-dim: #5a8868;
+      --accent: #50c878;
+      --accent-2: #3aad5e;
+      --cyan: #7dd3fc;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --grad: linear-gradient(135deg, #50c878 0%, #3aad5e 100%);
+      --grad-soft: linear-gradient(135deg, rgba(80, 200, 120, 0.12), rgba(58, 173, 94, 0.08));
+      --code-bg: rgba(0, 0, 0, 0.35);
+      color-scheme: dark;
+    }
+
+    body.theme-forest #sidebar {
+      background: #0d1a14 !important;
+      border-color: rgba(80, 200, 120, 0.1);
+    }
+
+    body.theme-forest .nav-item.active {
+      background: rgba(80, 200, 120, 0.15) !important;
+      border-color: rgba(80, 200, 120, 0.3) !important;
+    }
+
+    body.theme-forest .btn-primary {
+      color: #fff;
+    }
+
+    body.theme-forest .chat-bubble-user {
+      color: #fff;
+    }
+
+    body.theme-sunset {
+      --bg: #1a0f0a;
+      --bg-soft: #241410;
+      --card: rgba(255, 150, 80, 0.04);
+      --card-hi: rgba(255, 150, 80, 0.08);
+      --border: rgba(255, 150, 80, 0.1);
+      --border-hi: rgba(255, 150, 80, 0.2);
+      --text: #f5e0d0;
+      --text-mute: #c8a888;
+      --text-dim: #8a6a50;
+      --accent: #ff9650;
+      --accent-2: #e07830;
+      --cyan: #7dd3fc;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --grad: linear-gradient(135deg, #ff9650 0%, #e07830 100%);
+      --grad-soft: linear-gradient(135deg, rgba(255, 150, 80, 0.12), rgba(224, 120, 48, 0.08));
+      --code-bg: rgba(0, 0, 0, 0.35);
+      color-scheme: dark;
+    }
+
+    body.theme-sunset #sidebar {
+      background: #1e1210 !important;
+      border-color: rgba(255, 150, 80, 0.1);
+    }
+
+    body.theme-sunset .nav-item.active {
+      background: rgba(255, 150, 80, 0.15) !important;
+      border-color: rgba(255, 150, 80, 0.3) !important;
+    }
+
+    body.theme-sunset .btn-primary {
+      color: #fff;
+    }
+
+    body.theme-sunset .chat-bubble-user {
+      color: #fff;
+    }
+
+    /* ─── Task 9: 노드 그룹핑 ─── */
+    .wf-group-box {
+      fill: rgba(167, 139, 250, 0.06);
+      stroke: rgba(167, 139, 250, 0.3);
+      stroke-width: 1.5;
+      stroke-dasharray: 6 3;
+      rx: 16;
+      ry: 16;
+      cursor: move;
+    }
+
+    .wf-group-box:hover {
+      fill: rgba(167, 139, 250, 0.1);
+    }
+
+    .wf-group-label {
+      fill: var(--text-mute);
+      font-size: 11px;
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .wf-group-toggle {
+      cursor: pointer;
+      fill: var(--text-mute);
+      font-size: 14px;
+    }
+
+    .wf-group-toggle:hover {
+      fill: var(--text);
+    }
+
+    .wf-node.multi-selected .wf-node-body {
+      stroke: #a78bfa;
+      stroke-width: 2.5;
+      stroke-dasharray: 4 2;
+    }
+
+    /* ─── Task 1: 모바일 반응형 — 모달 전체 화면 ─── */
+    @media (max-width: 768px) {
+      .modal-backdrop {
+        padding: 0 !important;
+      }
+
+      .modal {
+        max-width: 100vw !important;
+        width: 100vw !important;
+        max-height: 100vh !important;
+        height: 100vh !important;
+        border-radius: 0 !important;
+      }
+
+      .modal-wide {
+        max-width: 100vw !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+      }
+    }
+
+    /* ─── Task 2: 포커스 트랩 시각 ─── */
+    .modal-backdrop:focus-within .modal {
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 2px var(--accent);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+    }
+
+    body.theme-light {
+      color-scheme: light;
+    }
+
+    html,
+    body {
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      height: 100%;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(55% 40% at 0% 0%, rgba(217, 119, 87, 0.04), transparent 60%),
+        radial-gradient(40% 35% at 100% 100%, rgba(255, 255, 255, 0.02), transparent 60%);
+    }
+
+    /* R3 (v2.66.4) — thinner default scrollbars; chrome behaviour stays for
      containers that need a chunkier handle (override per-element). */
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 8px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
-  ::-webkit-scrollbar-track { background: transparent; }
-  * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent; }
-  .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; min-width: 0; max-width: 100%; }
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
 
-  /* P1 (v2.66.2) — unified UI primitives, prefixed `lc-` to avoid clashes
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    /* P1 (v2.66.2) — unified UI primitives, prefixed `lc-` to avoid clashes
      with the Tailwind utility soup elsewhere in the file. The screenshot
      reference (Orchestrator tab) is the canonical look — match that. */
-  .lc-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; }
-  .lc-card + .lc-card { margin-top: 1rem; }
-  .lc-section-title { font-size: 0.95rem; font-weight: 600; color: var(--text); margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem; }
-  .lc-section-sub { font-size: 0.7rem; color: var(--text-dim); font-weight: 400; }
-  .lc-meta-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; font-size: 0.75rem; color: var(--text-dim); border-bottom: 1px dashed var(--border); }
-  .lc-meta-row:last-child { border-bottom: none; }
-  .lc-meta-row .lc-meta-label { min-width: 110px; color: var(--text-mute); }
-  .lc-meta-row .lc-meta-value { color: var(--text); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 0.78rem; word-break: break-all; }
-  .lc-empty { padding: 2rem 1rem; text-align: center; color: var(--text-dim); font-size: 0.78rem; border: 1px dashed var(--border); border-radius: 12px; }
-  .lc-empty-emoji { font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.6; }
-  .lc-loading { padding: 1.5rem 1rem; text-align: center; color: var(--text-dim); font-size: 0.78rem; }
-  .lc-loading::before { content: ''; display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; margin-right: 0.5rem; animation: lc-spin 0.8s linear infinite; vertical-align: middle; }
-  @keyframes lc-spin { to { transform: rotate(360deg); } }
-  .lc-error { padding: 1rem; background: rgba(252,165,165,0.06); border: 1px solid rgba(252,165,165,0.3); border-radius: 10px; color: #fca5a5; font-size: 0.78rem; }
-  .lc-grid-2 { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-  @media (min-width: 1024px) { .lc-grid-2 { grid-template-columns: 1fr 1fr; } }
-  .lc-stack > * + * { margin-top: 0.75rem; }
-  /* V1 (v2.66.8) — toast styling. */
-  .lc-toast {
-    background: var(--card); border: 1px solid var(--border);
-    border-left-width: 3px; border-radius: 12px;
-    padding: 0.75rem 1rem; font-size: 0.85rem;
-    display: flex; align-items: center; gap: 0.5rem;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-    transition: opacity 0.4s ease, transform 0.4s ease;
-    max-width: 480px;
-  }
-  .lc-toast-info { border-left-color: #60a5fa; }
-  .lc-toast-ok   { border-left-color: #4ade80; }
-  .lc-toast-warn { border-left-color: #fbbf24; }
-  .lc-toast-err  { border-left-color: #fca5a5; }
+    .lc-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+    }
 
-  /* Y4 (v2.66.11) — inline Mac-style terminal viewer for session replay. */
-  .mac-term { background: #1c1c1e; border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); border: 1px solid #2c2c2e; max-height: 80vh; display: flex; flex-direction: column; }
-  .mac-term-titlebar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: linear-gradient(to bottom, #3a3a3c, #2c2c2e); border-bottom: 1px solid #1a1a1c; user-select: none; }
-  .mac-term-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; cursor: pointer; }
-  .mac-dot-red    { background: #ff5f57; }
-  .mac-dot-yellow { background: #ffbd2e; }
-  .mac-dot-green  { background: #28c941; }
-  .mac-term-title { color: #c0c0c0; font-size: 12px; font-weight: 500; margin-left: 8px; flex: 1; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; }
-  .mac-term-spawn { background: rgba(255,255,255,0.08); color: #e0e0e0; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 3px 8px; font-size: 10px; cursor: pointer; }
-  .mac-term-spawn:hover { background: rgba(255,255,255,0.14); }
-  .mac-term-body { padding: 14px 18px; font-family: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #e8e8e8; overflow-y: auto; max-height: 70vh; line-height: 1.55; }
-  .mac-term-line { white-space: pre-wrap; word-break: break-word; padding: 1px 0; }
-  .mac-term-line.meta   { color: #6b6b6f; font-size: 11px; }
-  .mac-term-line.user   { color: #4ade80; padding: 4px 0 4px 8px; border-left: 2px solid #4ade80; margin: 6px 0; background: rgba(74,222,128,0.04); }
-  .mac-term-line.assist { color: #e8e8e8; padding: 2px 0 2px 12px; }
-  .mac-term-line .mac-prompt { color: #4ade80; margin-right: 6px; font-weight: 600; }
-  .mac-term-tools { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #3a3a3c; }
-  /* S1 (v2.66.5) — mode-aware view-header accent. Subtle 2px top-bar
+    .lc-card+.lc-card {
+      margin-top: 1rem;
+    }
+
+    .lc-section-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 0.75rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .lc-section-sub {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+
+    .lc-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      border-bottom: 1px dashed var(--border);
+    }
+
+    .lc-meta-row:last-child {
+      border-bottom: none;
+    }
+
+    .lc-meta-row .lc-meta-label {
+      min-width: 110px;
+      color: var(--text-mute);
+    }
+
+    .lc-meta-row .lc-meta-value {
+      color: var(--text);
+      font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+      font-size: 0.78rem;
+      word-break: break-all;
+    }
+
+    .lc-empty {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.78rem;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+
+    .lc-empty-emoji {
+      font-size: 2rem;
+      display: block;
+      margin-bottom: 0.5rem;
+      opacity: 0.6;
+    }
+
+    .lc-loading {
+      padding: 1.5rem 1rem;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.78rem;
+    }
+
+    .lc-loading::before {
+      content: '';
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      margin-right: 0.5rem;
+      animation: lc-spin 0.8s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes lc-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .lc-error {
+      padding: 1rem;
+      background: rgba(252, 165, 165, 0.06);
+      border: 1px solid rgba(252, 165, 165, 0.3);
+      border-radius: 10px;
+      color: #fca5a5;
+      font-size: 0.78rem;
+    }
+
+    .lc-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    @media (min-width: 1024px) {
+      .lc-grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .lc-stack>*+* {
+      margin-top: 0.75rem;
+    }
+
+    /* V1 (v2.66.8) — toast styling. */
+    .lc-toast {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left-width: 3px;
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      max-width: 480px;
+    }
+
+    .lc-toast-info {
+      border-left-color: #60a5fa;
+    }
+
+    .lc-toast-ok {
+      border-left-color: #4ade80;
+    }
+
+    .lc-toast-warn {
+      border-left-color: #fbbf24;
+    }
+
+    .lc-toast-err {
+      border-left-color: #fca5a5;
+    }
+
+    /* Y4 (v2.66.11) — inline Mac-style terminal viewer for session replay. */
+    .mac-term {
+      background: #1c1c1e;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+      border: 1px solid #2c2c2e;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mac-term-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: linear-gradient(to bottom, #3a3a3c, #2c2c2e);
+      border-bottom: 1px solid #1a1a1c;
+      user-select: none;
+    }
+
+    .mac-term-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      cursor: pointer;
+    }
+
+    .mac-dot-red {
+      background: #ff5f57;
+    }
+
+    .mac-dot-yellow {
+      background: #ffbd2e;
+    }
+
+    .mac-dot-green {
+      background: #28c941;
+    }
+
+    .mac-term-title {
+      color: #c0c0c0;
+      font-size: 12px;
+      font-weight: 500;
+      margin-left: 8px;
+      flex: 1;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif;
+    }
+
+    .mac-term-spawn {
+      background: rgba(255, 255, 255, 0.08);
+      color: #e0e0e0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    .mac-term-spawn:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .mac-term-body {
+      padding: 14px 18px;
+      font-family: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace;
+      font-size: 12px;
+      color: #e8e8e8;
+      overflow-y: auto;
+      max-height: 70vh;
+      line-height: 1.55;
+    }
+
+    .mac-term-line {
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding: 1px 0;
+    }
+
+    .mac-term-line.meta {
+      color: #6b6b6f;
+      font-size: 11px;
+    }
+
+    .mac-term-line.user {
+      color: #4ade80;
+      padding: 4px 0 4px 8px;
+      border-left: 2px solid #4ade80;
+      margin: 6px 0;
+      background: rgba(74, 222, 128, 0.04);
+    }
+
+    .mac-term-line.assist {
+      color: #e8e8e8;
+      padding: 2px 0 2px 12px;
+    }
+
+    .mac-term-line .mac-prompt {
+      color: #4ade80;
+      margin-right: 6px;
+      font-weight: 600;
+    }
+
+    .mac-term-tools {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed #3a3a3c;
+    }
+
+    /* S1 (v2.66.5) — mode-aware view-header accent. Subtle 2px top-bar
      tinted by current mode; helps the user remember which curated subset
      they're in. Applied via body[data-mode=*] selector so JS just toggles
      a single attribute on <body>. Keeps the rest of the chrome neutral. */
-  body[data-mode="claude"]    .lc-view-header { border-top: 2px solid #a78bfa44; padding-top: 0.5rem; }
-  body[data-mode="workflow"]  .lc-view-header { border-top: 2px solid #60a5fa44; padding-top: 0.5rem; }
-  body[data-mode="providers"] .lc-view-header { border-top: 2px solid #fbbf2444; padding-top: 0.5rem; }
-  .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.85rem; border-radius: 10px; font-size: 0.82rem; font-weight: 500; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text); cursor: pointer; transition: background 0.15s, border-color 0.15s, filter 0.15s, transform 0.15s; }
-  .btn:hover { background: rgba(255,255,255,0.12); border-color: var(--border-hi); }
-  /* R2 (v2.66.4) — keyboard a11y. Always-visible outline on :focus-visible
+    body[data-mode="claude"] .lc-view-header {
+      border-top: 2px solid #a78bfa44;
+      padding-top: 0.5rem;
+    }
+
+    body[data-mode="workflow"] .lc-view-header {
+      border-top: 2px solid #60a5fa44;
+      padding-top: 0.5rem;
+    }
+
+    body[data-mode="providers"] .lc-view-header {
+      border-top: 2px solid #fbbf2444;
+      padding-top: 0.5rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.85rem;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, filter 0.15s, transform 0.15s;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: var(--border-hi);
+    }
+
+    /* R2 (v2.66.4) — keyboard a11y. Always-visible outline on :focus-visible
      so tab-navigation stays obvious without affecting mouse use. */
-  .btn:focus-visible, .chip:focus-visible, .nav-item:focus-visible,
-  .nav-category:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .btn-primary { background: var(--grad); border: none; color: #0a0a0f; font-weight: 600; }
-  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
-  .btn-ghost { background: transparent; border-color: transparent; }
-  .btn-ghost:hover { background: rgba(255,255,255,0.06); }
-  .chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.7rem; background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--text-mute); }
-  .chip-accent { background: var(--grad-soft); border-color: rgba(167,139,250,0.35); color: #e9defc; }
-  .chip-ok { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.35); color: #86efac; }
-  .chip-warn { background: rgba(251,191,36,0.15); border-color: rgba(251,191,36,0.35); color: #fcd34d; }
-  .chip-err { background: rgba(248,113,113,0.15); border-color: rgba(248,113,113,0.35); color: #fca5a5; }
-  /* R1 (v2.66.4) — outline variant for low-emphasis tags. */
-  .chip-outline { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
-  .chip-outline:hover { color: var(--text); border-color: var(--border-hi); }
-  /* Larger, button-like chip */
-  .chip-lg { padding: 0.35rem 0.85rem; font-size: 0.78rem; font-weight: 500; cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.1s; }
-  .chip-lg:hover { background: rgba(255,255,255,0.1); }
-  /* chatbot — macOS floating window */
-  .chat-msg { display: flex; }
-  .chat-user { justify-content: flex-end; }
-  .chat-bot { justify-content: flex-start; }
-  .chat-bubble-user { background: var(--grad); color: #0a0a0f; border-radius: 14px 14px 4px 14px; padding: 8px 12px; max-width: 85%; font-size: 0.82rem; line-height: 1.45; word-break: break-word; }
-  .chat-bubble-bot { background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 14px 14px 14px 4px; padding: 8px 12px; max-width: 85%; font-size: 0.82rem; line-height: 1.45; color: var(--text); word-break: break-word; }
-  /* claude mascot */
-  #claudeMascot { cursor: grab; user-select: none; pointer-events: auto; will-change: left, top; touch-action: none; -webkit-tap-highlight-color: transparent; }
-  #claudeMascot:active { cursor: grabbing; }
-  #claudeMascot:hover { filter: drop-shadow(0 0 14px rgba(224,124,76,0.7)); }
-  #claudeMascot svg { transition: transform 0.15s; }
-  #claudeMascot.facing-left svg { transform: scaleX(-1); }
-  .mascot-bubble { position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--card-hi);border:1px solid var(--border-hi);border-radius:12px 12px 12px 4px;padding:7px 12px;font-size:0.72rem;color:var(--text);white-space:nowrap;pointer-events:none;animation:bubblePop 0.3s cubic-bezier(0.16,1,0.3,1);box-shadow:0 4px 16px rgba(0,0,0,0.4); }
-  .mascot-bubble::after { content:'';position:absolute;top:100%;left:18px;border:5px solid transparent;border-top-color:var(--border-hi); }
-  @keyframes bubblePop { from{opacity:0;transform:translateX(-50%) scale(0.85);} to{opacity:1;transform:translateX(-50%) scale(1);} }
-  /* streaming cursor */
-  .streaming-cursor::after { content: '▍'; animation: blink-cursor 0.8s infinite; color: var(--accent); font-weight: 300; }
-  @keyframes blink-cursor { 0%,100%{opacity:1} 50%{opacity:0} }
-  /* chat window animation */
-  @keyframes chatSlideIn { from { opacity:0; transform:translateY(20px) scale(0.95); } to { opacity:1; transform:none; } }
-  @keyframes chatSlideOut { from { opacity:1; transform:none; } to { opacity:0; transform:translateY(20px) scale(0.95); } }
-  .chat-win-enter { animation: chatSlideIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards; }
-  .chat-win-exit { animation: chatSlideOut 0.2s ease-in forwards; }
-  /* interactive counters */
-  @keyframes countFadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
-  .count-up { animation: countFadeIn 0.5s ease-out backwards; }
-  /* card stagger entrance */
-  @keyframes cardPop { from { opacity:0; transform:translateY(12px) scale(0.97); } to { opacity:1; transform:none; } }
-  .card-animate { animation: cardPop 0.4s cubic-bezier(0.16,1,0.3,1) backwards; will-change: transform, opacity; }
-  /* spotlight — macOS floating window style */
-  #spotlightInput, #spotlightInput:focus,
-  #chatInput, #chatInput:focus { outline:none !important; box-shadow:none !important; --tw-ring-shadow:none !important; }
-  .spotlight-item { display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.12s; }
-  .spotlight-item:hover,.spotlight-item.active { background:rgba(255,255,255,0.06); }
-  .spotlight-item .sl-icon { font-size:1.3rem;width:32px;text-align:center;flex-shrink:0; }
-  .spotlight-item .sl-label { font-size:0.95rem;font-weight:500; }
-  .spotlight-item .sl-desc { font-size:0.78rem;color:var(--text-dim);margin-top:2px; }
-  .spotlight-item .sl-kbd { font-size:0.7rem;color:var(--text-dim);background:rgba(255,255,255,0.06);padding:3px 8px;border-radius:5px;margin-left:auto;flex-shrink:0; }
-  .settings-item { display:flex;align-items:center;gap:8px;width:100%;padding:9px 14px;background:none;border:none;color:var(--text);font-size:0.82rem;cursor:pointer;text-align:left;font-family:inherit;transition:background 0.1s; }
-  .settings-item:hover { background:rgba(255,255,255,0.06); }
-  body.theme-light .settings-item:hover { background:rgba(0,0,0,0.05); }
-  .settings-check { margin-left:auto;color:var(--accent);font-size:0.85rem; }
-  .nav-item { display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 0.8rem; border-radius: 10px; color: var(--text-mute); font-size: 0.88rem; cursor: pointer; transition: background 0.15s, color 0.15s, transform 0.1s; user-select: none; will-change: background; position: relative; }
-  .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
-  .nav-item.active { background: var(--grad-soft); color: var(--text); border: 1px solid rgba(167,139,250,0.35); }
-  /* Q3 (v2.66.3) — left-edge accent bar on the active tab so the user
+    .btn:focus-visible,
+    .chip:focus-visible,
+    .nav-item:focus-visible,
+    .nav-category:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .btn-primary {
+      background: var(--grad);
+      border: none;
+      color: #0a0a0f;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--text-mute);
+    }
+
+    .chip-accent {
+      background: var(--grad-soft);
+      border-color: rgba(167, 139, 250, 0.35);
+      color: #e9defc;
+    }
+
+    .chip-ok {
+      background: rgba(74, 222, 128, 0.15);
+      border-color: rgba(74, 222, 128, 0.35);
+      color: #86efac;
+    }
+
+    .chip-warn {
+      background: rgba(251, 191, 36, 0.15);
+      border-color: rgba(251, 191, 36, 0.35);
+      color: #fcd34d;
+    }
+
+    .chip-err {
+      background: rgba(248, 113, 113, 0.15);
+      border-color: rgba(248, 113, 113, 0.35);
+      color: #fca5a5;
+    }
+
+    /* R1 (v2.66.4) — outline variant for low-emphasis tags. */
+    .chip-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+
+    .chip-outline:hover {
+      color: var(--text);
+      border-color: var(--border-hi);
+    }
+
+    /* Larger, button-like chip */
+    .chip-lg {
+      padding: 0.35rem 0.85rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    .chip-lg:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* chatbot — macOS floating window */
+    .chat-msg {
+      display: flex;
+    }
+
+    .chat-user {
+      justify-content: flex-end;
+    }
+
+    .chat-bot {
+      justify-content: flex-start;
+    }
+
+    .chat-bubble-user {
+      background: var(--grad);
+      color: #0a0a0f;
+      border-radius: 14px 14px 4px 14px;
+      padding: 8px 12px;
+      max-width: 85%;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .chat-bubble-bot {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      border-radius: 14px 14px 14px 4px;
+      padding: 8px 12px;
+      max-width: 85%;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    /* claude mascot */
+    #claudeMascot {
+      cursor: grab;
+      user-select: none;
+      pointer-events: auto;
+      will-change: left, top;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #claudeMascot,
+    #mascotSprite,
+    #mascotSprite svg {
+      background: transparent !important;
+    }
+
+    #claudeMascot:active {
+      cursor: grabbing;
+    }
+
+    #claudeMascot:hover {
+      filter: drop-shadow(0 0 14px rgba(224, 124, 76, 0.7));
+    }
+
+    #claudeMascot svg {
+      transition: transform 0.15s;
+    }
+
+    #claudeMascot.facing-left svg {
+      transform: scaleX(-1);
+    }
+
+    .mascot-bubble {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--card-hi);
+      border: 1px solid var(--border-hi);
+      border-radius: 12px 12px 12px 4px;
+      padding: 7px 12px;
+      font-size: 0.72rem;
+      color: var(--text);
+      white-space: nowrap;
+      pointer-events: none;
+      animation: bubblePop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .mascot-bubble::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 18px;
+      border: 5px solid transparent;
+      border-top-color: var(--border-hi);
+    }
+
+    @keyframes bubblePop {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.85);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+      }
+    }
+
+    /* streaming cursor */
+    .streaming-cursor::after {
+      content: '▍';
+      animation: blink-cursor 0.8s infinite;
+      color: var(--accent);
+      font-weight: 300;
+    }
+
+    @keyframes blink-cursor {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0
+      }
+    }
+
+    /* chat window animation */
+    @keyframes chatSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    @keyframes chatSlideOut {
+      from {
+        opacity: 1;
+        transform: none;
+      }
+
+      to {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+      }
+    }
+
+    .chat-win-enter {
+      animation: chatSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .chat-win-exit {
+      animation: chatSlideOut 0.2s ease-in forwards;
+    }
+
+    /* interactive counters */
+    @keyframes countFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    .count-up {
+      animation: countFadeIn 0.5s ease-out backwards;
+    }
+
+    /* card stagger entrance */
+    @keyframes cardPop {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    .card-animate {
+      animation: cardPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+      will-change: transform, opacity;
+    }
+
+    /* spotlight — macOS floating window style */
+    #spotlightInput,
+    #spotlightInput:focus,
+    #chatInput,
+    #chatInput:focus {
+      outline: none !important;
+      box-shadow: none !important;
+      --tw-ring-shadow: none !important;
+    }
+
+    .spotlight-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+
+    .spotlight-item:hover,
+    .spotlight-item.active {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .spotlight-item .sl-icon {
+      font-size: 1.3rem;
+      width: 32px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .spotlight-item .sl-label {
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .spotlight-item .sl-desc {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    .spotlight-item .sl-kbd {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.06);
+      padding: 3px 8px;
+      border-radius: 5px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .settings-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 14px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 0.82rem;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      transition: background 0.1s;
+    }
+
+    .settings-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    body.theme-light .settings-item:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .settings-check {
+      margin-left: auto;
+      color: var(--accent);
+      font-size: 0.85rem;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.6rem 0.8rem;
+      border-radius: 10px;
+      color: var(--text-mute);
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, transform 0.1s;
+      user-select: none;
+      will-change: background;
+      position: relative;
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: var(--grad-soft);
+      color: var(--text);
+      border: 1px solid rgba(167, 139, 250, 0.35);
+    }
+
+    /* Q3 (v2.66.3) — left-edge accent bar on the active tab so the user
      spots their location instantly even in dense flyouts. */
-  .nav-item.active::before {
-    content: ''; position: absolute; left: -3px; top: 6px; bottom: 6px;
-    width: 3px; border-radius: 2px; background: var(--accent);
-    box-shadow: 0 0 6px rgba(217,119,87,0.5);
-  }
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: -3px;
+      top: 6px;
+      bottom: 6px;
+      width: 3px;
+      border-radius: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 6px rgba(217, 119, 87, 0.5);
+    }
 
-  /* v2.40.0 — Sidebar discovery aids: Favorites + Recent above the categorical groups */
-  .nav-quick-block { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
-  .nav-quick-header {
-    display: flex; align-items: center; gap: 6px;
-    padding: 4px 8px; margin: 4px 0 2px;
-    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--text-dim);
-  }
-  .nav-quick-item {
-    display: flex; align-items: center; gap: 0.55rem;
-    padding: 0.4rem 0.7rem; border-radius: 8px;
-    color: var(--text-mute); font-size: 0.84rem; cursor: pointer;
-    transition: background 0.12s, color 0.12s;
-  }
-  .nav-quick-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
-  .nav-quick-item.active { background: var(--grad-soft); color: var(--text); border: 1px solid rgba(167,139,250,0.35); }
-  .nav-quick-icon { font-size: 0.95rem; width: 18px; text-align: center; flex-shrink: 0; }
-  body.theme-light .nav-quick-item:hover { background: rgba(0,0,0,0.04); }
-  body.theme-light .nav-quick-item.active { background: rgba(217,119,87,0.15); border-color: rgba(217,119,87,0.3); }
-  /* Star toggle button — appears on hover for non-favorites, always visible for favorites */
-  .nav-fav-btn {
-    background: transparent; border: 0; color: #fbbf24;
-    padding: 2px 4px; font-size: 13px; line-height: 1; cursor: pointer;
-    border-radius: 4px; transition: opacity 0.12s, background 0.12s;
-    flex-shrink: 0;
-  }
-  .nav-item .nav-fav-btn { opacity: 0; }
-  .nav-item:hover .nav-fav-btn,
-  .nav-item:focus-within .nav-fav-btn { opacity: 1; }
-  /* When already favorite (★ glyph), force visible regardless of hover. */
-  .nav-quick-item .nav-fav-btn { opacity: 1; }
-  .nav-fav-btn:hover { background: rgba(251,191,36,0.15); }
-  @media (max-width: 900px) {
-    .nav-quick-block { margin-bottom: 6px; padding-bottom: 6px; }
-  }
+    /* v2.40.0 — Sidebar discovery aids: Favorites + Recent above the categorical groups */
+    .nav-quick-block {
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed var(--border);
+    }
 
-  /* v2.26.0 — 상위 카테고리 + hover flyout */
-  .nav-category { display:flex; align-items:center; gap:0.7rem; padding:0.6rem 0.8rem; border-radius:10px; color:var(--text-mute); cursor:pointer; transition:background 0.15s, color 0.15s; position:relative; user-select:none; }
-  .nav-category:hover, .nav-category:focus-within, .nav-category.open { background: rgba(255,255,255,0.06); color: var(--text); }
-  .nav-category.has-active { color: var(--text); }
-  .nav-category.has-active .nav-cat-icon { filter: drop-shadow(0 0 6px rgba(217,119,87,0.5)); }
-  .nav-cat-icon { font-size: 1.15rem; width: 22px; text-align: center; flex-shrink: 0; }
-  .nav-cat-meta { display:flex; flex-direction:column; gap:2px; overflow:hidden; }
-  .nav-cat-label { font-size: 0.9rem; font-weight: 600; }
-  .nav-cat-dot { width:6px; height:6px; border-radius:50%; background: var(--accent); display:inline-block; flex-shrink:0; }
-  .nav-cat-desc { font-size: 10px; }
-  .nav-cat-count { flex-shrink: 0; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,0.06); }
-  .nav-cat-chevron { flex-shrink:0; color: var(--text-dim); transition: transform 0.15s; }
-  .nav-category:hover .nav-cat-chevron,
-  .nav-category:focus-within .nav-cat-chevron,
-  .nav-category.open .nav-cat-chevron { transform: translateX(2px); color: var(--accent); }
+    .nav-quick-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      margin: 4px 0 2px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+    }
 
-  .nav-flyout {
-    display:none; position:absolute; left: calc(100% + 8px); top: 0;
-    min-width: 300px; max-width: 360px; max-height: 80vh; overflow-y: auto;
-    background: var(--bg-soft); border: 1px solid var(--border-hi); border-radius: 12px;
-    padding: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.45);
-    z-index: 1200;
-    animation: navFlyoutIn 0.14s ease-out;
-  }
-  /* v2.33.1 — hover bridge: 카테고리 오른쪽에 투명 pseudo-element 를 두어
+    .nav-quick-item {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.4rem 0.7rem;
+      border-radius: 8px;
+      color: var(--text-mute);
+      font-size: 0.84rem;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .nav-quick-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+    }
+
+    .nav-quick-item.active {
+      background: var(--grad-soft);
+      color: var(--text);
+      border: 1px solid rgba(167, 139, 250, 0.35);
+    }
+
+    .nav-quick-icon {
+      font-size: 0.95rem;
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    body.theme-light .nav-quick-item:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    body.theme-light .nav-quick-item.active {
+      background: rgba(217, 119, 87, 0.15);
+      border-color: rgba(217, 119, 87, 0.3);
+    }
+
+    /* Star toggle button — appears on hover for non-favorites, always visible for favorites */
+    .nav-fav-btn {
+      background: transparent;
+      border: 0;
+      color: #fbbf24;
+      padding: 2px 4px;
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: opacity 0.12s, background 0.12s;
+      flex-shrink: 0;
+    }
+
+    .nav-item .nav-fav-btn {
+      opacity: 0;
+    }
+
+    .nav-item:hover .nav-fav-btn,
+    .nav-item:focus-within .nav-fav-btn {
+      opacity: 1;
+    }
+
+    /* When already favorite (★ glyph), force visible regardless of hover. */
+    .nav-quick-item .nav-fav-btn {
+      opacity: 1;
+    }
+
+    .nav-fav-btn:hover {
+      background: rgba(251, 191, 36, 0.15);
+    }
+
+    @media (max-width: 900px) {
+      .nav-quick-block {
+        margin-bottom: 6px;
+        padding-bottom: 6px;
+      }
+    }
+
+    /* v2.26.0 — 상위 카테고리 + hover flyout */
+    .nav-category {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.6rem 0.8rem;
+      border-radius: 10px;
+      color: var(--text-mute);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      position: relative;
+      user-select: none;
+    }
+
+    .nav-category:hover,
+    .nav-category:focus-within,
+    .nav-category.open {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+    }
+
+    .nav-category.has-active {
+      color: var(--text);
+    }
+
+    .nav-category.has-active .nav-cat-icon {
+      filter: drop-shadow(0 0 6px rgba(217, 119, 87, 0.5));
+    }
+
+    .nav-cat-icon {
+      font-size: 1.15rem;
+      width: 22px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .nav-cat-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+    }
+
+    .nav-cat-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .nav-cat-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .nav-cat-desc {
+      font-size: 10px;
+    }
+
+    .nav-cat-count {
+      flex-shrink: 0;
+      padding: 1px 6px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .nav-cat-chevron {
+      flex-shrink: 0;
+      color: var(--text-dim);
+      transition: transform 0.15s;
+    }
+
+    .nav-category:hover .nav-cat-chevron,
+    .nav-category:focus-within .nav-cat-chevron,
+    .nav-category.open .nav-cat-chevron {
+      transform: translateX(2px);
+      color: var(--accent);
+    }
+
+    .nav-flyout {
+      display: none;
+      position: absolute;
+      left: calc(100% + 8px);
+      top: 0;
+      min-width: 300px;
+      max-width: 360px;
+      max-height: 80vh;
+      overflow-y: auto;
+      background: var(--bg-soft);
+      border: 1px solid var(--border-hi);
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+      z-index: 1200;
+      animation: navFlyoutIn 0.14s ease-out;
+    }
+
+    /* v2.33.1 — hover bridge: 카테고리 오른쪽에 투명 pseudo-element 를 두어
      gap(8px) 을 건너는 동안 :hover 상태를 유지. category 의 자식이므로
      마우스가 bridge 위에 있어도 .nav-category:hover 가 참. */
-  .nav-category::after {
-    content: ''; position: absolute; left: 100%; top: 0;
-    width: 14px; height: 100%; background: transparent; z-index: 1201;
-    pointer-events: none;
-  }
-  .nav-category:hover::after,
-  .nav-category:focus-within::after,
-  .nav-category.open::after { pointer-events: auto; }
-  @keyframes navFlyoutIn {
-    from { opacity: 0; transform: translateX(-6px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-  .nav-flyout-header { padding: 2px 6px 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px; display:flex; align-items:center; }
-  .nav-category:hover > .nav-flyout,
-  .nav-category:focus-within > .nav-flyout,
-  .nav-category.open > .nav-flyout { display: block; }
-  /* flyout 내부는 hover 유지를 위해 pointer-events 자연스럽게 */
-  .nav-flyout .nav-item { margin-bottom: 2px; }
+    .nav-category::after {
+      content: '';
+      position: absolute;
+      left: 100%;
+      top: 0;
+      width: 14px;
+      height: 100%;
+      background: transparent;
+      z-index: 1201;
+      pointer-events: none;
+    }
 
-  /* 모바일: flyout 을 아코디언으로 (좌측에서 오른쪽으로 띄우면 영역 부족).
+    .nav-category:hover::after,
+    .nav-category:focus-within::after,
+    .nav-category.open::after {
+      pointer-events: auto;
+    }
+
+    @keyframes navFlyoutIn {
+      from {
+        opacity: 0;
+        transform: translateX(-6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .nav-flyout-header {
+      padding: 2px 6px 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-category:hover>.nav-flyout,
+    .nav-category:focus-within>.nav-flyout,
+    .nav-category.open>.nav-flyout {
+      display: block;
+    }
+
+    /* flyout 내부는 hover 유지를 위해 pointer-events 자연스럽게 */
+    .nav-flyout .nav-item {
+      margin-bottom: 2px;
+    }
+
+    /* 모바일: flyout 을 아코디언으로 (좌측에서 오른쪽으로 띄우면 영역 부족).
      v2.33.9 — nav-category 를 flex-wrap 하여 flyout 이 새 row 로 내려가며 100% 너비 차지.
      또한 데스크톱에서 _positionNavFlyout 이 박은 inline top/max-height 를 !important 로 덮어씀. */
-  @media (max-width: 900px) {
-    .nav-category {
-      flex-wrap: wrap;
+    @media (max-width: 900px) {
+      .nav-category {
+        flex-wrap: wrap;
+      }
+
+      .nav-flyout {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        min-width: 0;
+        max-width: none;
+        max-height: none !important;
+        /* inline style 에서 px 로 박힌 값 무효화 */
+        width: 100%;
+        flex-basis: 100%;
+        margin-top: 6px;
+        box-shadow: none;
+        background: rgba(255, 255, 255, 0.03);
+        animation: none;
+      }
+
+      .nav-category:hover>.nav-flyout {
+        display: none;
+      }
+
+      .nav-category.open>.nav-flyout {
+        display: block;
+      }
+
+      /* 브리지 pseudo-element 비활성 (좌→우 hover 이동 없음) */
+      .nav-category::after {
+        display: none;
+      }
     }
-    .nav-flyout {
-      position: static !important;
-      left: auto !important;
-      top: auto !important;
-      min-width: 0;
-      max-width: none;
-      max-height: none !important;   /* inline style 에서 px 로 박힌 값 무효화 */
-      width: 100%;
-      flex-basis: 100%;
-      margin-top: 6px;
-      box-shadow: none;
-      background: rgba(255,255,255,0.03);
+
+    .badge-n {
+      display: inline-block;
+      min-width: 20px;
+      height: 20px;
+      line-height: 20px;
+      text-align: center;
+      padding: 0 6px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-mute);
+    }
+
+    .gradient-text {
+      color: #d97757;
+    }
+
+    @property --p {
+      syntax: '<number>';
+      inherits: false;
+      initial-value: 0;
+    }
+
+    .score-ring {
+      --p: 0;
+      --col-a: #d97757;
+      --col-b: #c96442;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, var(--col-a) 0deg, var(--col-b) calc(var(--p) * 3.6deg), rgba(255, 255, 255, 0.05) calc(var(--p) * 3.6deg));
+      display: grid;
+      place-items: center;
+      position: relative;
+      transition: --p 1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .score-ring::after {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      background: var(--bg);
+      border-radius: 50%;
+    }
+
+    .score-ring>* {
+      position: relative;
+      z-index: 2;
+    }
+
+    @keyframes ringSpin {
+      from {
+        filter: brightness(0.6);
+      }
+
+      to {
+        filter: brightness(1);
+      }
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.45;
+      }
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse 1.4s infinite;
+      display: inline-block;
+    }
+
+    .pulse-dot.off {
+      background: #6b7280;
       animation: none;
     }
-    .nav-category:hover > .nav-flyout { display: none; }
-    .nav-category.open > .nav-flyout { display: block; }
-    /* 브리지 pseudo-element 비활성 (좌→우 hover 이동 없음) */
-    .nav-category::after { display: none; }
-  }
-  .badge-n { display: inline-block; min-width: 20px; height: 20px; line-height: 20px; text-align: center; padding: 0 6px; border-radius: 10px; font-size: 0.7rem; background: rgba(255,255,255,0.08); color: var(--text-mute); }
-  .gradient-text { color: #d97757; }
-  @property --p { syntax: '<number>'; inherits: false; initial-value: 0; }
-  .score-ring { --p: 0; --col-a: #d97757; --col-b: #c96442; width: 180px; height: 180px; border-radius: 50%;
-    background: conic-gradient(from 0deg, var(--col-a) 0deg, var(--col-b) calc(var(--p) * 3.6deg), rgba(255,255,255,0.05) calc(var(--p) * 3.6deg));
-    display: grid; place-items: center; position: relative; transition: --p 1s cubic-bezier(0.16,1,0.3,1); }
-  .score-ring::after { content: ""; position: absolute; inset: 10px; background: var(--bg); border-radius: 50%; }
-  .score-ring > * { position: relative; z-index: 2; }
-  @keyframes ringSpin { from { filter: brightness(0.6); } to { filter: brightness(1); } }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 1.4s infinite; display: inline-block; }
-  .pulse-dot.off { background: #6b7280; animation: none; }
-  .tab-enter { animation: tabFade 0.3s ease; will-change: transform, opacity; }
-  @keyframes tabFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-  table.data { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  table.data th { text-align: left; font-weight: 500; color: var(--text-mute); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
-  table.data td { padding: 0.65rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
-  table.data tr:hover td { background: var(--card-hi); }
-  .link-row { cursor: pointer; }
-  /* V3 (v2.66.8) — input polish: softer bg, smooth focus ring matching the
+
+    .tab-enter {
+      animation: tabFade 0.3s ease;
+      will-change: transform, opacity;
+    }
+
+    @keyframes tabFade {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    table.data th {
+      text-align: left;
+      font-weight: 500;
+      color: var(--text-mute);
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    table.data td {
+      padding: 0.65rem 0.75rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    table.data tr:hover td {
+      background: var(--card-hi);
+    }
+
+    .link-row {
+      cursor: pointer;
+    }
+
+    /* V3 (v2.66.8) — input polish: softer bg, smooth focus ring matching the
      screenshot reference. Box-shadow ring instead of outline so the radius
      stays clean. */
-  /* :where() keeps the default width at 0-specificity so any Tailwind width
+    /* :where() keeps the default width at 0-specificity so any Tailwind width
      utility (w-24, w-20, w-full, max-w-*, flex-1 with min-width:0, etc.)
      wins automatically. Without this, `.input` (specificity 0,1,0) tied
      with `w-24` and source order made the default win — squashing
      <select class="input flex-1"> into ~24px next to <input class="input w-24">. */
-  :where(.input) { width: 100%; }
-  .input { padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.88rem; -webkit-appearance: none; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s; }
-  .input:hover { background: rgba(255,255,255,0.06); }
-  .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,119,87,0.18); background: rgba(255,255,255,0.07); }
-  .input::placeholder { color: var(--text-dim); opacity: 0.7; }
-  /* number/password/text 등 모든 input 타입에 다크 테마 강제.
+    :where(.input) {
+      width: 100%;
+    }
+
+    .input {
+      padding: 0.55rem 0.75rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.88rem;
+      -webkit-appearance: none;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+
+    .input:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.18);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .input::placeholder {
+      color: var(--text-dim);
+      opacity: 0.7;
+    }
+
+    /* number/password/text 등 모든 input 타입에 다크 테마 강제.
      X4 (v2.66.10) — Tailwind's `forms` plugin resets border-radius on
      bare <input>/<select>/<textarea>. Our .input class adds 8px back,
      but on equal specificity Tailwind wins. Bump the radius to a
      tag+class selector so it always lands. */
-  input.input, select.input, textarea.input { background: rgba(255,255,255,0.04) !important; color: var(--text) !important; color-scheme: dark; border-radius: 8px !important; }
-  input.input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px rgba(10,10,10,1) inset !important; -webkit-text-fill-color: var(--text) !important; }
-  body.theme-light input.input, body.theme-light select.input { background: rgba(255,255,255,0.7) !important; color: var(--text) !important; color-scheme: light; }
-  body.theme-light input.input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px rgba(245,245,240,1) inset !important; }
-  textarea.input { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.8rem; line-height: 1.55; }
-  .kbd { display: inline-block; padding: 0.1rem 0.45rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: rgba(255,255,255,0.05); font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; }
-  /* V2 (v2.66.8) — modal polish: softer backdrop blur, slightly larger shadow */
-  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 50; display: grid; place-items: center; padding: 24px; animation: lc-fade-in 0.18s ease-out; }
-  .modal { background: var(--bg-soft); border: 1px solid var(--border-hi); border-radius: 18px; max-width: 1100px; width: 100%; max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 80px rgba(0,0,0,0.6); animation: lc-modal-in 0.22s cubic-bezier(0.16,1,0.3,1); }
-  @keyframes lc-fade-in { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes lc-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-  .modal-wide { max-width: 1440px; height: 90vh; max-height: 90vh; }
-  .modal-narrow { max-width: 520px !important; }
-  .modal-wide textarea { font-size: 13px; line-height: 1.55; }
-  .prose-claude { color: var(--text); font-size: 0.9rem; line-height: 1.6; }
-  .prose-claude h1, .prose-claude h2, .prose-claude h3 { color: var(--text); margin-top: 1em; }
-  .prose-claude code { background: rgba(255,255,255,0.08); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.85em; }
-  .prose-claude pre { background: var(--code-bg); padding: 1em; border-radius: 10px; overflow-x: auto; border: 1px solid var(--border); }
-  .prose-claude ul { padding-left: 1.2em; }
-  .hover-lift { transition: transform 0.15s, background 0.15s; will-change: transform; }
-  .hover-lift:hover { transform: translateY(-2px); background: var(--card-hi); }
-  .btn-active { background: var(--grad-soft) !important; border-color: rgba(167,139,250,0.45) !important; color: var(--text) !important; }
-  .onboard-done { opacity: 0.78; }
+    input.input,
+    select.input,
+    textarea.input {
+      background: rgba(255, 255, 255, 0.04) !important;
+      color: var(--text) !important;
+      color-scheme: dark;
+      border-radius: 8px !important;
+    }
 
-  /* ─── 워크플로우 에디터 (n8n 스타일) ─── */
-  /* 뷰포트 높이에서 상단 chrome(헤더·타이틀·통계 패널 ≈ 230px) 을 뺀 공간을 모두 사용 → 스크롤 없이 한눈에 */
-  #wfRoot { display: flex; gap: 10px; height: calc(100vh - 230px); min-height: 420px; }
-  #wfList { width: 260px; flex-shrink: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
-  #wfCanvasWrap { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
-  #wfToolbar { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; background: var(--card); border-radius: 12px 12px 0 0; }
-  #wfCanvasHost { flex: 1; position: relative; overflow: hidden; background:
-    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0),
-    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0);
-    background-size: 20px 20px, 60px 60px;
-    background-position: 0 0, 10px 10px;
-    border-radius: 0 0 12px 12px;
-    border: 1px solid var(--border); border-top: 0;
-  }
-  #wfCanvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; user-select: none; }
-  #wfCanvas:active { cursor: grabbing; }
-  /* QQ11 (v2.66.86) — optional dot grid behind the canvas. Helps the
+    input.input:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 1000px rgba(10, 10, 10, 1) inset !important;
+      -webkit-text-fill-color: var(--text) !important;
+    }
+
+    body.theme-light input.input,
+    body.theme-light select.input {
+      background: rgba(255, 255, 255, 0.7) !important;
+      color: var(--text) !important;
+      color-scheme: light;
+    }
+
+    body.theme-light input.input:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 1000px rgba(245, 245, 240, 1) inset !important;
+    }
+
+    textarea.input {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 0.8rem;
+      line-height: 1.55;
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 0.1rem 0.45rem;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.05);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+    }
+
+    /* V2 (v2.66.8) — modal polish: softer backdrop blur, slightly larger shadow */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      animation: lc-fade-in 0.18s ease-out;
+    }
+
+    .modal {
+      background: var(--bg-soft);
+      border: 1px solid var(--border-hi);
+      border-radius: 18px;
+      max-width: 1100px;
+      width: 100%;
+      max-height: 92vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+      animation: lc-modal-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes lc-fade-in {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes lc-modal-in {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .modal-wide {
+      max-width: 1440px;
+      height: 90vh;
+      max-height: 90vh;
+    }
+
+    .modal-narrow {
+      max-width: 520px !important;
+    }
+
+    .modal-wide textarea {
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .prose-claude {
+      color: var(--text);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .prose-claude h1,
+    .prose-claude h2,
+    .prose-claude h3 {
+      color: var(--text);
+      margin-top: 1em;
+    }
+
+    .prose-claude code {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+
+    .prose-claude pre {
+      background: var(--code-bg);
+      padding: 1em;
+      border-radius: 10px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+    }
+
+    .prose-claude ul {
+      padding-left: 1.2em;
+    }
+
+    .hover-lift {
+      transition: transform 0.15s, background 0.15s;
+      will-change: transform;
+    }
+
+    .hover-lift:hover {
+      transform: translateY(-2px);
+      background: var(--card-hi);
+    }
+
+    .btn-active {
+      background: var(--grad-soft) !important;
+      border-color: rgba(167, 139, 250, 0.45) !important;
+      color: var(--text) !important;
+    }
+
+    .onboard-done {
+      opacity: 0.78;
+    }
+
+    /* ─── 워크플로우 에디터 (n8n 스타일) ─── */
+    /* 뷰포트 높이에서 상단 chrome(헤더·타이틀·통계 패널 ≈ 230px) 을 뺀 공간을 모두 사용 → 스크롤 없이 한눈에 */
+    #wfRoot {
+      display: flex;
+      gap: 10px;
+      height: calc(100vh - 230px);
+      min-height: 420px;
+    }
+
+    #wfList {
+      width: 260px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    #wfCanvasWrap {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #wfToolbar {
+      display: flex;
+      gap: 6px;
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      align-items: center;
+      background: var(--card);
+      border-radius: 12px 12px 0 0;
+    }
+
+    #wfCanvasHost {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.06) 1px, transparent 0),
+        radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.03) 1px, transparent 0);
+      background-size: 20px 20px, 60px 60px;
+      background-position: 0 0, 10px 10px;
+      border-radius: 0 0 12px 12px;
+      border: 1px solid var(--border);
+      border-top: 0;
+    }
+
+    #wfCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+
+    #wfCanvas:active {
+      cursor: grabbing;
+    }
+
+    /* QQ11 (v2.66.86) — optional dot grid behind the canvas. Helps the
      user line nodes up to the 10px grid snap. Toggle via the
      ⊞ button on the bottom-right floating cluster. */
-  #wfCanvasHost.wf-grid-on::before {
-    content: '';
-    position: absolute; inset: 0;
-    background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
-    background-size: 20px 20px;
-    pointer-events: none;
-    z-index: 0;
-  }
-  #wfCanvasHost { position: relative; }
-  #wfCanvasHost > svg { position: relative; z-index: 1; }
-  #wfInspector { width: 320px; flex-shrink: 0; overflow-y: auto; padding: 12px; position: relative; }
-  /* LL23 (v2.66.52) — n8n-style draggable resize handle on the
-     inspector's left edge. Width persists in localStorage. */
-  .wf-inspector-resize {
-    position: absolute; left: -3px; top: 0; bottom: 0; width: 6px;
-    cursor: col-resize; z-index: 6; user-select: none;
-    transition: background 0.12s;
-  }
-  .wf-inspector-resize:hover { background: rgba(217,119,87,0.25); }
-  .wf-inspector-resize.dragging { background: rgba(217,119,87,0.45); }
-  .wf-list-item { padding: 10px 12px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; }
-  .wf-list-item:hover { background: rgba(255,255,255,0.04); }
-  .wf-list-item.active { background: var(--grad-soft); border-color: rgba(167,139,250,0.35); }
+    #wfCanvasHost.wf-grid-on::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+      background-size: 20px 20px;
+      pointer-events: none;
+      z-index: 0;
+    }
 
-  /* v2.34.1 — n8n-style accordion palette inside the node editor */
-  /* Z2 (v2.66.12) — n8n-style fixed-width palette. Lives inside the
+    #wfCanvasHost {
+      position: relative;
+    }
+
+    #wfCanvasHost>svg {
+      position: relative;
+      z-index: 1;
+    }
+
+    #wfInspector {
+      width: 320px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      padding: 12px;
+      position: relative;
+    }
+
+    /* LL23 (v2.66.52) — n8n-style draggable resize handle on the
+     inspector's left edge. Width persists in localStorage. */
+    .wf-inspector-resize {
+      position: absolute;
+      left: -3px;
+      top: 0;
+      bottom: 0;
+      width: 6px;
+      cursor: col-resize;
+      z-index: 6;
+      user-select: none;
+      transition: background 0.12s;
+    }
+
+    .wf-inspector-resize:hover {
+      background: rgba(217, 119, 87, 0.25);
+    }
+
+    .wf-inspector-resize.dragging {
+      background: rgba(217, 119, 87, 0.45);
+    }
+
+    .wf-list-item {
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.12s, border-color 0.12s;
+    }
+
+    .wf-list-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .wf-list-item.active {
+      background: var(--grad-soft);
+      border-color: rgba(167, 139, 250, 0.35);
+    }
+
+    /* v2.34.1 — n8n-style accordion palette inside the node editor */
+    /* Z2 (v2.66.12) — n8n-style fixed-width palette. Lives inside the
      editor's left aside; sticky search at top, scrollable category list
      below. No more accordion-pushes-window-down: the palette has its
      own scroll context. */
-  .wf-pal-search {
-    position: sticky; top: 0; z-index: 2;
-    display: flex; align-items: center; gap: 8px;
-    padding: 12px 14px 10px 14px;
-    background: var(--card);
-    border-bottom: 1px solid var(--border);
-  }
-  .wf-pal-search-icon { font-size: 12px; color: var(--text-dim); }
-  .wf-pal-search-input {
-    flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border);
-    color: var(--text); font-size: 12px; padding: 6px 10px; border-radius: 7px;
-    outline: none; transition: border-color 0.12s, box-shadow 0.12s;
-  }
-  .wf-pal-search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(217,119,87,0.15); }
-  .wf-pal-empty { padding: 24px 16px; color: var(--text-dim); font-size: 11px; text-align: center; }
+    .wf-pal-search {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 14px 10px 14px;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
 
-  .wf-palette { display: flex; flex-direction: column; padding: 6px 8px 14px 8px; gap: 4px; }
-  .wf-pal-cat { border: 1px solid transparent; border-radius: 8px; overflow: hidden; transition: border-color 0.12s; }
-  .wf-pal-cat.has-current { border-color: rgba(217,119,87,0.35); background: rgba(217,119,87,0.04); }
-  .wf-pal-cat-header {
-    display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center;
-    gap: 8px; width: 100%;
-    padding: 7px 10px; background: transparent; border: 0; color: var(--text);
-    cursor: pointer; text-align: left; font-size: 12px;
-    transition: background 0.12s;
-  }
-  .wf-pal-cat-header:hover { background: rgba(255,255,255,0.04); }
-  .wf-pal-cat-icon { font-size: 0.95rem; line-height: 1; text-align: center; }
-  .wf-pal-cat-label { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wf-pal-cat-count {
-    font-size: 9.5px; color: var(--text-dim); padding: 1px 6px;
-    background: rgba(255,255,255,0.06); border-radius: 7px;
-  }
-  .wf-pal-cat-chev { font-size: 10px; color: var(--text-dim); width: 12px; text-align: center; transition: transform 0.12s; }
-  .wf-pal-cat.open .wf-pal-cat-chev { color: var(--accent); }
+    .wf-pal-search-icon {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
 
-  .wf-pal-cat-body {
-    display: none;
-    padding: 3px 0 6px 0;
-    flex-direction: column;
-    gap: 1px;
-  }
-  .wf-pal-cat.open .wf-pal-cat-body { display: flex; }
+    .wf-pal-search-input {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 7px;
+      outline: none;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
 
-  .wf-pal-row {
-    display: grid; grid-template-columns: 20px 1fr;
-    column-gap: 9px; padding: 6px 12px;
-    background: transparent; border: 0; border-radius: 6px;
-    cursor: pointer; text-align: left; color: var(--text);
-    transition: background 0.1s;
-    align-items: center;
-  }
-  .wf-pal-row:hover { background: rgba(255,255,255,0.06); }
-  .wf-pal-row-active {
-    background: rgba(217,119,87,0.16) !important;
-  }
-  .wf-pal-icon { font-size: 0.95rem; line-height: 1; text-align: center; }
-  .wf-pal-label { font-size: 12px; font-weight: 500; color: var(--text); }
+    .wf-pal-search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.15);
+    }
 
-  /* v2.36.0 — Run Center cards + filters */
-  .rc-filter {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 8px; padding: 6px 10px; border-radius: 8px; border: 1px solid transparent;
-    background: transparent; color: var(--text); cursor: pointer; text-align: left;
-    transition: background 0.1s, border-color 0.1s;
-  }
-  .rc-filter:hover { background: rgba(255,255,255,0.04); }
-  .rc-filter-on { background: rgba(217,119,87,0.14); border-color: rgba(217,119,87,0.45); }
-  .rc-count { font-size: 10px; color: var(--text-dim); padding: 1px 6px; background: rgba(255,255,255,0.06); border-radius: 8px; }
+    .wf-pal-empty {
+      padding: 24px 16px;
+      color: var(--text-dim);
+      font-size: 11px;
+      text-align: center;
+    }
 
-  .rc-cat {
-    padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: transparent;
-    color: var(--text-mute); cursor: pointer; transition: all 0.1s;
-  }
-  .rc-cat:hover { color: var(--text); border-color: var(--border-hi); }
-  .rc-cat-on { background: rgba(167,139,250,0.18); border-color: rgba(167,139,250,0.55); color: var(--text); }
+    .wf-palette {
+      display: flex;
+      flex-direction: column;
+      padding: 6px 8px 14px 8px;
+      gap: 4px;
+    }
 
-  .rc-card {
-    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
-    background: rgba(255,255,255,0.015); cursor: pointer;
-    transition: background 0.12s, border-color 0.12s, transform 0.12s;
-    display: flex; flex-direction: column; gap: 6px; min-width: 0;
-  }
-  .rc-card:hover { background: rgba(255,255,255,0.04); border-color: var(--border-hi); transform: translateY(-1px); }
-  .rc-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .rc-source { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; }
-  .rc-fav { background: transparent; border: 0; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0; }
-  .rc-fav:hover { color: var(--accent); }
-  .rc-name { font-size: 13px; font-weight: 600; line-height: 1.3; word-break: break-word; }
-  .rc-desc {
-    font-size: 11.5px; color: var(--text-mute); line-height: 1.45;
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-  }
-  .rc-card-foot { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
-  .rc-cat-tag, .rc-kind-tag {
-    font-size: 10px; padding: 2px 6px; border-radius: 6px;
-    background: rgba(255,255,255,0.06); color: var(--text-dim);
-  }
-  .rc-card-compact { padding: 8px 10px; }
+    .wf-pal-cat {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      overflow: hidden;
+      transition: border-color 0.12s;
+    }
 
-  body.theme-light .rc-card { background: rgba(0,0,0,0.02); }
-  body.theme-light .rc-card:hover { background: rgba(0,0,0,0.05); }
-  body.theme-light .rc-cat-tag, body.theme-light .rc-kind-tag { background: rgba(0,0,0,0.06); }
-  body.theme-light .rc-count { background: rgba(0,0,0,0.06); }
+    .wf-pal-cat.has-current {
+      border-color: rgba(217, 119, 87, 0.35);
+      background: rgba(217, 119, 87, 0.04);
+    }
 
-  body.theme-light .wf-pal-cat { background: rgba(0,0,0,0.02); }
-  body.theme-light .wf-pal-cat-body { background: rgba(0,0,0,0.04); }
-  /* JJ1 (v2.66.26) — CSS containment for workflow nodes. Each node
+    .wf-pal-cat-header {
+      display: grid;
+      grid-template-columns: 22px 1fr auto auto;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 7px 10px;
+      background: transparent;
+      border: 0;
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      font-size: 12px;
+      transition: background 0.12s;
+    }
+
+    .wf-pal-cat-header:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .wf-pal-cat-icon {
+      font-size: 0.95rem;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .wf-pal-cat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .wf-pal-cat-count {
+      font-size: 9.5px;
+      color: var(--text-dim);
+      padding: 1px 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 7px;
+    }
+
+    .wf-pal-cat-chev {
+      font-size: 10px;
+      color: var(--text-dim);
+      width: 12px;
+      text-align: center;
+      transition: transform 0.12s;
+    }
+
+    .wf-pal-cat.open .wf-pal-cat-chev {
+      color: var(--accent);
+    }
+
+    .wf-pal-cat-body {
+      display: none;
+      padding: 3px 0 6px 0;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .wf-pal-cat.open .wf-pal-cat-body {
+      display: flex;
+    }
+
+    .wf-pal-row {
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      column-gap: 9px;
+      padding: 6px 12px;
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+      transition: background 0.1s;
+      align-items: center;
+    }
+
+    .wf-pal-row:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .wf-pal-row-active {
+      background: rgba(217, 119, 87, 0.16) !important;
+    }
+
+    .wf-pal-icon {
+      font-size: 0.95rem;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .wf-pal-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    /* v2.36.0 — Run Center cards + filters */
+    .rc-filter {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.1s, border-color 0.1s;
+    }
+
+    .rc-filter:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .rc-filter-on {
+      background: rgba(217, 119, 87, 0.14);
+      border-color: rgba(217, 119, 87, 0.45);
+    }
+
+    .rc-count {
+      font-size: 10px;
+      color: var(--text-dim);
+      padding: 1px 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+    }
+
+    .rc-cat {
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-mute);
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+
+    .rc-cat:hover {
+      color: var(--text);
+      border-color: var(--border-hi);
+    }
+
+    .rc-cat-on {
+      background: rgba(167, 139, 250, 0.18);
+      border-color: rgba(167, 139, 250, 0.55);
+      color: var(--text);
+    }
+
+    .rc-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.015);
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, transform 0.12s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .rc-card:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: var(--border-hi);
+      transform: translateY(-1px);
+    }
+
+    .rc-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .rc-source {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .rc-fav {
+      background: transparent;
+      border: 0;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0;
+    }
+
+    .rc-fav:hover {
+      color: var(--accent);
+    }
+
+    .rc-name {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    .rc-desc {
+      font-size: 11.5px;
+      color: var(--text-mute);
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .rc-card-foot {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: auto;
+      padding-top: 4px;
+    }
+
+    .rc-cat-tag,
+    .rc-kind-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-dim);
+    }
+
+    .rc-card-compact {
+      padding: 8px 10px;
+    }
+
+    body.theme-light .rc-card {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    body.theme-light .rc-card:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    body.theme-light .rc-cat-tag,
+    body.theme-light .rc-kind-tag {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    body.theme-light .rc-count {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    body.theme-light .wf-pal-cat {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    body.theme-light .wf-pal-cat-body {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    /* JJ1 (v2.66.26) — CSS containment for workflow nodes. Each node
      becomes its own paint/layout boundary so per-node attribute
      mutations (data-status, transform, .wf-node-elapsed text) don't
      trigger a relayout cascade across siblings. Significant on
      20+ node graphs during a live run. */
-  .wf-node { cursor: grab; contain: layout paint; will-change: transform; }
-  .wf-node:active { cursor: grabbing; }
-  .wf-node-body { fill: var(--card); stroke: var(--border); stroke-width: 1; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4)); }
-  .wf-node.selected .wf-node-body { stroke: var(--accent); stroke-width: 2; }
-  /* 노드 타입별 색상 구분 */
-  .wf-node[data-type="http"] .wf-node-body { stroke: #4ade80; stroke-width: 1.5; }
-  .wf-node[data-type="http"].selected .wf-node-body { stroke: #4ade80; stroke-width: 2.5; }
-  .wf-node[data-type="transform"] .wf-node-body { stroke: #c084fc; stroke-width: 1.5; }
-  .wf-node[data-type="transform"].selected .wf-node-body { stroke: #c084fc; stroke-width: 2.5; }
-  .wf-node[data-type="variable"] .wf-node-body { stroke: #fbbf24; stroke-width: 1.5; }
-  .wf-node[data-type="variable"].selected .wf-node-body { stroke: #fbbf24; stroke-width: 2.5; }
-  .wf-node[data-type="subworkflow"] .wf-node-body { stroke: #7dd3fc; stroke-width: 1.5; }
-  .wf-node[data-type="subworkflow"].selected .wf-node-body { stroke: #7dd3fc; stroke-width: 2.5; }
-  .wf-node[data-type="embedding"] .wf-node-body { stroke: #f472b6; stroke-width: 1.5; }
-  .wf-node[data-type="embedding"].selected .wf-node-body { stroke: #f472b6; stroke-width: 2.5; }
-  .wf-node[data-type="loop"] .wf-node-body { stroke: #a78bfa; stroke-width: 1.5; }
-  .wf-node[data-type="loop"].selected .wf-node-body { stroke: #a78bfa; stroke-width: 2.5; }
-  .wf-node[data-type="retry"] .wf-node-body { stroke: #fb923c; stroke-width: 1.5; }
-  .wf-node[data-type="retry"].selected .wf-node-body { stroke: #fb923c; stroke-width: 2.5; }
-  .wf-node[data-type="error_handler"] .wf-node-body { stroke: #f87171; stroke-width: 1.5; }
-  .wf-node[data-type="error_handler"].selected .wf-node-body { stroke: #f87171; stroke-width: 2.5; }
-  .wf-node[data-type="merge"] .wf-node-body { stroke: #06b6d4; stroke-width: 1.5; }
-  .wf-node[data-type="merge"].selected .wf-node-body { stroke: #06b6d4; stroke-width: 2.5; }
-  .wf-node[data-type="delay"] .wf-node-body { stroke: #94a3b8; stroke-width: 1.5; }
-  .wf-node[data-type="delay"].selected .wf-node-body { stroke: #94a3b8; stroke-width: 2.5; }
-  .wf-node[data-type="session"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
-  .wf-node[data-type="subagent"] .wf-node-body { stroke: var(--accent); stroke-width: 1.5; }
-  .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2.5; animation: wfPulse 1.2s infinite; filter: drop-shadow(0 0 8px rgba(167,139,250,0.6)); }
-  .wf-node[data-status="ok"] .wf-node-body { stroke: #4ade80; stroke-width: 2; }
-  .wf-node[data-status="err"] .wf-node-body { stroke: #f87171; stroke-width: 2; }
-  /* PP1 (v2.66.70) — sibling-cancelled (auto-cancel) gets amber dashed
+    .wf-node {
+      cursor: grab;
+      contain: layout paint;
+      will-change: transform;
+    }
+
+    .wf-node:active {
+      cursor: grabbing;
+    }
+
+    .wf-node-body {
+      fill: var(--card);
+      stroke: var(--border);
+      stroke-width: 1;
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
+    }
+
+    .wf-node.selected .wf-node-body {
+      stroke: var(--accent);
+      stroke-width: 2;
+    }
+
+    /* 노드 타입별 색상 구분 */
+    .wf-node[data-type="http"] .wf-node-body {
+      stroke: #4ade80;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="http"].selected .wf-node-body {
+      stroke: #4ade80;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="transform"] .wf-node-body {
+      stroke: #c084fc;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="transform"].selected .wf-node-body {
+      stroke: #c084fc;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="variable"] .wf-node-body {
+      stroke: #fbbf24;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="variable"].selected .wf-node-body {
+      stroke: #fbbf24;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="subworkflow"] .wf-node-body {
+      stroke: #7dd3fc;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="subworkflow"].selected .wf-node-body {
+      stroke: #7dd3fc;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="embedding"] .wf-node-body {
+      stroke: #f472b6;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="embedding"].selected .wf-node-body {
+      stroke: #f472b6;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="loop"] .wf-node-body {
+      stroke: #a78bfa;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="loop"].selected .wf-node-body {
+      stroke: #a78bfa;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="retry"] .wf-node-body {
+      stroke: #fb923c;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="retry"].selected .wf-node-body {
+      stroke: #fb923c;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="error_handler"] .wf-node-body {
+      stroke: #f87171;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="error_handler"].selected .wf-node-body {
+      stroke: #f87171;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="merge"] .wf-node-body {
+      stroke: #06b6d4;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="merge"].selected .wf-node-body {
+      stroke: #06b6d4;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="delay"] .wf-node-body {
+      stroke: #94a3b8;
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="delay"].selected .wf-node-body {
+      stroke: #94a3b8;
+      stroke-width: 2.5;
+    }
+
+    .wf-node[data-type="session"] .wf-node-body {
+      stroke: var(--accent);
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-type="subagent"] .wf-node-body {
+      stroke: var(--accent);
+      stroke-width: 1.5;
+    }
+
+    .wf-node[data-status="running"] .wf-node-body {
+      stroke: #a78bfa;
+      stroke-width: 2.5;
+      animation: wfPulse 1.2s infinite;
+      filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.6));
+    }
+
+    .wf-node[data-status="ok"] .wf-node-body {
+      stroke: #4ade80;
+      stroke-width: 2;
+    }
+
+    .wf-node[data-status="err"] .wf-node-body {
+      stroke: #f87171;
+      stroke-width: 2;
+    }
+
+    /* PP1 (v2.66.70) — sibling-cancelled (auto-cancel) gets amber dashed
      border to distinguish from real failures. The cancel state is set
      server-side when a node's subprocess is SIGTERM'd via MM1 fail-fast. */
-  .wf-node[data-status="cancelled"] .wf-node-body { stroke: #fbbf24; stroke-width: 2; stroke-dasharray: 6 3; }
-  /* PP2 (v2.66.72) — manually-disabled nodes (data.disabled === true)
+    .wf-node[data-status="cancelled"] .wf-node-body {
+      stroke: #fbbf24;
+      stroke-width: 2;
+      stroke-dasharray: 6 3;
+    }
+
+    /* PP2 (v2.66.72) — manually-disabled nodes (data.disabled === true)
      render at half opacity with grayscale so the user can see them in
      context but knows they will be skipped on the next run. n8n parity. */
-  .wf-node.wf-disabled { opacity: 0.45; filter: grayscale(0.7); }
-  .wf-node.wf-disabled .wf-node-body { stroke-dasharray: 4 3; }
-  /* QQ5 (v2.66.80) — explicit ⏸ badge in the top-right of disabled
-     nodes. Reads better than just the dashed border + grayscale. */
-  .wf-node-disabled-badge { display: none; pointer-events: none; }
-  .wf-node.wf-disabled .wf-node-disabled-badge { display: inline; }
-  .wf-node[data-status="skipped"] .wf-node-body { stroke: rgba(255,255,255,0.1); stroke-dasharray: 4 4; }
-  /* 회전하는 점선 외곽 링 — running 상태만 표시 */
-  .wf-node-ring { stroke: #a78bfa; stroke-width: 2; stroke-dasharray: 6 6; fill: none; opacity: 0; pointer-events: none; }
-  .wf-node[data-status="running"] .wf-node-ring { opacity: 0.8; animation: wfSpinDash 2.5s linear infinite; }
-  .wf-node-elapsed { fill: #a78bfa; font-size: 10px; font-weight: 700; pointer-events: none; opacity: 0; }
-  .wf-node[data-status="running"] .wf-node-elapsed { opacity: 1; }
-  @keyframes wfPulse { 0%,100%{stroke-opacity:0.55} 50%{stroke-opacity:1} }
-  @keyframes wfSpinDash { to { stroke-dashoffset: -24; } }
-  /* 실행 상태 배너 (캔버스 상단 플로팅) */
-  #wfRunBanner {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-    z-index: 7; min-width: 360px; max-width: 640px;
-    background: var(--card); border: 1.5px solid #a78bfa;
-    border-radius: 10px; padding: 10px 14px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(167,139,250,0.3);
-    backdrop-filter: blur(8px);
-    display: flex; flex-direction: column; gap: 6px;
-    opacity: 0; pointer-events: none; transition: opacity 0.25s;
-    font-size: 12px;
-  }
-  #wfRunBanner.visible { opacity: 1; pointer-events: auto; }
-  #wfRunBanner.state-ok { border-color: #4ade80; box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(74,222,128,0.3); }
-  #wfRunBanner.state-err { border-color: #f87171; box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 12px rgba(248,113,113,0.3); }
-  #wfRunBanner .wfrb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  #wfRunBanner .wfrb-title { font-weight: 600; color: var(--text); }
-  #wfRunBanner .wfrb-meta { color: var(--text-dim); font-size: 11px; font-family: ui-monospace, Menlo, monospace; }
-  #wfRunBanner .wfrb-bar { flex: 1; height: 6px; background: rgba(167,139,250,0.15); border-radius: 3px; overflow: hidden; min-width: 120px; }
-  #wfRunBanner .wfrb-bar-fill { height: 100%; background: linear-gradient(90deg, #a78bfa, #c4b5fd); transition: width 0.3s; }
-  #wfRunBanner.state-ok .wfrb-bar-fill { background: linear-gradient(90deg, #4ade80, #86efac); }
-  #wfRunBanner.state-err .wfrb-bar-fill { background: linear-gradient(90deg, #f87171, #fca5a5); }
-  #wfRunBanner .wfrb-focus { padding: 4px 10px; border-radius: 6px; background: rgba(167,139,250,0.2); color: #a78bfa; font-size: 11px; cursor: pointer; border: 1px solid rgba(167,139,250,0.4); white-space: nowrap; }
-  #wfRunBanner .wfrb-focus:hover { background: rgba(167,139,250,0.35); }
-  #wfRunBanner .wfrb-close { margin-left: auto; padding: 2px 6px; border-radius: 4px; cursor: pointer; color: var(--text-dim); font-size: 14px; line-height: 1; background: transparent; border: none; }
-  #wfRunBanner .wfrb-close:hover { color: var(--text); background: rgba(255,255,255,0.08); }
-  /* v2.10.2 — 노드 hover 결과 tooltip */
-  #wfNodeTooltip {
-    position: fixed; z-index: 9000;
-    max-width: 360px; min-width: 220px;
-    background: var(--card); color: var(--text);
-    border: 1px solid var(--border); border-radius: 8px;
-    padding: 8px 10px;
-    font-size: 11px; line-height: 1.5;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
-    pointer-events: none;
-    opacity: 0; transition: opacity 0.15s;
-  }
-  #wfNodeTooltip.visible { opacity: 1; }
-  #wfNodeTooltip.state-ok    { border-left: 3px solid #4ade80; }
-  #wfNodeTooltip.state-err   { border-left: 3px solid #f87171; }
-  #wfNodeTooltip.state-running { border-left: 3px solid #a78bfa; }
-  #wfNodeTooltip.state-skipped { border-left: 3px solid rgba(255,255,255,0.3); }
-  #wfNodeTooltip .wfnt-head { display: flex; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 4px; }
-  #wfNodeTooltip .wfnt-meta { color: var(--text-dim); font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
-  #wfNodeTooltip .wfnt-row  { display: flex; justify-content: space-between; gap: 8px; }
-  #wfNodeTooltip .wfnt-out  { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); white-space: pre-wrap; color: var(--text-mute); max-height: 120px; overflow: auto; font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
-  #wfNodeTooltip .wfnt-err  { color: #fca5a5; }
-  .wf-node-title { fill: var(--text); font-size: 13px; font-weight: 600; pointer-events: none; }
-  .wf-node-sub { fill: var(--text-dim); font-size: 10px; pointer-events: none; }
-  .wf-node-icon { font-size: 18px; pointer-events: none; }
-  .wf-port { fill: var(--accent); stroke: var(--bg); stroke-width: 2; cursor: crosshair; transition: r 0.12s; }
-  .wf-port:hover { r: 8; }
-  .wf-port-in { fill: #a78bfa; }
-  .wf-edge { stroke: var(--accent); stroke-width: 2; fill: none; marker-end: url(#wfArrow); pointer-events: stroke; cursor: pointer; }
-  .wf-edge:hover { stroke: #fbbf24; stroke-width: 3; }
-  .wf-edge.selected { stroke: #fbbf24; stroke-width: 3; }
-  .wf-edge-draft { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; fill: none; pointer-events: none; opacity: 0.7; }
-  .wf-dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; display: inline-block; margin-right: 4px; }
-  .wf-ok-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block; margin-right: 4px; }
-  /* 미니맵 — 워크플로우·노드 존재 시에만 표시 (기본은 숨김) */
-  #wfMinimap {
-    position: absolute; right: 12px; bottom: 48px; z-index: 6;
-    width: 150px; height: 100px;
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 8px; overflow: hidden; cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.4); backdrop-filter: blur(4px);
-    display: none;
-  }
-  /* 캔버스 내부 플로팅 컨트롤 (n8n 스타일) */
-  .wf-floating { position: absolute; right: 12px; bottom: 12px; z-index: 5; display: flex; gap: 6px; }
-  .wf-floating .btn { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(4px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
-  .wf-floating .btn:hover { background: var(--card-hi); }
-  /* 인스펙터 접기 */
-  #wfInspector.wf-collapsed { display: none; }
-  /* 튜토리얼 애니메이션 — 라이트/다크 모드 모두 일관되게 어두운 스테이지로 고정 */
-  @keyframes wfTutFadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes wfTutDraw { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
-  @keyframes wfTutClickRipple {
-    0%   { r: 0;  opacity: 0.9; stroke-width: 3; }
-    100% { r: 28; opacity: 0;   stroke-width: 1; }
-  }
-  .wf-tut-node-pop { animation: none; opacity: 1; }
-  #wfTutStage { background: #15151c !important; color: #fff; min-height: 280px; }
-  #wfTutStage .wf-node-body { fill: rgba(255,255,255,0.05); stroke: rgba(255,255,255,0.14); stroke-width: 1; }
-  #wfTutStage .wf-node[data-status="running"] .wf-node-body { stroke: #a78bfa; stroke-width: 2; animation: wfPulse 2s infinite; }
-  #wfTutStage .wf-node[data-status="ok"] .wf-node-body { stroke: #4ade80; stroke-width: 2; }
-  #wfTutStage .wf-node-title { fill: #fafafa !important; font-weight: 600; }
-  #wfTutStage .wf-node-sub { fill: rgba(255,255,255,0.55) !important; }
-  #wfTutStage .wf-node-icon { fill: #fff; }
-  #wfTutStage text { font-family: inherit; }
-  #wfTutCursor { transition: transform 0.35s ease-out; pointer-events: none; }
-  .wf-tut-ripple { animation: wfTutClickRipple 0.7s ease-out both; }
-  #wfTutStage .wf-tut-port-in { fill: #a78bfa; stroke: #15151c; stroke-width: 2; }
-  #wfTutStage .wf-tut-port-out { fill: #d97757; stroke: #15151c; stroke-width: 2; }
-  .wf-floating-right { position: absolute; right: 12px; top: 12px; z-index: 5; }
-  .wf-floating-right .btn { background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(4px); box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
-  .wf-floating-right .btn:hover { background: var(--card-hi); }
+    .wf-node.wf-disabled {
+      opacity: 0.45;
+      filter: grayscale(0.7);
+    }
 
-  @media (max-width: 900px) {
-    #wfRoot { flex-direction: column; height: auto; min-height: 0; max-height: none; }
-    #wfList, #wfInspector { width: 100%; max-height: 220px; }
-    #wfCanvasWrap { height: min(55vh, 520px); min-height: 240px; }
-  }
-  .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
-  /* P/Q (v2.66.x) — unify .empty look with .lc-empty so every legacy
+    .wf-node.wf-disabled .wf-node-body {
+      stroke-dasharray: 4 3;
+    }
+
+    /* QQ5 (v2.66.80) — explicit ⏸ badge in the top-right of disabled
+     nodes. Reads better than just the dashed border + grayscale. */
+    .wf-node-disabled-badge {
+      display: none;
+      pointer-events: none;
+    }
+
+    .wf-node.wf-disabled .wf-node-disabled-badge {
+      display: inline;
+    }
+
+    .wf-node[data-status="skipped"] .wf-node-body {
+      stroke: rgba(255, 255, 255, 0.1);
+      stroke-dasharray: 4 4;
+    }
+
+    /* 회전하는 점선 외곽 링 — running 상태만 표시 */
+    .wf-node-ring {
+      stroke: #a78bfa;
+      stroke-width: 2;
+      stroke-dasharray: 6 6;
+      fill: none;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .wf-node[data-status="running"] .wf-node-ring {
+      opacity: 0.8;
+      animation: wfSpinDash 2.5s linear infinite;
+    }
+
+    .wf-node-elapsed {
+      fill: #a78bfa;
+      font-size: 10px;
+      font-weight: 700;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .wf-node[data-status="running"] .wf-node-elapsed {
+      opacity: 1;
+    }
+
+    @keyframes wfPulse {
+
+      0%,
+      100% {
+        stroke-opacity: 0.55
+      }
+
+      50% {
+        stroke-opacity: 1
+      }
+    }
+
+    @keyframes wfSpinDash {
+      to {
+        stroke-dashoffset: -24;
+      }
+    }
+
+    /* 실행 상태 배너 (캔버스 상단 플로팅) */
+    #wfRunBanner {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 7;
+      min-width: 360px;
+      max-width: 640px;
+      background: var(--card);
+      border: 1.5px solid #a78bfa;
+      border-radius: 10px;
+      padding: 10px 14px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 12px rgba(167, 139, 250, 0.3);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+      font-size: 12px;
+    }
+
+    #wfRunBanner.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #wfRunBanner.state-ok {
+      border-color: #4ade80;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 12px rgba(74, 222, 128, 0.3);
+    }
+
+    #wfRunBanner.state-err {
+      border-color: #f87171;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 12px rgba(248, 113, 113, 0.3);
+    }
+
+    #wfRunBanner .wfrb-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    #wfRunBanner .wfrb-title {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    #wfRunBanner .wfrb-meta {
+      color: var(--text-dim);
+      font-size: 11px;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+
+    #wfRunBanner .wfrb-bar {
+      flex: 1;
+      height: 6px;
+      background: rgba(167, 139, 250, 0.15);
+      border-radius: 3px;
+      overflow: hidden;
+      min-width: 120px;
+    }
+
+    #wfRunBanner .wfrb-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #a78bfa, #c4b5fd);
+      transition: width 0.3s;
+    }
+
+    #wfRunBanner.state-ok .wfrb-bar-fill {
+      background: linear-gradient(90deg, #4ade80, #86efac);
+    }
+
+    #wfRunBanner.state-err .wfrb-bar-fill {
+      background: linear-gradient(90deg, #f87171, #fca5a5);
+    }
+
+    #wfRunBanner .wfrb-focus {
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(167, 139, 250, 0.2);
+      color: #a78bfa;
+      font-size: 11px;
+      cursor: pointer;
+      border: 1px solid rgba(167, 139, 250, 0.4);
+      white-space: nowrap;
+    }
+
+    #wfRunBanner .wfrb-focus:hover {
+      background: rgba(167, 139, 250, 0.35);
+    }
+
+    #wfRunBanner .wfrb-close {
+      margin-left: auto;
+      padding: 2px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 14px;
+      line-height: 1;
+      background: transparent;
+      border: none;
+    }
+
+    #wfRunBanner .wfrb-close:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    /* v2.10.2 — 노드 hover 결과 tooltip */
+    #wfNodeTooltip {
+      position: fixed;
+      z-index: 9000;
+      max-width: 360px;
+      min-width: 220px;
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.5;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    #wfNodeTooltip.visible {
+      opacity: 1;
+    }
+
+    #wfNodeTooltip.state-ok {
+      border-left: 3px solid #4ade80;
+    }
+
+    #wfNodeTooltip.state-err {
+      border-left: 3px solid #f87171;
+    }
+
+    #wfNodeTooltip.state-running {
+      border-left: 3px solid #a78bfa;
+    }
+
+    #wfNodeTooltip.state-skipped {
+      border-left: 3px solid rgba(255, 255, 255, 0.3);
+    }
+
+    #wfNodeTooltip .wfnt-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    #wfNodeTooltip .wfnt-meta {
+      color: var(--text-dim);
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 10px;
+    }
+
+    #wfNodeTooltip .wfnt-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #wfNodeTooltip .wfnt-out {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--border);
+      white-space: pre-wrap;
+      color: var(--text-mute);
+      max-height: 120px;
+      overflow: auto;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 10px;
+    }
+
+    #wfNodeTooltip .wfnt-err {
+      color: #fca5a5;
+    }
+
+    .wf-node-title {
+      fill: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .wf-node-sub {
+      fill: var(--text-dim);
+      font-size: 10px;
+      pointer-events: none;
+    }
+
+    .wf-node-icon {
+      font-size: 18px;
+      pointer-events: none;
+    }
+
+    .wf-port {
+      fill: var(--accent);
+      stroke: var(--bg);
+      stroke-width: 2;
+      cursor: crosshair;
+      transition: r 0.12s;
+    }
+
+    .wf-port:hover {
+      r: 8;
+    }
+
+    .wf-port-in {
+      fill: #a78bfa;
+    }
+
+    .wf-edge {
+      stroke: var(--accent);
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#wfArrow);
+      pointer-events: stroke;
+      cursor: pointer;
+    }
+
+    .wf-edge:hover {
+      stroke: #fbbf24;
+      stroke-width: 3;
+    }
+
+    .wf-edge.selected {
+      stroke: #fbbf24;
+      stroke-width: 3;
+    }
+
+    .wf-edge-draft {
+      stroke: var(--accent);
+      stroke-width: 2;
+      stroke-dasharray: 4 4;
+      fill: none;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .wf-dirty-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fbbf24;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    .wf-ok-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    /* 미니맵 — 워크플로우·노드 존재 시에만 표시 (기본은 숨김) */
+    #wfMinimap {
+      position: absolute;
+      right: 12px;
+      bottom: 48px;
+      z-index: 6;
+      width: 150px;
+      height: 100px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      display: none;
+    }
+
+    /* 캔버스 내부 플로팅 컨트롤 (n8n 스타일) */
+    .wf-floating {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 5;
+      display: flex;
+      gap: 6px;
+    }
+
+    .wf-floating .btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(4px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    }
+
+    .wf-floating .btn:hover {
+      background: var(--card-hi);
+    }
+
+    /* 인스펙터 접기 */
+    #wfInspector.wf-collapsed {
+      display: none;
+    }
+
+    /* 튜토리얼 애니메이션 — 라이트/다크 모드 모두 일관되게 어두운 스테이지로 고정 */
+    @keyframes wfTutFadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes wfTutDraw {
+      from {
+        stroke-dashoffset: 100;
+      }
+
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    @keyframes wfTutClickRipple {
+      0% {
+        r: 0;
+        opacity: 0.9;
+        stroke-width: 3;
+      }
+
+      100% {
+        r: 28;
+        opacity: 0;
+        stroke-width: 1;
+      }
+    }
+
+    .wf-tut-node-pop {
+      animation: none;
+      opacity: 1;
+    }
+
+    #wfTutStage {
+      background: #15151c !important;
+      color: #fff;
+      min-height: 280px;
+    }
+
+    #wfTutStage .wf-node-body {
+      fill: rgba(255, 255, 255, 0.05);
+      stroke: rgba(255, 255, 255, 0.14);
+      stroke-width: 1;
+    }
+
+    #wfTutStage .wf-node[data-status="running"] .wf-node-body {
+      stroke: #a78bfa;
+      stroke-width: 2;
+      animation: wfPulse 2s infinite;
+    }
+
+    #wfTutStage .wf-node[data-status="ok"] .wf-node-body {
+      stroke: #4ade80;
+      stroke-width: 2;
+    }
+
+    #wfTutStage .wf-node-title {
+      fill: #fafafa !important;
+      font-weight: 600;
+    }
+
+    #wfTutStage .wf-node-sub {
+      fill: rgba(255, 255, 255, 0.55) !important;
+    }
+
+    #wfTutStage .wf-node-icon {
+      fill: #fff;
+    }
+
+    #wfTutStage text {
+      font-family: inherit;
+    }
+
+    #wfTutCursor {
+      transition: transform 0.35s ease-out;
+      pointer-events: none;
+    }
+
+    .wf-tut-ripple {
+      animation: wfTutClickRipple 0.7s ease-out both;
+    }
+
+    #wfTutStage .wf-tut-port-in {
+      fill: #a78bfa;
+      stroke: #15151c;
+      stroke-width: 2;
+    }
+
+    #wfTutStage .wf-tut-port-out {
+      fill: #d97757;
+      stroke: #15151c;
+      stroke-width: 2;
+    }
+
+    .wf-floating-right {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      z-index: 5;
+    }
+
+    .wf-floating-right .btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(4px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    }
+
+    .wf-floating-right .btn:hover {
+      background: var(--card-hi);
+    }
+
+    @media (max-width: 900px) {
+      #wfRoot {
+        flex-direction: column;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+      }
+
+      #wfList,
+      #wfInspector {
+        width: 100%;
+        max-height: 220px;
+      }
+
+      #wfCanvasWrap {
+        height: min(55vh, 520px);
+        min-height: 240px;
+      }
+    }
+
+    .grid-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 0.75rem;
+    }
+
+    /* P/Q (v2.66.x) — unify .empty look with .lc-empty so every legacy
      empty-state instantly inherits the new polish. Padding kept generous
      for the table-row variant (where this is the entire <tr>'s content). */
-  .empty { text-align: center; padding: 2rem 1rem; color: var(--text-dim); font-size: 0.78rem; }
-  .empty.card, .empty[class*="card"] { border: 1px dashed var(--border); border-radius: 12px; background: transparent; }
-  .tag-tool { display: inline-block; padding: 1px 7px; font-size: 0.68rem; border-radius: 4px; background: rgba(217,119,87,0.14); color: #f5b997; font-family: 'JetBrains Mono', monospace; margin: 1px; }
-  .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.12), rgba(255,255,255,0.04)); background-size: 200% 100%; animation: shimmerMove 1.6s infinite; border-radius: 6px; }
-  @keyframes shimmerMove { 0% { background-position: 0% 0; } 100% { background-position: -200% 0; } }
-  .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-  .line-clamp-6 { display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
-  /* 햄버거 토글 중복 방지: sb-collapsed 상태면 sbToggle 숨기고 navToggle 만, 평상시엔 반대 */
-  body.sb-collapsed #sbToggle { display: none; }
-  body.sb-collapsed #sidebar { width: 78px; }
+    .empty {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--text-dim);
+      font-size: 0.78rem;
+    }
 
-  /* 🪟 macOS 스타일 플로팅 창 (신기능 전용) */
-  .feat-win {
-    position: fixed;
-    width: min(640px, calc(100vw - 80px));
-    min-width: 360px;
-    max-width: calc(100vw - 40px);
-    min-height: 180px;
-    max-height: calc(100vh - 80px);
-    background: var(--bg-soft);
-    border: 1px solid var(--border-hi);
-    border-radius: 12px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.02);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    resize: both;
-    transition: box-shadow 0.15s;
-  }
-  .feat-win:hover { box-shadow: 0 24px 72px rgba(0,0,0,0.7), 0 0 0 1px rgba(217,119,87,0.15); }
-  .feat-win-title {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px;
-    background: rgba(255,255,255,0.04);
-    border-bottom: 1px solid var(--border);
-    cursor: move;
-    user-select: none;
-    flex-shrink: 0;
-  }
-  .feat-win-lights { display: flex; gap: 7px; }
-  .feat-light {
-    width: 12px; height: 12px; border-radius: 50%;
-    border: none; padding: 0; cursor: pointer;
-    transition: filter 0.1s;
-  }
-  .feat-light:hover { filter: brightness(1.25); }
-  .feat-light-close { background: #ff5f57; }
-  .feat-light-min   { background: #febc2e; }
-  .feat-light-max   { background: #28c840; }
-  .feat-win-title-text { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; truncate: overflow; }
-  .feat-win-body {
-    padding: 16px;
-    overflow-y: auto;
-    flex: 1 1 0;
-    min-height: 0;
-  }
-  .feat-win-minimized { height: 40px !important; min-height: 40px !important; overflow: hidden; }
-  .feat-win-minimized .feat-win-body { display: none; }
-  .feat-win-maxed { border-radius: 8px; resize: none; }
-  body.sb-collapsed #sidebar .nav-label,
-  body.sb-collapsed #sidebar .nav-desc,
-  body.sb-collapsed #sidebar .brand-text,
-  body.sb-collapsed #sidebar .cli-body { display: none; }
-  body.sb-collapsed #sidebar .nav-item { justify-content: center; padding: 0.55rem 0.4rem; }
-  /* v2.33.1 — collapsed 카테고리: 아이콘 + 짧은 라벨 세로 배치로 "뭐가 뭔지" 즉시 인지 가능 */
-  body.sb-collapsed #sidebar .nav-category {
-    flex-direction: column; gap: 2px; padding: 0.5rem 0.2rem; text-align: center;
-  }
-  body.sb-collapsed #sidebar .nav-cat-desc,
-  body.sb-collapsed #sidebar .nav-cat-count,
-  body.sb-collapsed #sidebar .nav-cat-chevron,
-  body.sb-collapsed #sidebar .nav-cat-dot { display: none; }
-  body.sb-collapsed #sidebar .nav-cat-meta { flex: none; width: 100%; overflow: visible; }
-  body.sb-collapsed #sidebar .nav-cat-label {
-    font-size: 9.5px; font-weight: 600; line-height: 1.1; color: var(--text-mute);
-    white-space: nowrap; overflow: hidden; text-overflow: clip;
-    letter-spacing: 0.02em; max-width: 72px;
-    justify-content: center;
-  }
-  /* 기본(expanded): full 라벨만, short 숨김 */
-  .nav-cat-label-short { display: none; }
-  /* collapsed: short 만, full 숨김. `> span` 셀렉터보다 특이도를 높이기 위해 속성 셀렉터 이용 */
-  body.sb-collapsed #sidebar .nav-cat-label span.nav-cat-label-full { display: none; }
-  body.sb-collapsed #sidebar .nav-cat-label span.nav-cat-label-short { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-  body.sb-collapsed #sidebar .nav-category.has-active .nav-cat-label { color: var(--text); }
-  body.sb-collapsed #sidebar .nav-cat-icon { font-size: 1.25rem; width: auto; }
-  body.sb-collapsed #content { margin-left: 78px; }
-  body.sb-collapsed #sidebar-foot { padding: 0.4rem; gap: 0.3rem; }
-  body.sb-collapsed #sidebar-foot .btn { display: none; }  /* 접힌 상태에서 버튼 숨김 */
-  body.sb-collapsed #sidebar-foot #cliStatus > .card { padding: 0.35rem !important; }
-  body.sb-collapsed #sidebar-foot #cliStatus .cli-body,
-  body.sb-collapsed #sidebar-foot #cliStatus .flex.items-center.justify-between > span:first-child { display: none; }
-  body.sb-collapsed #sidebar-foot #cliStatus .flex { justify-content: center !important; margin: 0 !important; }
-  /* CC7 (v2.66.14) — collapsed sidebar: keep "최근 사용 / 즐겨찾기" tidy.
+    .empty.card,
+    .empty[class*="card"] {
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: transparent;
+    }
+
+    .tag-tool {
+      display: inline-block;
+      padding: 1px 7px;
+      font-size: 0.68rem;
+      border-radius: 4px;
+      background: rgba(217, 119, 87, 0.14);
+      color: #f5b997;
+      font-family: 'JetBrains Mono', monospace;
+      margin: 1px;
+    }
+
+    .shimmer {
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+      background-size: 200% 100%;
+      animation: shimmerMove 1.6s infinite;
+      border-radius: 6px;
+    }
+
+    @keyframes shimmerMove {
+      0% {
+        background-position: 0% 0;
+      }
+
+      100% {
+        background-position: -200% 0;
+      }
+    }
+
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .line-clamp-3 {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .line-clamp-6 {
+      display: -webkit-box;
+      -webkit-line-clamp: 6;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* 햄버거 토글 중복 방지: sb-collapsed 상태면 sbToggle 숨기고 navToggle 만, 평상시엔 반대 */
+    body.sb-collapsed #sbToggle {
+      display: none;
+    }
+
+    body.sb-collapsed #sidebar {
+      width: 78px;
+    }
+
+    /* 🪟 macOS 스타일 플로팅 창 (신기능 전용) */
+    .feat-win {
+      position: fixed;
+      width: min(640px, calc(100vw - 80px));
+      min-width: 360px;
+      max-width: calc(100vw - 40px);
+      min-height: 180px;
+      max-height: calc(100vh - 80px);
+      background: var(--bg-soft);
+      border: 1px solid var(--border-hi);
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.02);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      resize: both;
+      transition: box-shadow 0.15s;
+    }
+
+    .feat-win:hover {
+      box-shadow: 0 24px 72px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(217, 119, 87, 0.15);
+    }
+
+    .feat-win-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid var(--border);
+      cursor: move;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .feat-win-lights {
+      display: flex;
+      gap: 7px;
+    }
+
+    .feat-light {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      transition: filter 0.1s;
+    }
+
+    .feat-light:hover {
+      filter: brightness(1.25);
+    }
+
+    .feat-light-close {
+      background: #ff5f57;
+    }
+
+    .feat-light-min {
+      background: #febc2e;
+    }
+
+    .feat-light-max {
+      background: #28c840;
+    }
+
+    .feat-win-title-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      truncate: overflow;
+    }
+
+    .feat-win-body {
+      padding: 16px;
+      overflow-y: auto;
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
+    .feat-win-minimized {
+      height: 40px !important;
+      min-height: 40px !important;
+      overflow: hidden;
+    }
+
+    .feat-win-minimized .feat-win-body {
+      display: none;
+    }
+
+    .feat-win-maxed {
+      border-radius: 8px;
+      resize: none;
+    }
+
+    body.sb-collapsed #sidebar .nav-label,
+    body.sb-collapsed #sidebar .nav-desc,
+    body.sb-collapsed #sidebar .brand-text,
+    body.sb-collapsed #sidebar .cli-body {
+      display: none;
+    }
+
+    body.sb-collapsed #sidebar .nav-item {
+      justify-content: center;
+      padding: 0.55rem 0.4rem;
+    }
+
+    /* v2.33.1 — collapsed 카테고리: 아이콘 + 짧은 라벨 세로 배치로 "뭐가 뭔지" 즉시 인지 가능 */
+    body.sb-collapsed #sidebar .nav-category {
+      flex-direction: column;
+      gap: 2px;
+      padding: 0.5rem 0.2rem;
+      text-align: center;
+    }
+
+    body.sb-collapsed #sidebar .nav-cat-desc,
+    body.sb-collapsed #sidebar .nav-cat-count,
+    body.sb-collapsed #sidebar .nav-cat-chevron,
+    body.sb-collapsed #sidebar .nav-cat-dot {
+      display: none;
+    }
+
+    body.sb-collapsed #sidebar .nav-cat-meta {
+      flex: none;
+      width: 100%;
+      overflow: visible;
+    }
+
+    body.sb-collapsed #sidebar .nav-cat-label {
+      font-size: 9.5px;
+      font-weight: 600;
+      line-height: 1.1;
+      color: var(--text-mute);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
+      letter-spacing: 0.02em;
+      max-width: 72px;
+      justify-content: center;
+    }
+
+    /* 기본(expanded): full 라벨만, short 숨김 */
+    .nav-cat-label-short {
+      display: none;
+    }
+
+    /* collapsed: short 만, full 숨김. `> span` 셀렉터보다 특이도를 높이기 위해 속성 셀렉터 이용 */
+    body.sb-collapsed #sidebar .nav-cat-label span.nav-cat-label-full {
+      display: none;
+    }
+
+    body.sb-collapsed #sidebar .nav-cat-label span.nav-cat-label-short {
+      display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    body.sb-collapsed #sidebar .nav-category.has-active .nav-cat-label {
+      color: var(--text);
+    }
+
+    body.sb-collapsed #sidebar .nav-cat-icon {
+      font-size: 1.25rem;
+      width: auto;
+    }
+
+    body.sb-collapsed #content {
+      margin-left: 78px;
+    }
+
+    body.sb-collapsed #sidebar-foot {
+      padding: 0.4rem;
+      gap: 0.3rem;
+    }
+
+    body.sb-collapsed #sidebar-foot .btn {
+      display: none;
+    }
+
+    /* 접힌 상태에서 버튼 숨김 */
+    body.sb-collapsed #sidebar-foot #cliStatus>.card {
+      padding: 0.35rem !important;
+    }
+
+    body.sb-collapsed #sidebar-foot #cliStatus .cli-body,
+    body.sb-collapsed #sidebar-foot #cliStatus .flex.items-center.justify-between>span:first-child {
+      display: none;
+    }
+
+    body.sb-collapsed #sidebar-foot #cliStatus .flex {
+      justify-content: center !important;
+      margin: 0 !important;
+    }
+
+    /* CC7 (v2.66.14) — collapsed sidebar: keep "최근 사용 / 즐겨찾기" tidy.
      Hide the "최근 사용 5" header text (only the clock icon stays as a
      visual hint) and center+truncate the quick-link items so the 78px
      rail doesn't show wrapping text. */
-  body.sb-collapsed #sidebar .nav-quick-header > span:not(:first-child) { display: none; }
-  body.sb-collapsed #sidebar .nav-quick-header { justify-content: center; padding: 4px 0; }
-  body.sb-collapsed #sidebar .nav-quick-item { justify-content: center; padding: 0.4rem 0.3rem; gap: 0; }
-  body.sb-collapsed #sidebar .nav-quick-item > *:not(.nav-quick-icon) { display: none; }
-  body.sb-collapsed #sidebar .nav-quick-block { padding: 4px 0 6px; margin-bottom: 6px; }
-  #sidebar { transition: width 0.18s ease; }
-  #content { transition: margin-left 0.18s ease; }
+    body.sb-collapsed #sidebar .nav-quick-header>span:not(:first-child) {
+      display: none;
+    }
 
-  /* ─── 모바일 반응형 ─── */
-  @media (max-width: 900px) {
-    /* v2.33.10 — 긴 카테고리 리스트가 뷰포트보다 길면 사이드바 내부 스크롤
-       (기존에는 overflow 가 지정되지 않아 마지막 카테고리가 잘렸음) */
+    body.sb-collapsed #sidebar .nav-quick-header {
+      justify-content: center;
+      padding: 4px 0;
+    }
+
+    body.sb-collapsed #sidebar .nav-quick-item {
+      justify-content: center;
+      padding: 0.4rem 0.3rem;
+      gap: 0;
+    }
+
+    body.sb-collapsed #sidebar .nav-quick-item>*:not(.nav-quick-icon) {
+      display: none;
+    }
+
+    body.sb-collapsed #sidebar .nav-quick-block {
+      padding: 4px 0 6px;
+      margin-bottom: 6px;
+    }
+
     #sidebar {
-      position: fixed; left: 0; top: 0; height: 100vh; z-index: 40;
-      transform: translateX(-100%); transition: transform 0.2s;
-      /* v2.34.3 — 720px 미만 (모바일·태블릿 portrait·작은 데스크톱 창) 은
+      transition: width 0.18s ease;
+    }
+
+    #content {
+      transition: margin-left 0.18s ease;
+    }
+
+    /* ─── 모바일 반응형 ─── */
+    @media (max-width: 900px) {
+
+      /* v2.33.10 — 긴 카테고리 리스트가 뷰포트보다 길면 사이드바 내부 스크롤
+       (기존에는 overflow 가 지정되지 않아 마지막 카테고리가 잘렸음) */
+      #sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        z-index: 40;
+        transform: translateX(-100%);
+        transition: transform 0.2s;
+        /* v2.34.3 — 720px 미만 (모바일·태블릿 portrait·작은 데스크톱 창) 은
          사이드바를 100vw 로 풀스크린 → 우측 콘텐츠 노출 0%.
          720~900px 만 360px / 92vw 로 부분 노출 + 강한 백드롭 차단. */
-      width: min(360px, 92vw) !important;
-      overflow-y: auto; overflow-x: hidden;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-    }
-    @media (max-width: 720px) {
-      #sidebar { width: 100vw !important; }
-    }
-    #sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,0.6); }
-    #content { margin-left: 0 !important; }
-    /* v2.34.3 — 백드롭을 거의 불투명(0.92) + 강한 blur 로 다크 테마에서도
+        width: min(360px, 92vw) !important;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+
+      @media (max-width: 720px) {
+        #sidebar {
+          width: 100vw !important;
+        }
+      }
+
+      #sidebar.open {
+        transform: translateX(0);
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+      }
+
+      #content {
+        margin-left: 0 !important;
+      }
+
+      /* v2.34.3 — 백드롭을 거의 불투명(0.92) + 강한 blur 로 다크 테마에서도
        뒷 콘텐츠가 절대 읽히지 않도록. 0.78 + blur(2px) 는 부족하다는 사용자 보고. */
-    body.sidebar-open { overflow: hidden; }
-    body.sidebar-open::after {
-      content: ''; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.92);
-      backdrop-filter: blur(10px) saturate(0.6);
-      -webkit-backdrop-filter: blur(10px) saturate(0.6);
-      z-index: 35; transition: opacity 0.2s;
-    }
-    body.theme-light.sidebar-open::after {
-      background: rgba(255,255,255,0.85);
-      backdrop-filter: blur(10px) saturate(0.7);
-      -webkit-backdrop-filter: blur(10px) saturate(0.7);
-    }
-    /* v2.34.1 — 모바일 사이드바 열림 시 floating mascot/chatBubble 등은 숨김.
+      body.sidebar-open {
+        overflow: hidden;
+      }
+
+      body.sidebar-open::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.92);
+        backdrop-filter: blur(10px) saturate(0.6);
+        -webkit-backdrop-filter: blur(10px) saturate(0.6);
+        z-index: 35;
+        transition: opacity 0.2s;
+      }
+
+      body.theme-light.sidebar-open::after {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px) saturate(0.7);
+        -webkit-backdrop-filter: blur(10px) saturate(0.7);
+      }
+
+      /* v2.34.1 — 모바일 사이드바 열림 시 floating mascot/chatBubble 등은 숨김.
        이전엔 z-index 1100~1150 라 백드롭 위로 그대로 떠 있어 "이상한 핑크 픽셀" 처럼
        보였음. */
-    body.sidebar-open #claudeMascot,
-    body.sidebar-open #chatBubble,
-    body.sidebar-open #chatLauncher { display: none !important; }
+      body.sidebar-open #claudeMascot,
+      body.sidebar-open #chatBubble,
+      body.sidebar-open #chatLauncher {
+        display: none !important;
+      }
 
-    /* 헤더 / 본문 패딩 축소 */
-    #content header { padding: 0.5rem 0.75rem !important; }
-    #content #view { padding: 0.75rem !important; }
+      /* 헤더 / 본문 패딩 축소 */
+      #content header {
+        padding: 0.5rem 0.75rem !important;
+      }
 
-    /* 큰 타이포 축소 */
-    h1.text-2xl { font-size: 1.25rem !important; }
-    h2.text-lg, h2.text-xl { font-size: 1rem !important; }
+      #content #view {
+        padding: 0.75rem !important;
+      }
 
-    /* 카드 padding 축소 */
-    .card.p-5, .card.p-6 { padding: 0.75rem !important; }
-    .card.p-4 { padding: 0.625rem !important; }
+      /* 큰 타이포 축소 */
+      h1.text-2xl {
+        font-size: 1.25rem !important;
+      }
 
-    /* 테이블 가로 스크롤 */
-    table.data { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; max-width: 100%; }
-    table.data thead, table.data tbody { display: table; min-width: 100%; }
+      h2.text-lg,
+      h2.text-xl {
+        font-size: 1rem !important;
+      }
 
-    /* 그리드 강제 1 컬럼 (md/lg breakpoint 무시) */
-    .grid.grid-cols-2 { grid-template-columns: 1fr 1fr !important; }
-    .grid.md\:grid-cols-2, .grid.md\:grid-cols-3, .grid.md\:grid-cols-4, .grid.md\:grid-cols-5,
-    .grid.lg\:grid-cols-2, .grid.lg\:grid-cols-3, .grid.lg\:grid-cols-4, .grid.lg\:grid-cols-5 {
-      grid-template-columns: 1fr !important;
+      /* 카드 padding 축소 */
+      .card.p-5,
+      .card.p-6 {
+        padding: 0.75rem !important;
+      }
+
+      .card.p-4 {
+        padding: 0.625rem !important;
+      }
+
+      /* 테이블 가로 스크롤 */
+      table.data {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        max-width: 100%;
+      }
+
+      table.data thead,
+      table.data tbody {
+        display: table;
+        min-width: 100%;
+      }
+
+      /* 그리드 강제 1 컬럼 (md/lg breakpoint 무시) */
+      .grid.grid-cols-2 {
+        grid-template-columns: 1fr 1fr !important;
+      }
+
+      .grid.md\:grid-cols-2,
+      .grid.md\:grid-cols-3,
+      .grid.md\:grid-cols-4,
+      .grid.md\:grid-cols-5,
+      .grid.lg\:grid-cols-2,
+      .grid.lg\:grid-cols-3,
+      .grid.lg\:grid-cols-4,
+      .grid.lg\:grid-cols-5 {
+        grid-template-columns: 1fr !important;
+      }
+
+      .grid-list {
+        grid-template-columns: 1fr !important;
+      }
+
+      /* 입력 필드 풀폭 */
+      .input {
+        font-size: 16px !important;
+      }
+
+      /* iOS 자동 줌 방지 */
+      .max-w-\[260px\],
+      .max-w-\[280px\],
+      .max-w-\[300px\],
+      .max-w-\[340px\],
+      .max-w-\[420px\] {
+        max-width: 100% !important;
+      }
+
+      #globalSearch {
+        font-size: 14px !important;
+      }
+
+      /* 모달 */
+      .modal-backdrop {
+        padding: 8px !important;
+      }
+
+      .modal {
+        max-height: 96vh !important;
+        border-radius: 12px !important;
+      }
+
+      .modal-wide {
+        height: 96vh !important;
+        max-height: 96vh !important;
+      }
+
+      /* 신기능 창 / 챗 윈도우 — 화면 거의 전체 */
+      .feat-win {
+        width: calc(100vw - 16px) !important;
+        max-width: calc(100vw - 16px) !important;
+        left: 8px !important;
+        top: 8px !important;
+        right: auto !important;
+        bottom: auto !important;
+        height: auto !important;
+        max-height: calc(100vh - 16px) !important;
+        resize: none !important;
+      }
+
+      /* 튜토리얼·노드 에디터처럼 flex 기반 레이아웃 창은 화면 전체 높이 보장 */
+      .feat-win.wf-tut-win,
+      .feat-win[id^="wfNodeWin-"] {
+        height: calc(100vh - 16px) !important;
+      }
+
+      .feat-win-title {
+        touch-action: none;
+        cursor: move;
+      }
+
+      /* 마스코트 — 모바일에서 기본 터치 타겟 보장 + 초기 위치 안전 */
+      #claudeMascot {
+        width: 64px !important;
+        height: 58px !important;
+      }
+
+      /* Chip / 버튼 터치 타겟 */
+      .btn,
+      .btn-primary,
+      .btn-ghost {
+        min-height: 36px;
+      }
+
+      .chip {
+        min-height: 22px;
+      }
+
+      /* 사이드바 네비 항목 터치 타겟 */
+      .nav-item {
+        min-height: 44px;
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+      }
+
+      /* 이미지/ pre 넘침 */
+      pre {
+        max-width: 100%;
+        overflow-x: auto;
+      }
     }
-    .grid-list { grid-template-columns: 1fr !important; }
 
-    /* 입력 필드 풀폭 */
-    .input { font-size: 16px !important; } /* iOS 자동 줌 방지 */
-    .max-w-\[260px\], .max-w-\[280px\], .max-w-\[300px\], .max-w-\[340px\], .max-w-\[420px\] { max-width: 100% !important; }
-    #globalSearch { font-size: 14px !important; }
+    /* 아주 좁은 화면 — iPhone SE 등 */
+    @media (max-width: 420px) {
+      .grid.grid-cols-2 {
+        grid-template-columns: 1fr !important;
+      }
 
-    /* 모달 */
-    .modal-backdrop { padding: 8px !important; }
-    .modal { max-height: 96vh !important; border-radius: 12px !important; }
-    .modal-wide { height: 96vh !important; max-height: 96vh !important; }
+      #content header {
+        gap: 0.5rem !important;
+      }
 
-    /* 신기능 창 / 챗 윈도우 — 화면 거의 전체 */
-    .feat-win {
-      width: calc(100vw - 16px) !important;
-      max-width: calc(100vw - 16px) !important;
-      left: 8px !important;
-      top: 8px !important;
-      right: auto !important;
-      bottom: auto !important;
-      height: auto !important;
-      max-height: calc(100vh - 16px) !important;
-      resize: none !important;
-    }
-    /* 튜토리얼·노드 에디터처럼 flex 기반 레이아웃 창은 화면 전체 높이 보장 */
-    .feat-win.wf-tut-win,
-    .feat-win[id^="wfNodeWin-"] {
-      height: calc(100vh - 16px) !important;
-    }
-    .feat-win-title { touch-action: none; cursor: move; }
+      #content #view {
+        padding: 0.5rem !important;
+      }
 
-    /* 마스코트 — 모바일에서 기본 터치 타겟 보장 + 초기 위치 안전 */
-    #claudeMascot { width: 64px !important; height: 58px !important; }
-
-    /* Chip / 버튼 터치 타겟 */
-    .btn, .btn-primary, .btn-ghost { min-height: 36px; }
-    .chip { min-height: 22px; }
-
-    /* 사이드바 네비 항목 터치 타겟 */
-    .nav-item { min-height: 44px; padding-top: 10px !important; padding-bottom: 10px !important; }
-
-    /* 이미지/ pre 넘침 */
-    pre { max-width: 100%; overflow-x: auto; }
-  }
-
-  /* 아주 좁은 화면 — iPhone SE 등 */
-  @media (max-width: 420px) {
-    .grid.grid-cols-2 { grid-template-columns: 1fr !important; }
-    #content header { gap: 0.5rem !important; }
-    #content #view { padding: 0.5rem !important; }
-    /* QQ236 — collapse the chat layout's session sidebar on tiny
+      /* QQ236 — collapse the chat layout's session sidebar on tiny
        viewports. The 220px column becomes a single-row strip above
        the main panel so the composer + send button can fit in 320px. */
-    .lc-chat-layout { grid-template-columns: 1fr !important; grid-template-rows: auto 1fr !important; }
-    .lc-chat-layout > div:first-child { max-height: 32vh; border-right: 0 !important; border-bottom: 1px solid var(--border) !important; }
-  }
-  /* Ollama 모델 허브 */
-  .ollama-cat-filter.active { background: var(--accent) !important; color: #fff !important; }
-  #ollamaCatalogGrid { max-height: 720px; overflow-y: auto; }
-  #ollamaCatalogGrid .card { transition: transform 0.15s, box-shadow 0.15s; }
-  #ollamaCatalogGrid .card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
-  #ollamaInstalledTable th { text-align: left; white-space: nowrap; }
-  #ollamaInstalledTable td { white-space: nowrap; }
-</style>
+      .lc-chat-layout {
+        grid-template-columns: 1fr !important;
+        grid-template-rows: auto 1fr !important;
+      }
+
+      .lc-chat-layout>div:first-child {
+        max-height: 32vh;
+        border-right: 0 !important;
+        border-bottom: 1px solid var(--border) !important;
+      }
+    }
+
+    /* Ollama 모델 허브 */
+    .ollama-cat-filter.active {
+      background: var(--accent) !important;
+      color: #fff !important;
+    }
+
+    #ollamaCatalogGrid {
+      max-height: 720px;
+      overflow-y: auto;
+    }
+
+    #ollamaCatalogGrid .card {
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    #ollamaCatalogGrid .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    #ollamaInstalledTable th {
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    #ollamaInstalledTable td {
+      white-space: nowrap;
+    }
+  </style>
 </head>
+
 <body>
 
-<aside id="sidebar" class="fixed left-0 top-0 h-screen w-[260px] border-r border-[var(--border)] bg-[var(--bg-soft)] flex flex-col z-30">
-  <div class="px-3 pt-4 pb-3 flex items-center gap-2">
-    <div class="w-9 h-9 rounded-[10px] grid place-items-center flex-shrink-0" style="background: #d97757;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2 L13.2 9.6 L20.8 10.8 L13.2 12 L12 19.6 L10.8 12 L3.2 10.8 L10.8 9.6 Z" fill="#000"/>
-        <path d="M5.2 4.2 L7.4 9.6 L12 10.8 L7.4 12 L5.2 17.4 L3 12 L-1.6 10.8 L3 9.6 Z" fill="#000" opacity="0.55" transform="translate(2 2) rotate(30 6 10.8)"/>
-      </svg>
+  <aside id="sidebar"
+    class="fixed left-0 top-0 h-screen w-[260px] border-r border-[var(--border)] bg-[var(--bg-soft)] flex flex-col z-30">
+    <div class="px-3 pt-4 pb-3 flex items-center gap-2">
+      <div class="w-9 h-9 rounded-[10px] grid place-items-center flex-shrink-0" style="background: #d97757;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2 L13.2 9.6 L20.8 10.8 L13.2 12 L12 19.6 L10.8 12 L3.2 10.8 L10.8 9.6 Z" fill="#000" />
+          <path d="M5.2 4.2 L7.4 9.6 L12 10.8 L7.4 12 L5.2 17.4 L3 12 L-1.6 10.8 L3 9.6 Z" fill="#000" opacity="0.55"
+            transform="translate(2 2) rotate(30 6 10.8)" />
+        </svg>
+      </div>
+      <div class="brand-text flex-1 min-w-0">
+        <div class="font-semibold text-[14px] truncate">LazyClaude</div>
+      </div>
+      <button id="sbToggle" class="btn-ghost btn p-1.5" title="사이드바 접기/펼치기" aria-label="사이드바 접기/펼치기">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M3 12h18M3 18h18" />
+        </svg>
+      </button>
     </div>
-    <div class="brand-text flex-1 min-w-0">
-      <div class="font-semibold text-[14px] truncate">LazyClaude</div>
-    </div>
-    <button id="sbToggle" class="btn-ghost btn p-1.5" title="사이드바 접기/펼치기" aria-label="사이드바 접기/펼치기">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-    </button>
-  </div>
-  <nav id="nav" class="flex-1 px-3 pb-3 space-y-1" style="overflow: visible;"></nav>
-  <div id="sidebar-foot" class="border-t border-[var(--border)] p-3 space-y-2">
-    <div id="cliStatus" class="text-[11px]"></div>
-    <button id="btn-reindex" class="btn w-full justify-center text-[12px]" aria-label="세션 재인덱스">
-      <span>🔄</span><span>세션 재인덱스</span>
-    </button>
-    <button id="btn-latest-features" class="btn w-full justify-center text-[12px]" title="Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가" aria-label="최신 정보 로딩">
-      <span>📡</span><span>최신 정보 로딩</span>
-    </button>
-    <div class="flex items-center justify-center gap-1 mt-1">
-      <div id="appVersion" class="text-center text-[10px] text-[var(--text-dim)] cursor-pointer hover:text-[var(--text-mute)]" onclick="_showVersionModal()" title="버전 정보 / 변경 이력"></div>
-      <button class="btn-ghost btn text-[9px] px-1.5 py-0.5" onclick="_openShortcutHelp()" title="키보드 단축키 (?)" aria-label="키보드 단축키">⌨️</button>
-    </div>
-  </div>
-</aside>
-
-<main id="content" class="ml-[260px] min-h-screen" style="background:var(--bg);">
-  <header id="mainHeader" class="sticky top-0 z-20 backdrop-blur-xl border-b border-[var(--border)] px-7 py-3 flex items-center gap-4" style="background:var(--bg-soft);">
-    <button id="navToggle" class="btn-ghost btn" title="사이드바 토글" aria-label="사이드바 열기/닫기" style="display:none;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-    </button>
-    <div class="flex-1">
-      <div class="relative max-w-[420px] w-full cursor-pointer" onclick="openSpotlight()">
-        <input id="globalSearch" class="input w-full" placeholder="검색… ⌘K · /" readonly style="cursor:pointer;" />
+    <nav id="nav" class="flex-1 px-3 pb-3 space-y-1" style="overflow: visible;"></nav>
+    <div id="sidebar-foot" class="border-t border-[var(--border)] p-3 space-y-2">
+      <div id="cliStatus" class="text-[11px]"></div>
+      <button id="btn-reindex" class="btn w-full justify-center text-[12px]" aria-label="세션 재인덱스">
+        <span>🔄</span><span>세션 재인덱스</span>
+      </button>
+      <button id="btn-latest-features" class="btn w-full justify-center text-[12px]"
+        title="Claude 가 최근 발표한 신기능을 찾아서 신기능 탭에 추가" aria-label="최신 정보 로딩">
+        <span>📡</span><span>최신 정보 로딩</span>
+      </button>
+      <div class="flex items-center justify-center gap-1 mt-1">
+        <div id="appVersion"
+          class="text-center text-[10px] text-[var(--text-dim)] cursor-pointer hover:text-[var(--text-mute)]"
+          onclick="_showVersionModal()" title="버전 정보 / 변경 이력"></div>
+        <button class="btn-ghost btn text-[9px] px-1.5 py-0.5" onclick="_openShortcutHelp()" title="키보드 단축키 (?)"
+          aria-label="키보드 단축키">⌨️</button>
       </div>
     </div>
-    <div class="flex items-center gap-2">
-      <select id="modeSelect" class="input text-xs" style="width:auto;padding:4px 8px;" onchange="setMode(this.value)" title="대시보드 모드 — 사이드바 탭 필터" aria-label="대시보드 모드 선택">
-        <option value="all">🌐 All</option>
-        <option value="claude">💤 Claude</option>
-        <option value="workflow">🔀 Workflow</option>
-        <option value="providers">🤖 Providers</option>
-      </select>
-      <span id="liveStatus" class="chip chip-ok"><span class="pulse-dot"></span><span>연결됨</span></span>
-      <div style="position:relative;">
-        <button id="btn-settings" class="btn-ghost btn" title="설정" aria-label="설정 메뉴 열기" onclick="toggleSettingsDropdown()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-        <div id="settingsDropdown" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:220px;background:var(--bg-soft);border:1px solid var(--border-hi);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.4);overflow:hidden;z-index:45;">
-          <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);" data-i18n="settings.theme">테마</div>
-          <button class="settings-item" onclick="setTheme('auto')" id="themeOptAuto">
-            <span>🖥️</span><span data-i18n="settings.auto">자동 (OS)</span><span class="settings-check theme-check" data-theme="auto" id="checkAuto" style="display:none;">✓</span>
-          </button>
-          <button class="settings-item" onclick="setTheme('dark')" id="themeOptDark">
-            <span>🌙</span><span data-i18n="settings.dark">다크</span><span class="settings-check theme-check" data-theme="dark" id="checkDark">✓</span>
-          </button>
-          <button class="settings-item" onclick="setTheme('light')" id="themeOptLight">
-            <span>☀️</span><span data-i18n="settings.light">라이트</span><span class="settings-check theme-check" data-theme="light" id="checkLight" style="display:none;">✓</span>
-          </button>
-          <button class="settings-item" onclick="setTheme('midnight')" id="themeOptMidnight">
-            <span>🌌</span><span data-i18n="settings.midnight">미드나잇</span><span class="settings-check theme-check" data-theme="midnight" style="display:none;">✓</span>
-          </button>
-          <button class="settings-item" onclick="setTheme('forest')" id="themeOptForest">
-            <span>🌲</span><span data-i18n="settings.forest">포레스트</span><span class="settings-check theme-check" data-theme="forest" style="display:none;">✓</span>
-          </button>
-          <button class="settings-item" onclick="setTheme('sunset')" id="themeOptSunset">
-            <span>🌅</span><span data-i18n="settings.sunset">선셋</span><span class="settings-check theme-check" data-theme="sunset" style="display:none;">✓</span>
-          </button>
-          <div style="padding:10px 14px;border-bottom:1px solid var(--border);border-top:1px solid var(--border);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);" data-i18n="settings.language">언어</div>
-          <button class="settings-item" onclick="setLang('ko')"><span>🇰🇷</span><span>한국어</span><span class="settings-check lang-check" data-lang="ko">✓</span></button>
-          <button class="settings-item" onclick="setLang('en')"><span>🇺🇸</span><span>English</span><span class="settings-check lang-check" data-lang="en" style="display:none;">✓</span></button>
-          <button class="settings-item" onclick="setLang('zh')"><span>🇨🇳</span><span>中文</span><span class="settings-check lang-check" data-lang="zh" style="display:none;">✓</span></button>
-          <div style="border-top:1px solid var(--border);"></div>
-          <button class="settings-item" onclick="toggleSettingsDropdown(); openQuickSettings()" title="⌘,">
-            <span>⚡</span><span data-i18n="settings.quickSettings">빠른 설정 — 모든 파라미터</span>
-            <span style="margin-left:auto;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.04em;">⌘,</span>
-          </button>
-          <button class="settings-item" onclick="toggleSettingsDropdown(); _openModeUsageModal()">
-            <span>📊</span><span>모드별 사용량</span>
-          </button>
+  </aside>
+
+  <main id="content" class="ml-[260px] min-h-screen" style="background:var(--bg);">
+    <header id="mainHeader"
+      class="sticky top-0 z-20 backdrop-blur-xl border-b border-[var(--border)] px-7 py-3 flex items-center gap-4"
+      style="background:var(--bg-soft);">
+      <button id="navToggle" class="btn-ghost btn" title="사이드바 토글" aria-label="사이드바 열기/닫기" style="display:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M3 12h18M3 18h18" />
+        </svg>
+      </button>
+      <div class="flex-1">
+        <div class="relative max-w-[420px] w-full cursor-pointer" onclick="openSpotlight()">
+          <input id="globalSearch" class="input w-full" placeholder="검색… ⌘K · /" readonly style="cursor:pointer;" />
         </div>
       </div>
+      <div class="flex items-center gap-2">
+        <select id="modeSelect" class="input text-xs" style="width:auto;padding:4px 8px;" onchange="setMode(this.value)"
+          title="대시보드 모드 — 사이드바 탭 필터" aria-label="대시보드 모드 선택">
+          <option value="all">🌐 All</option>
+          <option value="claude">💤 Claude</option>
+          <option value="workflow">🔀 Workflow</option>
+          <option value="providers">🤖 Providers</option>
+        </select>
+        <span id="liveStatus" class="chip chip-ok"><span class="pulse-dot"></span><span>연결됨</span></span>
+        <div style="position:relative;">
+          <button id="btn-settings" class="btn-ghost btn" title="설정" aria-label="설정 메뉴 열기"
+            onclick="toggleSettingsDropdown()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path
+                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+          <div id="settingsDropdown"
+            style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:220px;background:var(--bg-soft);border:1px solid var(--border-hi);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.4);overflow:hidden;z-index:45;">
+            <div
+              style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);"
+              data-i18n="settings.theme">테마</div>
+            <button class="settings-item" onclick="setTheme('auto')" id="themeOptAuto">
+              <span>🖥️</span><span data-i18n="settings.auto">자동 (OS)</span><span class="settings-check theme-check"
+                data-theme="auto" id="checkAuto" style="display:none;">✓</span>
+            </button>
+            <button class="settings-item" onclick="setTheme('dark')" id="themeOptDark">
+              <span>🌙</span><span data-i18n="settings.dark">다크</span><span class="settings-check theme-check"
+                data-theme="dark" id="checkDark">✓</span>
+            </button>
+            <button class="settings-item" onclick="setTheme('light')" id="themeOptLight">
+              <span>☀️</span><span data-i18n="settings.light">라이트</span><span class="settings-check theme-check"
+                data-theme="light" id="checkLight" style="display:none;">✓</span>
+            </button>
+            <button class="settings-item" onclick="setTheme('midnight')" id="themeOptMidnight">
+              <span>🌌</span><span data-i18n="settings.midnight">미드나잇</span><span class="settings-check theme-check"
+                data-theme="midnight" style="display:none;">✓</span>
+            </button>
+            <button class="settings-item" onclick="setTheme('forest')" id="themeOptForest">
+              <span>🌲</span><span data-i18n="settings.forest">포레스트</span><span class="settings-check theme-check"
+                data-theme="forest" style="display:none;">✓</span>
+            </button>
+            <button class="settings-item" onclick="setTheme('sunset')" id="themeOptSunset">
+              <span>🌅</span><span data-i18n="settings.sunset">선셋</span><span class="settings-check theme-check"
+                data-theme="sunset" style="display:none;">✓</span>
+            </button>
+            <div
+              style="padding:10px 14px;border-bottom:1px solid var(--border);border-top:1px solid var(--border);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);"
+              data-i18n="settings.language">언어</div>
+            <button class="settings-item" onclick="setLang('ko')"><span>🇰🇷</span><span>한국어</span><span
+                class="settings-check lang-check" data-lang="ko">✓</span></button>
+            <button class="settings-item" onclick="setLang('en')"><span>🇺🇸</span><span>English</span><span
+                class="settings-check lang-check" data-lang="en" style="display:none;">✓</span></button>
+            <button class="settings-item" onclick="setLang('zh')"><span>🇨🇳</span><span>中文</span><span
+                class="settings-check lang-check" data-lang="zh" style="display:none;">✓</span></button>
+            <div style="border-top:1px solid var(--border);"></div>
+            <button class="settings-item" onclick="toggleSettingsDropdown(); openQuickSettings()" title="⌘,">
+              <span>⚡</span><span data-i18n="settings.quickSettings">빠른 설정 — 모든 파라미터</span>
+              <span style="margin-left:auto;font-size:0.65rem;color:var(--text-dim);letter-spacing:0.04em;">⌘,</span>
+            </button>
+            <button class="settings-item" onclick="toggleSettingsDropdown(); _openModeUsageModal()">
+              <span>📊</span><span>모드별 사용량</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div id="view" class="px-7 py-6" style="min-width:0; overflow-x:hidden;"></div>
+  </main>
+
+  <div id="toast" class="fixed right-6 z-[60] space-y-2" style="bottom: 72px;"></div>
+  <div id="modal-root"></div>
+
+  <!-- Claude Mascot — 16x16 sprite (Claude Design handoff v0.1) -->
+  <!-- The sprite is built at runtime by _mascotBuildSprite() in app.js using   -->
+  <!-- the BASE rows + FACES overrides. Four states (idle/working/done/error)  -->
+  <!-- share one rendered <svg>; _mascotSetState() swaps the active <g>.       -->
+  <div id="claudeMascot" style="position:fixed;z-index:1150;width:72px;height:72px;">
+    <div id="mascotBubble" class="mascot-bubble" style="display:none;"></div>
+    <div id="mascotSprite" data-state="idle" style="width:100%;height:100%;">
+      <!-- populated on DOMContentLoaded -->
     </div>
-  </header>
-
-  <div id="view" class="px-7 py-6" style="min-width:0; overflow-x:hidden;"></div>
-</main>
-
-<div id="toast" class="fixed right-6 z-[60] space-y-2" style="bottom: 72px;"></div>
-<div id="modal-root"></div>
-
-<!-- Claude Mascot — 16x16 sprite (Claude Design handoff v0.1) -->
-<!-- The sprite is built at runtime by _mascotBuildSprite() in app.js using   -->
-<!-- the BASE rows + FACES overrides. Four states (idle/working/done/error)  -->
-<!-- share one rendered <svg>; _mascotSetState() swaps the active <g>.       -->
-<div id="claudeMascot" style="position:fixed;z-index:1150;width:72px;height:72px;">
-  <div id="mascotBubble" class="mascot-bubble" style="display:none;"></div>
-  <div id="mascotSprite" data-state="idle" style="width:100%;height:100%;">
-    <!-- populated on DOMContentLoaded -->
   </div>
-</div>
-<!-- Chatbot macOS floating window -->
-<div id="chatWin" class="feat-win" style="display:none;right:24px;bottom:92px;left:auto;top:auto;width:420px;min-height:400px;max-height:min(600px,80vh);z-index:1100;">
-  <div class="feat-win-title" id="chatWinTitle">
-    <div class="feat-win-lights">
-      <button class="feat-light feat-light-close" title="닫기" onclick="toggleChat()"></button>
-      <button class="feat-light feat-light-min" title="내리기" onclick="document.getElementById('chatWin').classList.toggle('feat-win-minimized')"></button>
-      <button class="feat-light feat-light-max" title="펼치기" onclick="_chatToggleMax()"></button>
-    </div>
-    <div class="feat-win-title-text" style="display:flex;align-items:center;gap:6px;">
-      <span id="chatTitleMascot" data-state="idle" style="display:inline-flex;width:24px;height:24px;flex-shrink:0;">
-        <!-- populated by _mascotPaintInline('#chatTitleMascot') -->
-      </span>
-      대시보드 도우미
-    </div>
-  </div>
-  <div class="feat-win-body" style="padding:0;display:flex;flex-direction:column;">
-    <div id="chatMessages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;">
-      <div class="chat-msg chat-bot">
-        <div class="chat-bubble-bot">안녕하세요! 대시보드 기능에 대해 무엇이든 물어보세요.<br>해당 탭으로 바로 안내해 드릴게요.</div>
+  <!-- Chatbot macOS floating window -->
+  <div id="chatWin" class="feat-win"
+    style="display:none;right:24px;bottom:92px;left:auto;top:auto;width:420px;min-height:400px;max-height:min(600px,80vh);z-index:1100;">
+    <div class="feat-win-title" id="chatWinTitle">
+      <div class="feat-win-lights">
+        <button class="feat-light feat-light-close" title="닫기" onclick="toggleChat()"></button>
+        <button class="feat-light feat-light-min" title="내리기"
+          onclick="document.getElementById('chatWin').classList.toggle('feat-win-minimized')"></button>
+        <button class="feat-light feat-light-max" title="펼치기" onclick="_chatToggleMax()"></button>
+      </div>
+      <div class="feat-win-title-text" style="display:flex;align-items:center;gap:6px;">
+        <span id="chatTitleMascot" data-state="idle" style="display:inline-flex;width:24px;height:24px;flex-shrink:0;">
+          <!-- populated by _mascotPaintInline('#chatTitleMascot') -->
+        </span>
+        대시보드 도우미
       </div>
     </div>
-    <div style="border-top:1px solid var(--border);padding:8px 10px 0 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;">
-      <button id="chatModeToggle" type="button" onclick="toggleChatMode()"
-              class="chip" style="font-size:0.7rem;padding:2px 8px;cursor:pointer;"
-              title="네비게이션 도우미 ↔ 멀티 에이전트 오케스트레이터 전환">
-        💬 도우미 모드
-      </button>
-      <select id="chatOrchPreset" class="input"
-              style="font-size:0.68rem;padding:2px 4px;width:auto;display:none;"
-              title="오케스트레이터 프리셋">
-        <option value="default">default — 4 sub-agents</option>
-        <option value="fast">fast — 2 sub-agents</option>
-        <option value="deep">deep — 8 sub-agents</option>
-      </select>
-    </div>
-    <div style="border-top:1px solid var(--border);padding:10px;display:flex;gap:8px;flex-shrink:0;">
-      <input id="chatInput" class="input" style="flex:1;font-size:0.82rem;" placeholder="예: MCP 어디서 설정해?" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}">
-      <button onclick="sendChat()" class="btn-primary btn" style="padding:6px 14px;font-size:0.82rem;" aria-label="채팅 전송">전송</button>
+    <div class="feat-win-body" style="padding:0;display:flex;flex-direction:column;">
+      <div id="chatMessages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;">
+        <div class="chat-msg chat-bot">
+          <div class="chat-bubble-bot">안녕하세요! 대시보드 기능에 대해 무엇이든 물어보세요.<br>해당 탭으로 바로 안내해 드릴게요.</div>
+        </div>
+      </div>
+      <div
+        style="border-top:1px solid var(--border);padding:8px 10px 0 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+        <button id="chatModeToggle" type="button" onclick="toggleChatMode()" class="chip"
+          style="font-size:0.7rem;padding:2px 8px;cursor:pointer;" title="네비게이션 도우미 ↔ 멀티 에이전트 오케스트레이터 전환">
+          💬 도우미 모드
+        </button>
+        <select id="chatOrchPreset" class="input" style="font-size:0.68rem;padding:2px 4px;width:auto;display:none;"
+          title="오케스트레이터 프리셋">
+          <option value="default">default — 4 sub-agents</option>
+          <option value="fast">fast — 2 sub-agents</option>
+          <option value="deep">deep — 8 sub-agents</option>
+        </select>
+      </div>
+      <div style="border-top:1px solid var(--border);padding:10px;display:flex;gap:8px;flex-shrink:0;">
+        <input id="chatInput" class="input" style="flex:1;font-size:0.82rem;" placeholder="예: MCP 어디서 설정해?"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}">
+        <button onclick="sendChat()" class="btn-primary btn" style="padding:6px 14px;font-size:0.82rem;"
+          aria-label="채팅 전송">전송</button>
+      </div>
     </div>
   </div>
-</div>
 
-<script src="/app.js" defer></script>
+  <script src="/app.js?v=20260527" defer></script>
 </body>
+
 </html>
