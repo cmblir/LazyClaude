@@ -26339,7 +26339,7 @@ const _MASCOT_W = 16;
 // Mascot Sprite System v3 — uses actual GIF image files
 // Images served from /mascots/*.gif (transparent background)
 // ═══════════════════════════════════════════════════════════════════
-const _MASCOT_FRIENDS = ['idea', 'basic', 'basic2', 'bird', 'sparkle', 'worker', 'cool', 'pirate', 'headset'];
+const _MASCOT_FRIENDS = ['idea', 'basic', 'basic2', 'bird', 'worker', 'cool', 'pirate', 'headset'];
 const _MASCOT_ALL = [..._MASCOT_FRIENDS, 'error'];
 let _mascotVariant = 'idea';
 let _mascotVariantTimer = null;
