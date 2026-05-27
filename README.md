@@ -47,8 +47,10 @@ CLAUDE_HOME=/path/to/.claude python3 server.py
 ## � Screenshots
 
 <table>
-<tr>
-<td align="center"><b>Dashboard</b><br/><img src="./docs/screenshots/dashboard.png" width="400" /></td>
+<tr><td align="center"><b>Overview</b><br/><img src="./docs/screenshots/overview.png" width="400" /></td>
+<td align="center"><b>Dashboard Assistant</b><br/><img src="./docs/screenshots/assistant.png" width="400" /></td>
+</tr>
+<tr><td align="center"><b>Dashboard</b><br/><img src="./docs/screenshots/dashboard.png" width="400" /></td>
 <td align="center"><b>Workflows</b><br/><img src="./docs/screenshots/workflows.png" width="400" /></td>
 </tr>
 <tr>
