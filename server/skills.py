@@ -1,7 +1,7 @@
 """Claude Code 스킬 (`~/.claude/skills/*`) + 플러그인 마켓플레이스 스킬.
 
 - list_skills: 사용자 스킬 + 플러그인 스킬 + 번역 주입
-- get_skill / put_skill: 단건 조회/편집 (플러그인 스킬은 read-only)
+- get_skill / put_skill / delete_skill: 단건 조회/편집/삭제 (플러그인 스킬은 read-only)
 - _scan_plugin_skills / _resolve_skill_path: 플러그인 두 레이아웃 지원
 """
 from __future__ import annotations
@@ -257,3 +257,39 @@ def put_skill(skill_id: str, body: dict) -> dict:
     p = SKILLS_DIR / skill_id / "SKILL.md"
     ok = _safe_write(p, raw)
     return {"ok": ok}
+
+
+def delete_skill(body: dict) -> dict:
+    """전역 사용자 스킬 삭제 (`~/.claude/skills/<id>/`).
+
+    플러그인 스킬(`market:plugin:id` / `market:id`)은 마켓플레이스 소유이므로
+    삭제 불가 — 비활성화로 안내한다. 디렉터리 안에 하위 폴더가 있으면
+    예기치 않은 사용자 자료일 수 있으니 거부하고 그대로 둔다.
+    """
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    skill_id = (body.get("id") or "").strip()
+    if not skill_id:
+        return {"ok": False, "error": "id required"}
+    if ":" in skill_id:
+        from .errors import err
+        return err("skill_plugin_readonly")
+    if not re.match(r"^[a-zA-Z0-9_-]+$", skill_id):
+        return {"ok": False, "error": "invalid skill id"}
+    base = SKILLS_DIR / skill_id
+    if not base.exists() or not base.is_dir():
+        return {"ok": False, "error": "not found"}
+    try:
+        for f in base.iterdir():
+            if f.is_file() or f.is_symlink():
+                f.unlink()
+            else:
+                return {"ok": False, "error": f"refusing to recurse into {f.name}"}
+        base.rmdir()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    # Bust the TTL cache so the next /api/skills call reflects the removal.
+    with _skills_lock:
+        _skills_cache["key"] = None
+        _skills_cache["value"] = None
+    return {"ok": True}

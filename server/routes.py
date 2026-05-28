@@ -250,10 +250,11 @@ from .sessions import (
     api_session_timeline, api_session_tokens, api_sessions_list,
     api_sessions_search, api_sessions_stats, index_all_sessions,
 )
-from .skills import get_skill, list_skills, put_skill
+from .skills import delete_skill, get_skill, list_skills, put_skill
 from .system import (
     api_backup_diff, api_backups_list, api_bash_history, api_env_config, api_homunculus_projects,
-    api_ide_status, api_memory_list, api_metrics_summary, api_model_config,
+    api_ide_status, api_memory_delete, api_memory_get, api_memory_list, api_memory_put,
+    api_metrics_summary, api_model_config,
     api_output_style_delete, api_output_style_save, api_output_styles_list,
     api_plans_list, api_scheduled_tasks, api_statusline_info,
     api_task_delete, api_task_save, api_tasks_list, api_telemetry_summary,
@@ -357,6 +358,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/usage/summary": lambda q: api_usage_summary(),
     "/api/usage/project": api_usage_project,
     "/api/memory/list": api_memory_list,
+    "/api/memory/get": api_memory_get,
     "/api/tasks/list": lambda q: api_tasks_list(),
     "/api/team/info": lambda q: api_team_info(),
     "/api/output-styles/list": lambda q: api_output_styles_list(),
@@ -535,6 +537,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/subagent/set-model": api_subagent_set_model,
     "/api/agents/create": api_agent_create,
     "/api/agents/delete": api_agent_delete,
+    "/api/skills/delete": delete_skill,
     "/api/tasks/save": api_task_save,
     "/api/tasks/delete": api_task_delete,
     "/api/output-styles/save": api_output_style_save,
@@ -670,6 +673,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/process/kill":                  api_process_kill,
     "/api/sessions-monitor/open-terminal": api_session_open_terminal,
     "/api/memory/kill-idle-claude":       api_kill_idle_claude,
+    "/api/memory/put":                    api_memory_put,
+    "/api/memory/delete":                 api_memory_delete,
     # v2.45.0 — Claude Code Router (CCR / zclaude) wizard
     "/api/ccr/config":                    api_ccr_config_save,
     "/api/ccr/service":                   api_ccr_service,

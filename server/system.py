@@ -365,6 +365,80 @@ def api_memory_list(query: dict) -> dict:
                 })
     return {"projects": out}
 
+
+def api_memory_get(query: dict) -> dict:
+    """GET /api/memory/get?path=... — read a single memory file."""
+    fpath = (query.get("path") or [""])[0] if isinstance(query.get("path"), list) else str(query.get("path", ""))
+    if not fpath:
+        return {"ok": False, "error": "path required"}
+    p = Path(fpath)
+    # Security: only allow files under ~/.claude/projects/*/memory/
+    try:
+        p = p.resolve()
+    except Exception:
+        return {"ok": False, "error": "invalid path"}
+    if not str(p).startswith(str(PROJECTS_DIR)):
+        return {"ok": False, "error": "path outside projects dir"}
+    if "/memory/" not in str(p):
+        return {"ok": False, "error": "not a memory file"}
+    if not p.exists():
+        return {"ok": False, "error": "file not found"}
+    raw = _safe_read(p, 50000)
+    return {"ok": True, "path": str(p), "raw": raw}
+
+
+def api_memory_put(body: dict) -> dict:
+    """POST /api/memory/put  body: {path, raw}  — write a memory file."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    fpath = str(body.get("path", "")).strip()
+    raw = body.get("raw", "")
+    if not fpath:
+        return {"ok": False, "error": "path required"}
+    if not isinstance(raw, str):
+        return {"ok": False, "error": "raw must be string"}
+    p = Path(fpath)
+    try:
+        p = p.resolve()
+    except Exception:
+        return {"ok": False, "error": "invalid path"}
+    if not str(p).startswith(str(PROJECTS_DIR)):
+        return {"ok": False, "error": "path outside projects dir"}
+    if "/memory/" not in str(p):
+        return {"ok": False, "error": "not a memory path"}
+    if not p.suffix == ".md":
+        return {"ok": False, "error": "only .md files allowed"}
+    # Ensure parent dir exists
+    p.parent.mkdir(parents=True, exist_ok=True)
+    ok = _safe_write(p, raw)
+    return {"ok": bool(ok), "path": str(p)}
+
+
+def api_memory_delete(body: dict) -> dict:
+    """POST /api/memory/delete  body: {path}  — delete a memory file."""
+    if not isinstance(body, dict):
+        return {"ok": False, "error": "bad body"}
+    fpath = str(body.get("path", "")).strip()
+    if not fpath:
+        return {"ok": False, "error": "path required"}
+    p = Path(fpath)
+    try:
+        p = p.resolve()
+    except Exception:
+        return {"ok": False, "error": "invalid path"}
+    if not str(p).startswith(str(PROJECTS_DIR)):
+        return {"ok": False, "error": "path outside projects dir"}
+    if "/memory/" not in str(p):
+        return {"ok": False, "error": "not a memory file"}
+    if not p.exists():
+        return {"ok": False, "error": "file not found"}
+    try:
+        p.unlink()
+        return {"ok": True, "path": str(p)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def api_tasks_list() -> dict:
     """~/.claude/tasks/<sessionId>/*.json 태스크 전부 수집."""
     out = []

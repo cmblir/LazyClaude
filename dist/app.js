@@ -1810,7 +1810,7 @@ async function _eccInstallPlugin(btn, action) {
   const waitText = action === 'install' ? t('플러그인 설치 중...') : t('플러그인 제거 중...');
   btn.disabled = true; const orig = btn.textContent; btn.textContent = '⏳ ' + waitText;
   try {
-    const r = await api(url, { method: 'POST', body: { scope: 'user' } });
+    const r = await api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'user' }) });
     if (r.ok) {
       // v2.33.5 — Plugins / Marketplaces 탭 캐시 무효화 → 이동 시 즉시 최신 표시
       _apiCacheInvalidate('/api/plugins');
@@ -17056,7 +17056,8 @@ async function openRalphRecommend(cwd) {
     const url = '/api/ralph/recommend' + (state.data._ralphPolish ? '' : '');
     const r = await api('/api/ralph/recommend', {
       method: 'POST',
-      body: { project: cwd, polish: !!state.data._ralphPolish },
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: cwd, polish: !!state.data._ralphPolish }),
     });
     closeModal();
     if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
@@ -17093,11 +17094,12 @@ async function _ralphRecStart(cwd) {
   const budget = parseFloat((document.getElementById('ralphRecBudget') || {}).value || '5');
   if (!prompt.trim()) { toast(t('프롬프트가 비어 있음')); return; }
   const r = await api('/api/ralph/start', {
-    method: 'POST', body: {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       prompt, maxIterations: max, budgetUsd: budget,
       completion: (state.data._ralphRec && state.data._ralphRec.completion) || '<promise>DONE</promise>',
       cwd: cwd,
-    }
+    })
   });
   closeModal();
   if (!r.ok) { toast(r.error || t('실패'), 'err'); return; }
@@ -21251,13 +21253,13 @@ async function _ralphPolishLoad() {
 async function _ralphPolishSave() {
   const text = (document.getElementById('ralphPolishText') || {}).value || '';
   if (!text.trim()) { toast(t('비어있는 프롬프트는 저장할 수 없음. 기본값 복원을 사용하세요.'), 'err'); return; }
-  const r = await api('/api/ralph/polish-prompt', { method: 'POST', body: { text } });
+  const r = await api('/api/ralph/polish-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
   toast(r && r.ok ? t('저장됨') : ((r && r.error) || t('실패')), r && r.ok ? 'ok' : 'err');
   if (r && r.ok) _ralphPolishLoad();
 }
 async function _ralphPolishClear() {
   if (!confirm(t('Polish 시스템 프롬프트를 기본값으로 되돌릴까요?'))) return;
-  const r = await api('/api/ralph/polish-prompt', { method: 'POST', body: { clear: true } });
+  const r = await api('/api/ralph/polish-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clear: true }) });
   toast(r && r.ok ? t('기본값으로 복원됨') : ((r && r.error) || t('실패')), r && r.ok ? 'ok' : 'err');
   if (r && r.ok) _ralphPolishLoad();
 }
@@ -21319,9 +21321,10 @@ async function _ralphStart() {
   const budget = parseFloat((document.getElementById('ralphBudget') || {}).value || '5');
   if (!prompt.trim()) { toast(t('프롬프트가 비어 있음')); return; }
   const r = await api('/api/ralph/start', {
-    method: 'POST', body: {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       prompt, assignee, completion, maxIterations: max, budgetUsd: budget,
-    }
+    })
   });
   if (!r.ok) { toast(r.error || 'failed'); return; }
   toast(`${t('시작됨')}: ${r.runId}`);
@@ -21376,7 +21379,7 @@ function _ralphSelect(runId) {
 
 async function _ralphCancel(runId) {
   if (!confirm(t('이 Ralph 루프를 중단할까요?'))) return;
-  const r = await api('/api/ralph/cancel', { method: 'POST', body: { runId } });
+  const r = await api('/api/ralph/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId }) });
   toast(r.ok ? t('취소 요청 전송됨') : (r.error || t('실패')));
 }
 
@@ -22905,7 +22908,9 @@ VIEWS.memory = async () => {
             <div class="rounded bg-white/5 border border-[var(--border)] p-3">
               <div class="flex items-center gap-2 mb-1">
                 <span class="chip text-[10px]">${escapeHtml(it.type || 'memo')}</span>
-                <div class="font-semibold text-sm">${escapeHtml(it.name)}</div>
+                <div class="font-semibold text-sm flex-1">${escapeHtml(it.name)}</div>
+                <button class="btn text-[10px]" onclick='openMemoryEditor(${JSON.stringify(it.path)})'>편집</button>
+                <button class="btn text-[10px]" style="color:#fca5a5" onclick='deleteMemoryFile(${JSON.stringify(it.path)}, ${JSON.stringify(it.name)})'>삭제</button>
               </div>
               ${it.description ? `<div class="text-xs text-[var(--text-mute)] mb-1">${escapeHtml(it.description)}</div>` : ''}
               <pre class="mono text-[10px] whitespace-pre-wrap text-[var(--text-mute)] line-clamp-6">${escapeHtml((it.content || '').slice(0, 800))}${(it.content || '').length > 800 ? '\n…' : ''}</pre>
@@ -22914,6 +22919,68 @@ VIEWS.memory = async () => {
       </div>`).join('') : `<div class="card empty">${(q || type) ? t('일치하는 메모리 없음') : '아직 저장된 메모리가 없습니다.<br><span class="text-xs">Claude 가 \"Saved to memory\" 라고 말하면 여기에 자동으로 나타납니다.</span>'}</div>`}
   `;
 };
+
+// Memory editor helpers
+async function openMemoryEditor(filePath) {
+  try {
+    const r = await api('/api/memory/get?path=' + encodeURIComponent(filePath));
+    if (!r.ok) { toast(r.error || '파일을 읽을 수 없습니다', 'error'); return; }
+    const fname = filePath.split('/').pop();
+    const html = `
+      <div class="p-4" style="min-width:min(560px,80vw);">
+        <h3 class="text-base font-semibold mb-2">📝 ${escapeHtml(fname)}</h3>
+        <div class="text-[10px] mono text-[var(--text-dim)] mb-3">${escapeHtml(filePath)}</div>
+        <textarea id="_memEditArea" class="input mono w-full" style="min-height:320px;font-size:11px;white-space:pre;resize:vertical;">${escapeHtml(r.raw)}</textarea>
+        <div class="flex justify-end gap-2 mt-3">
+          <button class="btn" onclick="closeModal()">취소</button>
+          <button class="btn-primary btn" onclick="saveMemoryEdit('${escapeHtml(filePath).replace(/'/g, "\\'")}')">저장</button>
+        </div>
+      </div>`;
+    showModal(html);
+  } catch (e) {
+    toast('메모리 파일 로드 실패: ' + e.message, 'error');
+  }
+}
+
+async function saveMemoryEdit(filePath) {
+  const area = document.getElementById('_memEditArea');
+  if (!area) return;
+  try {
+    const r = await api('/api/memory/put', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: filePath, raw: area.value }),
+    });
+    if (r.ok) {
+      toast('저장 완료', 'success');
+      closeModal();
+      renderView();
+    } else {
+      toast(r.error || '저장 실패', 'error');
+    }
+  } catch (e) {
+    toast('저장 실패: ' + e.message, 'error');
+  }
+}
+
+async function deleteMemoryFile(filePath, name) {
+  if (!confirm(`"${name}" 메모리를 삭제할까요?\n${filePath}`)) return;
+  try {
+    const r = await api('/api/memory/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: filePath }),
+    });
+    if (r.ok) {
+      toast('삭제 완료', 'success');
+      renderView();
+    } else {
+      toast(r.error || '삭제 실패', 'error');
+    }
+  } catch (e) {
+    toast('삭제 실패: ' + e.message, 'error');
+  }
+}
 
 // ────────────────────────────────────────────────────────────────
 // TASKS
@@ -23959,18 +24026,49 @@ AFTER.autoResumeManager = () => {
 };
 
 window._armOpenDetail = (sid) => {
-  // Reuse existing session detail flow if available; otherwise show binding json.
-  if (typeof showAutoResumeDetail === 'function') {
-    try { showAutoResumeDetail(sid); return; } catch { }
-  }
   api('/api/auto_resume/get?sessionId=' + encodeURIComponent(sid))
     .then(r => {
       if (!r || !r.ok) return toast(t('세션 정보를 불러올 수 없습니다'), 'err');
-      const txt = JSON.stringify(r.entry || {}, null, 2);
-      // best-effort: log to console + clipboard so user can inspect
-      try { navigator.clipboard.writeText(txt); } catch { }
-      toast(t('상세') + ': ' + sid.slice(0, 8), 'ok');
-      console.log('[auto-resume detail]', r.entry);
+      const e = r.entry || {};
+      const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : '—';
+      const maxLabel = e.maxAttempts === 0 ? '∞ (무제한)' : String(e.maxAttempts ?? 12);
+      const rows = [
+        ['세션 ID', e.sessionId || '—'],
+        ['상태', e.state || '—'],
+        ['활성', e.enabled ? '✅ 활성' : '❌ 비활성'],
+        ['작업 디렉토리', e.cwd || '—'],
+        ['프롬프트', e.prompt || '—'],
+        ['시도 횟수', `${e.attempts ?? 0} / ${maxLabel}`],
+        ['폴링 간격', `${e.pollInterval ?? 300}초`],
+        ['유휴 감지', `${e.idleSeconds ?? 90}초`],
+        ['useContinue', e.useContinue ? '예 (--continue)' : '아니오 (--resume)'],
+        ['마지막 시도', fmtTime(e.lastAttemptAt)],
+        ['다음 시도', fmtTime(e.nextAttemptAt)],
+        ['마지막 종료 코드', e.lastExitCode != null ? String(e.lastExitCode) : '—'],
+        ['마지막 종료 사유', e.lastExitReason || '—'],
+        ['중지 사유', e.stopReason || '—'],
+        ['생성일', fmtTime(e.createdAt)],
+        ['jsonl 경로', e.jsonlPath || '—'],
+      ];
+      const lastErr = (e.lastError || '').trim();
+      const errHtml = lastErr
+        ? `<div class="mt-3"><div class="text-xs text-[var(--text-mute)] mb-1">${t('마지막 출력')}</div><pre class="mono text-[11px] p-2 rounded overflow-auto" style="max-height:120px;background:rgba(148,163,184,.08);">${escapeHtml(lastErr.slice(-1000))}</pre></div>`
+        : '';
+      showModal(`
+        <div class="p-5" style="max-width:560px;">
+          <h3 class="font-semibold text-base mb-4">🔄 Auto-Resume ${t('상세')}</h3>
+          <div class="grid gap-2 text-sm" style="grid-template-columns: auto 1fr;">
+            ${rows.map(([k, v]) => `
+              <div class="text-xs text-[var(--text-mute)] py-1">${t(k)}</div>
+              <div class="mono text-xs py-1 break-all">${escapeHtml(String(v))}</div>
+            `).join('')}
+          </div>
+          ${errHtml}
+          <div class="flex justify-end gap-2 mt-4">
+            <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+          </div>
+        </div>
+      `);
     })
     .catch(e => toast(e.message, 'err'));
 };
@@ -26748,7 +26846,8 @@ async function sendChat() {
       const preset = (document.getElementById('chatOrchPreset') || {}).value || 'default';
       const r = await api('/api/chat/orchestrator', {
         method: 'POST',
-        body: { message: msg, history: _chatHistory.slice(-6), preset },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, history: _chatHistory.slice(-6), preset }),
       });
       _chatStopWaitBubble();
       if (r.error) {

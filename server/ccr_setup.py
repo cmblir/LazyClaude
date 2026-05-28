@@ -44,6 +44,7 @@ _SERVICE_TIMEOUT = 15
 _ALLOWED_TOP_KEYS = {
     "APIKEY", "PROXY_URL", "LOG", "LOG_LEVEL", "HOST", "PORT",
     "NON_INTERACTIVE_MODE", "API_TIMEOUT_MS", "Providers", "Router",
+    "transformers",
 }
 _ALLOWED_LOG_LEVELS = {"fatal", "error", "warn", "info", "debug", "trace"}
 _ALLOWED_ROUTER_KEYS = {
@@ -139,7 +140,9 @@ def _node_version() -> tuple[str, bool]:
 def _tool_version(name: str) -> tuple[bool, str]:
     if not _which(name):
         return False, ""
-    rc, out, _ = _run([name, "--version"])
+    # ccr uses `-v` not `--version` (--version prints help with exit 1)
+    flag = "-v" if name == "ccr" else "--version"
+    rc, out, _ = _run([name, flag])
     return (rc == 0, out if rc == 0 else "")
 
 
@@ -379,6 +382,45 @@ def api_ccr_service(body: dict) -> dict:
         return {"ok": False, "error": "action must be start|stop|restart|status"}
     if not _which("ccr"):
         return {"ok": False, "error": "ccr not installed"}
+
+    # `ccr start` runs in foreground — use Popen to daemonize it.
+    if action in ("start", "restart"):
+        import time
+        if action == "restart":
+            _run(["ccr", "stop"], _SERVICE_TIMEOUT)
+            time.sleep(1)
+        # Read config for host/port
+        port = DEFAULT_PORT
+        host = DEFAULT_HOST
+        if CCR_CONFIG_PATH.exists():
+            try:
+                cfg = json.loads(_safe_read(CCR_CONFIG_PATH) or "{}")
+                if isinstance(cfg.get("PORT"), int):
+                    port = cfg["PORT"]
+                if isinstance(cfg.get("HOST"), str) and cfg["HOST"].strip():
+                    host = cfg["HOST"].strip()
+            except Exception:
+                pass
+        # Launch detached
+        try:
+            ccr_bin = _which("ccr")
+            subprocess.Popen(
+                [ccr_bin, "start"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except Exception as e:
+            return {"ok": False, "action": action, "error": str(e)}
+        # Wait for port to come up
+        for _ in range(20):
+            time.sleep(0.3)
+            if _port_listening(host, port):
+                pid = _service_pid(port)
+                return {"ok": True, "action": action, "output": f"ccr started on {host}:{port} (pid {pid})", "pid": pid}
+        return {"ok": False, "action": action, "error": f"ccr start timed out — port {port} not listening after 6s"}
+
     rc, out, err = _run(["ccr", action], _SERVICE_TIMEOUT)
     return {
         "ok": rc == 0,

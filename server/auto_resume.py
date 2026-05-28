@@ -57,6 +57,7 @@ Storage
       }
     }
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -76,7 +77,6 @@ from .config import _env_path, CLAUDE_HOME
 from .logger import log
 from .utils import _safe_read, _safe_write
 
-
 # ───────── Paths & constants ─────────
 
 AUTO_RESUME_PATH = _env_path(
@@ -91,9 +91,9 @@ MAX_POLL_INTERVAL = 3600
 DEFAULT_IDLE_SECONDS = 90
 MIN_IDLE_SECONDS = 30
 
-DEFAULT_MAX_ATTEMPTS = 12          # 12 * 5min ≈ 1h floor; with backoff > 60h
-SNAPSHOT_STALL_LIMIT = 3           # N identical hashes in a row -> stalled
-SNAPSHOT_HASH_HISTORY = 5          # how many tail hashes to keep
+DEFAULT_MAX_ATTEMPTS = 12  # 12 * 5min ≈ 1h floor; with backoff > 60h
+SNAPSHOT_STALL_LIMIT = 3  # N identical hashes in a row -> stalled
+SNAPSHOT_HASH_HISTORY = 5  # how many tail hashes to keep
 
 DEFAULT_PROMPT = (
     "Continue the previous task. The session was interrupted by a usage / rate "
@@ -105,21 +105,21 @@ WORKER_TICK_SECONDS = 5
 
 # ── Exit reason taxonomy (mechanism #1) ──
 EXIT_REASONS = (
-    "rate_limit",      # 5h / weekly cap or transient 429 — wait + retry
-    "context_full",    # message too long / token cap exceeded — permanent stop
-    "auth_expired",    # /login required — permanent stop, surface to user
-    "clean",           # exit 0 — drop back to watch mode
-    "unknown",         # everything else — exponential backoff
+    "rate_limit",  # 5h / weekly cap or transient 429 — wait + retry
+    "context_full",  # message too long / token cap exceeded — permanent stop
+    "auth_expired",  # /login required — permanent stop, surface to user
+    "clean",  # exit 0 — drop back to watch mode
+    "unknown",  # everything else — exponential backoff
 )
 
-STATE_RUNNING   = "running"     # subprocess in flight
-STATE_WAITING   = "waiting"     # cooling down, nextAttemptAt in future
-STATE_WATCHING  = "watching"    # alive, monitoring jsonl
-STATE_DONE      = "done"        # last attempt exited 0 cleanly
-STATE_FAILED    = "failed"      # permanent stop (context/auth)
-STATE_EXHAUSTED = "exhausted"   # maxAttempts hit OR snapshot hash stalled
-STATE_STOPPED   = "stopped"     # user disabled
-STATE_ERROR     = "error"       # internal error (jsonl missing etc.)
+STATE_RUNNING = "running"  # subprocess in flight
+STATE_WAITING = "waiting"  # cooling down, nextAttemptAt in future
+STATE_WATCHING = "watching"  # alive, monitoring jsonl
+STATE_DONE = "done"  # last attempt exited 0 cleanly
+STATE_FAILED = "failed"  # permanent stop (context/auth)
+STATE_EXHAUSTED = "exhausted"  # maxAttempts hit OR snapshot hash stalled
+STATE_STOPPED = "stopped"  # user disabled
+STATE_ERROR = "error"  # internal error (jsonl missing etc.)
 
 # Heuristic hints in the jsonl tail that suggest a rate-limit kill.
 RATE_LIMIT_HINTS = (
@@ -187,6 +187,7 @@ _RETRY_POOL = ThreadPoolExecutor(
 
 # ───────── Storage ─────────
 
+
 def _load_all() -> dict:
     raw = _safe_read(AUTO_RESUME_PATH)
     if not raw.strip():
@@ -225,8 +226,10 @@ def _now_ms() -> int:
 
 # ───────── Mechanism #1: classify exit reason ─────────
 
-def _classify_exit(exit_code: int, stderr_tail: str, stdout_tail: str,
-                   jsonl_tail: str) -> str:
+
+def _classify_exit(
+    exit_code: int, stderr_tail: str, stdout_tail: str, jsonl_tail: str
+) -> str:
     """Return one of EXIT_REASONS based on exit code + output text.
 
     Order matters: auth_expired and context_full are permanent so they are
@@ -234,7 +237,9 @@ def _classify_exit(exit_code: int, stderr_tail: str, stdout_tail: str,
     """
     if exit_code == 0:
         return "clean"
-    blob = "\n".join(filter(None, [stderr_tail or "", stdout_tail or "", jsonl_tail or ""]))
+    blob = "\n".join(
+        filter(None, [stderr_tail or "", stdout_tail or "", jsonl_tail or ""])
+    )
     if _PAT_AUTH_EXPIRED.search(blob):
         return "auth_expired"
     if _PAT_CONTEXT_FULL.search(blob):
@@ -311,6 +316,7 @@ def _parse_reset_time(text: str, now_ts: Optional[float] = None) -> Optional[int
 
 # ───────── Mechanism #6: exponential backoff + snapshot stall ─────────
 
+
 def _exponential_backoff(attempt: int) -> int:
     """1m → 2m → 4m → 8m → 16m → 30m cap. attempt is 1-indexed."""
     base = 60
@@ -354,6 +360,7 @@ def _push_hash_and_check_stall(entry: dict, fresh_hash: str) -> bool:
 
 
 # ───────── jsonl helpers ─────────
+
 
 def _resolve_jsonl(session_id: str, cwd: str = "") -> Optional[Path]:
     if not session_id:
@@ -463,38 +470,39 @@ def _claude_bin() -> Optional[str]:
 
 # ───────── Public state helper ─────────
 
+
 def _public_state(entry: dict) -> dict:
     notify = entry.get("notify") or {}
     return {
-        "sessionId":      entry.get("sessionId"),
-        "enabled":        bool(entry.get("enabled")),
-        "cwd":            entry.get("cwd") or "",
-        "jsonlPath":      entry.get("jsonlPath") or "",
-        "prompt":         entry.get("prompt") or "",
-        "pollInterval":   entry.get("pollInterval") or DEFAULT_POLL_INTERVAL,
-        "idleSeconds":    entry.get("idleSeconds") or DEFAULT_IDLE_SECONDS,
-        "maxAttempts":    entry.get("maxAttempts") or DEFAULT_MAX_ATTEMPTS,
-        "deadlineMs":     int(entry.get("deadlineMs") or 0),
-        "useContinue":    bool(entry.get("useContinue")),
-        "extraArgs":      list(entry.get("extraArgs") or []),
-        "installHooks":   bool(entry.get("installHooks")),
-        "notify":         {
-            "slack":   (notify.get("slack") or "")[:500],
+        "sessionId": entry.get("sessionId"),
+        "enabled": bool(entry.get("enabled")),
+        "cwd": entry.get("cwd") or "",
+        "jsonlPath": entry.get("jsonlPath") or "",
+        "prompt": entry.get("prompt") or "",
+        "pollInterval": entry.get("pollInterval") or DEFAULT_POLL_INTERVAL,
+        "idleSeconds": entry.get("idleSeconds") or DEFAULT_IDLE_SECONDS,
+        "maxAttempts": entry.get("maxAttempts") if entry.get("maxAttempts") is not None else DEFAULT_MAX_ATTEMPTS,
+        "deadlineMs": int(entry.get("deadlineMs") or 0),
+        "useContinue": bool(entry.get("useContinue")),
+        "extraArgs": list(entry.get("extraArgs") or []),
+        "installHooks": bool(entry.get("installHooks")),
+        "notify": {
+            "slack": (notify.get("slack") or "")[:500],
             "discord": (notify.get("discord") or "")[:500],
         },
-        "attempts":       int(entry.get("attempts") or 0),
-        "lastAttemptAt":  entry.get("lastAttemptAt") or 0,
-        "nextAttemptAt":  entry.get("nextAttemptAt") or 0,
-        "lastExitCode":   entry.get("lastExitCode"),
+        "attempts": int(entry.get("attempts") or 0),
+        "lastAttemptAt": entry.get("lastAttemptAt") or 0,
+        "nextAttemptAt": entry.get("nextAttemptAt") or 0,
+        "lastExitCode": entry.get("lastExitCode"),
         "lastExitReason": entry.get("lastExitReason") or "",
-        "lastError":      (entry.get("lastError") or "")[-2000:],
+        "lastError": (entry.get("lastError") or "")[-2000:],
         "snapshotHashes": list(entry.get("snapshotHashes") or []),
-        "state":          entry.get("state") or STATE_WATCHING,
-        "stopReason":     entry.get("stopReason") or "",
-        "lastResetAt":    entry.get("lastResetAt") or 0,
-        "createdAt":      entry.get("createdAt") or 0,
-        "pid":            entry.get("pid") if entry.get("pid") is not None else None,
-        "terminal_app":   entry.get("terminal_app") or "",
+        "state": entry.get("state") or STATE_WATCHING,
+        "stopReason": entry.get("stopReason") or "",
+        "lastResetAt": entry.get("lastResetAt") or 0,
+        "createdAt": entry.get("createdAt") or 0,
+        "pid": entry.get("pid") if entry.get("pid") is not None else None,
+        "terminal_app": entry.get("terminal_app") or "",
         "terminalClosedAction": entry.get("terminalClosedAction") or "wait",
     }
 
@@ -536,53 +544,65 @@ def _send_notify(entry: dict, kind: str, summary: str) -> None:
     slack = (notify.get("slack") or "").strip()
     discord = (notify.get("discord") or "").strip()
     email_cfg = notify.get("email") if isinstance(notify.get("email"), dict) else None
-    telegram_cfg = notify.get("telegram") if isinstance(notify.get("telegram"), dict) else None
+    telegram_cfg = (
+        notify.get("telegram") if isinstance(notify.get("telegram"), dict) else None
+    )
     if not slack and not discord and not email_cfg and not telegram_cfg:
         return
     try:
         from .notify import send_slack, send_discord, send_email, send_telegram
+
         emoji = {
             "succeeded": "✅",
-            "failed":    "🚫",
+            "failed": "🚫",
             "exhausted": "⛔",
-            "retrying":  "🔄",
+            "retrying": "🔄",
         }.get(kind, "ℹ️")
         sid = entry.get("sessionId") or "?"
         cwd = entry.get("cwd") or "?"
         title = f"{emoji} LazyClaude Auto-Resume · {kind} · {sid[:8]}"
         body = f"session: {sid}\ncwd: {cwd}\nattempts: {entry.get('attempts')}/{entry.get('maxAttempts')}\nstate: {entry.get('state')}\n\n{summary[:1200]}"
         if slack:
-            try: send_slack(slack, title, body)
-            except Exception as e: log.warning("auto_resume notify slack: %s", e)
+            try:
+                send_slack(slack, title, body)
+            except Exception as e:
+                log.warning("auto_resume notify slack: %s", e)
         if discord:
-            try: send_discord(discord, title, body)
-            except Exception as e: log.warning("auto_resume notify discord: %s", e)
+            try:
+                send_discord(discord, title, body)
+            except Exception as e:
+                log.warning("auto_resume notify discord: %s", e)
         if email_cfg:
             try:
                 r = send_email(email_cfg, title, body)
                 if not r.get("ok"):
                     log.warning("auto_resume notify email: %s", r.get("error"))
-            except Exception as e: log.warning("auto_resume notify email: %s", e)
+            except Exception as e:
+                log.warning("auto_resume notify email: %s", e)
         if telegram_cfg:
             try:
                 r = send_telegram(telegram_cfg, title, body)
                 if not r.get("ok"):
                     log.warning("auto_resume notify telegram: %s", r.get("error"))
-            except Exception as e: log.warning("auto_resume notify telegram: %s", e)
+            except Exception as e:
+                log.warning("auto_resume notify telegram: %s", e)
     except Exception as e:
         log.warning("auto_resume notify failed: %s", e)
 
 
 # ───────── Public API ─────────
 
+
 def _live_cli_sessions() -> dict:
     """Return {sessionId: liveRecord} for currently-running Claude Code CLI sessions.
-    Best-effort — failures degrade to empty dict so binding still works in headless tests."""
+    Best-effort — failures degrade to empty dict so binding still works in headless tests.
+    """
     try:
         from .process_monitor import api_cli_sessions_list
+
         r = api_cli_sessions_list({}) or {}
         out: dict = {}
-        for s in (r.get("sessions") or []):
+        for s in r.get("sessions") or []:
             sid = s.get("sessionId")
             if sid:
                 out[sid] = s
@@ -612,7 +632,10 @@ def api_auto_resume_set(body: dict) -> dict:
     cwd = (body.get("cwd") or "").strip()
     jsonl = _resolve_jsonl(session_id, cwd)
     if jsonl is None:
-        return {"ok": False, "error": "session jsonl not found under ~/.claude/projects"}
+        return {
+            "ok": False,
+            "error": "session jsonl not found under ~/.claude/projects",
+        }
     if not cwd:
         cwd = _resolve_cwd_from_jsonl(jsonl)
     if not cwd:
@@ -624,7 +647,9 @@ def api_auto_resume_set(body: dict) -> dict:
     poll = int(body.get("pollInterval") or DEFAULT_POLL_INTERVAL)
     poll = max(MIN_POLL_INTERVAL, min(MAX_POLL_INTERVAL, poll))
     idle = max(MIN_IDLE_SECONDS, int(body.get("idleSeconds") or DEFAULT_IDLE_SECONDS))
-    max_attempts = max(1, min(60, int(body.get("maxAttempts") or DEFAULT_MAX_ATTEMPTS)))
+    # maxAttempts=0 means unlimited (keep retrying until clean exit)
+    raw_max = int(body.get("maxAttempts") if body.get("maxAttempts") is not None else DEFAULT_MAX_ATTEMPTS)
+    max_attempts = 0 if raw_max <= 0 else min(60, raw_max)
     # User-requested change: time-based deadline as the primary "give up" trigger.
     # Two ways to express it (both optional, both honoured):
     #   - deadlineMs: explicit epoch-ms cutoff
@@ -661,7 +686,9 @@ def api_auto_resume_set(body: dict) -> dict:
     bind_terminal_app = ""
     if live_rec:
         try:
-            bind_pid = int(live_rec.get("pid")) if live_rec.get("pid") is not None else None
+            bind_pid = (
+                int(live_rec.get("pid")) if live_rec.get("pid") is not None else None
+            )
         except Exception:
             bind_pid = None
         bind_terminal_app = (live_rec.get("terminal_app") or "")[:64]
@@ -671,9 +698,14 @@ def api_auto_resume_set(body: dict) -> dict:
     if install_hooks:
         try:
             from .auto_resume_hooks import install as _hooks_install
+
             hook_result = _hooks_install(cwd, use_haiku_summary=use_haiku_summary)
             if not hook_result.get("ok"):
-                return {"ok": False, "error": "hook install failed: " + (hook_result.get("error") or "?")}
+                return {
+                    "ok": False,
+                    "error": "hook install failed: "
+                    + (hook_result.get("error") or "?"),
+                }
         except Exception as e:
             return {"ok": False, "error": f"hook install crashed: {e}"}
 
@@ -682,34 +714,34 @@ def api_auto_resume_set(body: dict) -> dict:
         existing = store.get(session_id) or {}
         entry = {
             **existing,
-            "sessionId":       session_id,
-            "enabled":         True,
-            "cwd":             cwd,
-            "jsonlPath":       str(jsonl),
-            "prompt":          prompt,
-            "pollInterval":    poll,
-            "idleSeconds":     idle,
-            "maxAttempts":     max_attempts,
-            "deadlineMs":      deadline_ms or int(existing.get("deadlineMs") or 0),
-            "useContinue":     use_continue,
-            "extraArgs":       extra_args,
-            "installHooks":    install_hooks,
-            "notify":          notify_clean,
-            "createdAt":       existing.get("createdAt") or _now_ms(),
-            "attempts":        int(existing.get("attempts") or 0),
-            "lastAttemptAt":   existing.get("lastAttemptAt") or 0,
-            "nextAttemptAt":   _now_ms(),
-            "lastExitCode":    existing.get("lastExitCode"),
-            "lastExitReason":  existing.get("lastExitReason") or "",
-            "lastError":       existing.get("lastError") or "",
-            "snapshotHashes":  list(existing.get("snapshotHashes") or []),
-            "state":           STATE_WATCHING,
-            "stopReason":      "",
-            "lastResetAt":     existing.get("lastResetAt") or 0,
-            "pid":             bind_pid if bind_pid is not None else existing.get("pid"),
-            "terminal_app":    bind_terminal_app or existing.get("terminal_app") or "",
+            "sessionId": session_id,
+            "enabled": True,
+            "cwd": cwd,
+            "jsonlPath": str(jsonl),
+            "prompt": prompt,
+            "pollInterval": poll,
+            "idleSeconds": idle,
+            "maxAttempts": max_attempts,
+            "deadlineMs": deadline_ms or int(existing.get("deadlineMs") or 0),
+            "useContinue": use_continue,
+            "extraArgs": extra_args,
+            "installHooks": install_hooks,
+            "notify": notify_clean,
+            "createdAt": existing.get("createdAt") or _now_ms(),
+            "attempts": int(existing.get("attempts") or 0),
+            "lastAttemptAt": existing.get("lastAttemptAt") or 0,
+            "nextAttemptAt": _now_ms(),
+            "lastExitCode": existing.get("lastExitCode"),
+            "lastExitReason": existing.get("lastExitReason") or "",
+            "lastError": existing.get("lastError") or "",
+            "snapshotHashes": list(existing.get("snapshotHashes") or []),
+            "state": STATE_WATCHING,
+            "stopReason": "",
+            "lastResetAt": existing.get("lastResetAt") or 0,
+            "pid": bind_pid if bind_pid is not None else existing.get("pid"),
+            "terminal_app": bind_terminal_app or existing.get("terminal_app") or "",
             "terminalClosedAction": tca,
-            "_deadTicks":      0,
+            "_deadTicks": 0,
         }
         store[session_id] = entry
         _dump_all(store)
@@ -784,7 +816,10 @@ def api_auto_resume_inject_live(body: dict) -> dict:
         return {"ok": False, "error": f"no live PID for session {session_id}"}
 
     from .auto_resume_inject import inject_live as _inject
-    result = _inject(pid, prompt, press_choice=press_choice, allow_system_events=allow_se)
+
+    result = _inject(
+        pid, prompt, press_choice=press_choice, allow_system_events=allow_se
+    )
     return {"ok": bool(result.get("ok")), **result}
 
 
@@ -829,6 +864,7 @@ _AR_STATUS_TTL_S = 1.5
 
 def api_auto_resume_status(query: dict) -> dict:
     import time as _time
+
     store = _load_all()
     # perf(v2.52.0): short-circuit when no bindings exist — skip the
     # ~150-300 ms lsof + ps cross-reference. Most installs sit at zero
@@ -846,7 +882,10 @@ def api_auto_resume_status(query: dict) -> dict:
         nc = nc[0] if nc else None
     if nc not in ("1", "true", "yes", True):
         cached = _AR_STATUS_CACHE.get("data")
-        if cached is not None and (_time.time() - _AR_STATUS_CACHE.get("ts", 0)) < _AR_STATUS_TTL_S:
+        if (
+            cached is not None
+            and (_time.time() - _AR_STATUS_CACHE.get("ts", 0)) < _AR_STATUS_TTL_S
+        ):
             return cached
     live_map = _live_cli_sessions()
     entries = []
@@ -856,16 +895,24 @@ def api_auto_resume_status(query: dict) -> dict:
         live = live_map.get(sid)
         if live:
             try:
-                ps["pid"] = int(live.get("pid")) if live.get("pid") is not None else ps.get("pid")
+                ps["pid"] = (
+                    int(live.get("pid"))
+                    if live.get("pid") is not None
+                    else ps.get("pid")
+                )
             except Exception:
                 pass
-            ps["terminal_app"] = live.get("terminal_app") or ps.get("terminal_app") or ""
+            ps["terminal_app"] = (
+                live.get("terminal_app") or ps.get("terminal_app") or ""
+            )
             ps["liveSession"] = True
         else:
             ps["liveSession"] = False
         entries.append(ps)
     # Sort: live first, then by createdAt desc.
-    entries.sort(key=lambda e: (0 if e.get("liveSession") else 1, -(e.get("createdAt") or 0)))
+    entries.sort(
+        key=lambda e: (0 if e.get("liveSession") else 1, -(e.get("createdAt") or 0))
+    )
     result = {
         "ok": True,
         "workerAlive": bool(_WORKER_THREAD and _WORKER_THREAD.is_alive()),
@@ -892,7 +939,9 @@ def api_auto_resume_get(query: dict) -> dict:
         snap = _snapshot_md_path(cwd)
         if snap.exists():
             try:
-                out["snapshotPreview"] = snap.read_text(encoding="utf-8", errors="replace")[:4000]
+                out["snapshotPreview"] = snap.read_text(
+                    encoding="utf-8", errors="replace"
+                )[:4000]
             except Exception:
                 out["snapshotPreview"] = ""
         else:
@@ -931,12 +980,14 @@ def api_auto_resume_advise(body: dict) -> dict:
         for item in raw_hist[-5:]:
             if not isinstance(item, dict):
                 continue
-            recent_failures.append({
-                "at":         int(item.get("at") or 0),
-                "attempt":    int(item.get("attempt") or 0),
-                "exitReason": str(item.get("exitReason") or ""),
-                "notes":      str(item.get("notes") or "")[:400],
-            })
+            recent_failures.append(
+                {
+                    "at": int(item.get("at") or 0),
+                    "attempt": int(item.get("attempt") or 0),
+                    "exitReason": str(item.get("exitReason") or ""),
+                    "notes": str(item.get("notes") or "")[:400],
+                }
+            )
     else:
         attempts = int(entry.get("attempts") or 0)
         last_reason = entry.get("lastExitReason") or ""
@@ -945,12 +996,14 @@ def api_auto_resume_advise(body: dict) -> dict:
         # Reconstruct up to last 5 attempts as same-reason events.
         n = min(5, max(0, attempts))
         for i in range(n):
-            recent_failures.append({
-                "at":         last_at,
-                "attempt":    attempts - (n - 1 - i),
-                "exitReason": last_reason,
-                "notes":      last_error if i == n - 1 else "",
-            })
+            recent_failures.append(
+                {
+                    "at": last_at,
+                    "attempt": attempts - (n - 1 - i),
+                    "exitReason": last_reason,
+                    "notes": last_error if i == n - 1 else "",
+                }
+            )
 
     assignee = (body.get("assignee") or "claude:haiku").strip() or "claude:haiku"
 
@@ -961,13 +1014,13 @@ def api_auto_resume_advise(body: dict) -> dict:
 
     result = hyper_advise_auto_resume(entry, recent_failures, assignee=assignee)
     out = {
-        "ok":       bool(result.get("ok")),
-        "advice":   result.get("advice"),
-        "error":    result.get("error"),
+        "ok": bool(result.get("ok")),
+        "advice": result.get("advice"),
+        "error": result.get("error"),
         "cost_usd": float(result.get("cost_usd") or 0.0),
         "sessionId": session_id,
         "currentPollInterval": entry.get("pollInterval") or DEFAULT_POLL_INTERVAL,
-        "currentMaxAttempts":  entry.get("maxAttempts") or DEFAULT_MAX_ATTEMPTS,
+        "currentMaxAttempts": entry.get("maxAttempts") or DEFAULT_MAX_ATTEMPTS,
     }
     return out
 
@@ -978,6 +1031,7 @@ def api_auto_resume_install_hooks(body: dict) -> dict:
         return {"ok": False, "error": "cwd required"}
     use_haiku_summary = bool(body.get("useHaikuSummary"))
     from .auto_resume_hooks import install as _hooks_install
+
     return _hooks_install(cwd, use_haiku_summary=use_haiku_summary)
 
 
@@ -986,6 +1040,7 @@ def api_auto_resume_uninstall_hooks(body: dict) -> dict:
     if not cwd:
         return {"ok": False, "error": "cwd required"}
     from .auto_resume_hooks import uninstall as _hooks_uninstall
+
     return _hooks_uninstall(cwd)
 
 
@@ -994,10 +1049,12 @@ def api_auto_resume_hook_status(query: dict) -> dict:
     if not cwd:
         return {"ok": False, "error": "cwd required"}
     from .auto_resume_hooks import status as _hooks_status
+
     return _hooks_status(cwd)
 
 
 # ───────── Mechanism #5: external wrapper restart loop ─────────
+
 
 def _spawn_resume(entry: dict) -> tuple[int, str, str]:
     """Run `claude` once and return (exit_code, stderr_tail, stdout_tail)."""
@@ -1084,14 +1141,16 @@ def _process_one(session_id: str) -> None:
             if tca == "cancel" and dead_ticks > 2:
                 store[session_id]["enabled"] = False
                 store[session_id]["state"] = STATE_STOPPED
-                store[session_id]["stopReason"] = "terminal closed (auto-cancel after 3 ticks)"
+                store[session_id][
+                    "stopReason"
+                ] = "terminal closed (auto-cancel after 3 ticks)"
                 _dump_all(store)
                 return
             _dump_all(store)
         next_at = int(entry.get("nextAttemptAt") or 0)
         idle_required = int(entry.get("idleSeconds") or DEFAULT_IDLE_SECONDS)
         attempts = int(entry.get("attempts") or 0)
-        max_attempts = int(entry.get("maxAttempts") or DEFAULT_MAX_ATTEMPTS)
+        max_attempts = int(entry.get("maxAttempts")) if entry.get("maxAttempts") is not None else DEFAULT_MAX_ATTEMPTS
         deadline_ms = int(entry.get("deadlineMs") or 0)
 
     now_ms = _now_ms()
@@ -1108,24 +1167,26 @@ def _process_one(session_id: str) -> None:
                 # Format the deadline as ISO so the stop reason is
                 # human-debuggable when the user reads it back.
                 from datetime import datetime as _dt, timezone as _tz
+
                 iso = _dt.fromtimestamp(deadline_ms / 1000, tz=_tz.utc).isoformat()
-                store[session_id]["stopReason"] = (
-                    f"deadline reached at {iso} (after {attempts} attempts)"
-                )
+                store[session_id][
+                    "stopReason"
+                ] = f"deadline reached at {iso} (after {attempts} attempts)"
                 _dump_all(store)
         return
 
     # Mechanism #6b — legacy hard cap on attempts (still honoured for
     # backward compat with older entries / users who prefer this).
-    if attempts >= max_attempts:
+    # maxAttempts==0 means unlimited — skip this guard entirely.
+    if max_attempts > 0 and attempts >= max_attempts:
         with _LOCK:
             store = _load_all()
             if session_id in store:
                 store[session_id]["state"] = STATE_EXHAUSTED
                 store[session_id]["enabled"] = False
-                store[session_id]["stopReason"] = (
-                    f"max attempts reached ({attempts}/{max_attempts})"
-                )
+                store[session_id][
+                    "stopReason"
+                ] = f"max attempts reached ({attempts}/{max_attempts})"
                 _dump_all(store)
         return
 
@@ -1133,7 +1194,10 @@ def _process_one(session_id: str) -> None:
         with _LOCK:
             store = _load_all()
             if session_id in store and store[session_id].get("state") not in (
-                STATE_FAILED, STATE_EXHAUSTED, STATE_STOPPED, STATE_DONE,
+                STATE_FAILED,
+                STATE_EXHAUSTED,
+                STATE_STOPPED,
+                STATE_DONE,
             ):
                 store[session_id]["state"] = STATE_WAITING
                 _dump_all(store)
@@ -1157,7 +1221,10 @@ def _process_one(session_id: str) -> None:
         with _LOCK:
             store = _load_all()
             if session_id in store and store[session_id].get("state") not in (
-                STATE_FAILED, STATE_EXHAUSTED, STATE_STOPPED, STATE_DONE,
+                STATE_FAILED,
+                STATE_EXHAUSTED,
+                STATE_STOPPED,
+                STATE_DONE,
             ):
                 store[session_id]["state"] = STATE_WATCHING
                 _dump_all(store)
@@ -1167,7 +1234,8 @@ def _process_one(session_id: str) -> None:
     if not _looks_rate_limited(jsonl):
         log.debug(
             "auto_resume: %s idle %.0fs but no rate-limit signal in jsonl tail, skipping",
-            session_id, idle,
+            session_id,
+            idle,
         )
         return
 
@@ -1194,18 +1262,26 @@ def _process_one(session_id: str) -> None:
             pid = None
         if not pid:
             try:
-                pid = int(attempt_entry.get("pid")) if attempt_entry.get("pid") is not None else None
+                pid = (
+                    int(attempt_entry.get("pid"))
+                    if attempt_entry.get("pid") is not None
+                    else None
+                )
             except Exception:
                 pid = None
         if pid:
             try:
                 from .auto_resume_inject import inject_live as _inject
+
                 prompt = attempt_entry.get("prompt") or DEFAULT_PROMPT
-                result = _inject(pid, prompt, press_choice="1", allow_system_events=True)
+                result = _inject(
+                    pid, prompt, press_choice="1", allow_system_events=True
+                )
                 if result.get("ok"):
                     log.info(
                         "auto_resume: %s inject_live succeeded via %s",
-                        session_id, result.get("mechanism"),
+                        session_id,
+                        result.get("mechanism"),
                     )
                     # Injection succeeded — revert to watching state and wait
                     # for the session to produce new jsonl activity.
@@ -1219,7 +1295,8 @@ def _process_one(session_id: str) -> None:
                 else:
                     log.info(
                         "auto_resume: %s inject_live failed (%s), falling back to spawn",
-                        session_id, result.get("error", "?")[:200],
+                        session_id,
+                        result.get("error", "?")[:200],
                     )
             except Exception as e:
                 log.warning("auto_resume: %s inject_live crashed: %s", session_id, e)
@@ -1256,9 +1333,13 @@ def _process_one(session_id: str) -> None:
         notify_summary = ""
         if reason == "clean":
             e["state"] = STATE_DONE
+            e["enabled"] = False
             e["nextAttemptAt"] = 0
+            e["stopReason"] = f"completed successfully after {e.get('attempts')} attempts"
             notify_kind = "succeeded"
-            notify_summary = "Session resumed successfully on attempt #" + str(e.get("attempts"))
+            notify_summary = "Session resumed successfully on attempt #" + str(
+                e.get("attempts")
+            )
         elif reason == "context_full":
             e["state"] = STATE_FAILED
             e["enabled"] = False
@@ -1285,14 +1366,19 @@ def _process_one(session_id: str) -> None:
             if reason == "rate_limit" and reset_ms:
                 e["nextAttemptAt"] = reset_ms
             elif reason == "rate_limit":
-                e["nextAttemptAt"] = _now_ms() + int(e.get("pollInterval") or DEFAULT_POLL_INTERVAL) * 1000
+                e["nextAttemptAt"] = (
+                    _now_ms()
+                    + int(e.get("pollInterval") or DEFAULT_POLL_INTERVAL) * 1000
+                )
             else:
                 back = _exponential_backoff(int(e.get("attempts") or 1))
                 e["nextAttemptAt"] = _now_ms() + back * 1000
             e["state"] = STATE_WAITING
             log.info(
                 "auto_resume: %s exited %s (%s), next attempt in %ds",
-                session_id, exit_code, reason,
+                session_id,
+                exit_code,
+                reason,
                 max(0, (e["nextAttemptAt"] - _now_ms()) // 1000),
             )
         _dump_all(store)
@@ -1308,7 +1394,8 @@ def _process_one(session_id: str) -> None:
 def _worker_loop() -> None:
     log.info(
         "auto_resume worker started (tick=%ss, pool=%d)",
-        WORKER_TICK_SECONDS, _RETRY_POOL_MAX_WORKERS,
+        WORKER_TICK_SECONDS,
+        _RETRY_POOL_MAX_WORKERS,
     )
     while not _WORKER_STOP.wait(WORKER_TICK_SECONDS):
         try:
@@ -1331,9 +1418,7 @@ def _worker_loop() -> None:
             batch = entries_due[:_RETRY_POOL_MAX_WORKERS]
             if not batch:
                 continue
-            futures = {
-                _RETRY_POOL.submit(_process_one, sid): sid for sid in batch
-            }
+            futures = {_RETRY_POOL.submit(_process_one, sid): sid for sid in batch}
             # Bounded wait: tick interval is the natural budget. Anything
             # still running falls through; same-sid re-entry is blocked by
             # _RUNNING_PROCS so concurrent ticks are safe.
@@ -1344,7 +1429,9 @@ def _worker_loop() -> None:
                         fut.result()
                     except Exception as ex:
                         log.warning(
-                            "auto_resume: process error for %s: %s", sid, ex,
+                            "auto_resume: process error for %s: %s",
+                            sid,
+                            ex,
                         )
             except TimeoutError:
                 # Long-running attempts continue in the background; we just
@@ -1393,6 +1480,7 @@ def stop_auto_resume() -> None:
 
 # ───────── v2.54.0 — Stale entry purge ─────────
 
+
 def api_auto_resume_prune_stale(body: dict) -> dict:
     """Purge auto-resume bindings stuck in terminal states past ``thresholdDays``.
 
@@ -1409,7 +1497,11 @@ def api_auto_resume_prune_stale(body: dict) -> dict:
     dry_run = bool(body.get("dryRun", False))
 
     terminal_states = {
-        STATE_DONE, STATE_FAILED, STATE_EXHAUSTED, STATE_STOPPED, STATE_ERROR,
+        STATE_DONE,
+        STATE_FAILED,
+        STATE_EXHAUSTED,
+        STATE_STOPPED,
+        STATE_ERROR,
     }
     threshold_ms = threshold_days * 86400 * 1000
     now_ms_val = _now_ms()
@@ -1437,11 +1529,13 @@ def api_auto_resume_prune_stale(body: dict) -> dict:
         if age_ms < threshold_ms:
             new_store[sid] = entry
             continue
-        deleted.append({
-            "sessionId": sid,
-            "state": state,
-            "lastAttemptAt": last_attempt,
-        })
+        deleted.append(
+            {
+                "sessionId": sid,
+                "state": state,
+                "lastAttemptAt": last_attempt,
+            }
+        )
 
     if not dry_run and deleted:
         _dump_all(new_store)
