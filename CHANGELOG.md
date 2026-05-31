@@ -10,6 +10,34 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.34] — 2026-06-01  🎛️ interactive hour-of-day chart + uniform mascot sizing
+
+### Usage breakdown — interactive + correct axis
+
+- The hour-of-day profile is now a **Chart.js bar chart** instead of hand-rolled
+  divs: it has hover tooltips (tokens + call count per hour) and a proper
+  **X-axis that labels every hour 0–23** (it previously skipped to 0/3/6/… which
+  read as broken).
+- The day×hour heatmap is now interactive — hovering a cell highlights it and
+  shows a cursor-following tooltip (date · hour · tokens) instead of the native
+  `title`.
+
+### Mascot sizing — uniform with claw'd
+
+- `tools/process_mascot_gifs.py` gained a `target_h_frac` normalisation: each
+  mascot's canvas is sized so the **median per-frame character height** is a
+  fixed fraction (~0.56) of the canvas. Because the sprite is shown
+  height-filling a square box, equal char-height/canvas → equal on-screen size.
+  Sizing on the median (not the max) keeps a pose with tall outlier frames from
+  looking shrunken; guards prevent clipping the tallest/widest frame.
+- Regenerated `flag` / `party` / `run` / `stand` so their on-screen size matches
+  the existing claw'd cast (they were 0.72–0.78 / 0.50 before — now all ~0.55).
+
+Verified in-app: hour chart shows 24 labels, heatmap hover tooltip fires, the
+new mascots render at a consistent size next to the existing set, 0 console
+errors. Bumped the app.js cache-bust query.
+
+---
 ## [3.99.33] — 2026-06-01  🤖 model catalog: add Opus 4.8, correct stale Opus/Sonnet/Haiku pricing & context
 
 The model catalog topped out at Opus 4.7 and carried stale pricing — a problem

@@ -75,7 +75,8 @@ def _bbox(opaque: np.ndarray):
     return int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
 
 
-def process(path: str, out_path: str, pad_frac: float = 0.10, max_side: int = 256) -> dict:
+def process(path: str, out_path: str, pad_frac: float = 0.10, max_side: int = 256,
+            target_h_frac: float = 0.56) -> dict:
     frames, durs = load_frames(path)
     keyed = []
     for arr in frames:
@@ -93,14 +94,33 @@ def process(path: str, out_path: str, pad_frac: float = 0.10, max_side: int = 25
     cys = [(b[1] + b[3]) / 2 for b in bbs]
     recenter = (max(cxs) - min(cxs) > 0.18 * w) or (max(cys) - min(cys) > 0.18 * h)
 
+    # Representative (median) per-frame character height drives the apparent
+    # size; the crop boxes that actually get placed drive the no-clip guard.
+    per_h = sorted(b[3] - b[1] + 1 for b in bbs)
+    per_w = [b[2] - b[0] + 1 for b in bbs]
+    rep_h = per_h[len(per_h) // 2]
     if recenter:
         crops = bbs
-        mw = max(b[2] - b[0] + 1 for b in bbs)
-        mh = max(b[3] - b[1] + 1 for b in bbs)
+        crop_max_h = per_h[-1]
+        crop_max_w = max(per_w)
     else:
         crops = [union] * len(keyed)
-        mw, mh = union[2] - union[0] + 1, union[3] - union[1] + 1
-    side = int(round(max(mw, mh) * (1 + 2 * pad_frac)))
+        crop_max_h = union[3] - union[1] + 1
+        crop_max_w = union[2] - union[0] + 1
+    # Normalise apparent size: pick the square canvas so the *typical* (median)
+    # character height is a fixed fraction of the canvas (target_h_frac). The
+    # sprite is shown height-filling a square box, so equal median-char-height /
+    # canvas across mascots → equal on-screen size — this is what keeps the new
+    # poses consistent with claw'd. Sizing on the median (not the max) keeps a
+    # pose whose animation has tall outlier frames (e.g. a squash/stretch) from
+    # looking shrunken; the max(...) guards ensure the tallest/widest crop still
+    # fits without clipping.
+    if target_h_frac:
+        side = max(int(round(rep_h / target_h_frac)),
+                   crop_max_h,
+                   int(round(crop_max_w / 0.86)))
+    else:
+        side = int(round(max(crop_max_w, crop_max_h) * (1 + 2 * pad_frac)))
 
     pframes = []
     for arr, (x0, y0, x1, y1) in zip(keyed, crops):

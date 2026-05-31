@@ -22784,27 +22784,18 @@ async function loadUsageBreakdown(cwd, days) {
   const hourly = r.hourly || [], daily = r.daily || [], dayHour = r.dayHour || [];
   const byAgent = r.byAgent || [], tot = r.totals || {};
 
-  // hour-of-day profile (24 bars)
-  const hMax = Math.max(1, ...hourly.map(h => h.tokens || 0));
-  const hourBars = hourly.map(h => {
-    const pct = h.tokens ? Math.max(3, Math.round(h.tokens / hMax * 100)) : 0;
-    return `<div class="flex flex-col items-center justify-end" style="flex:1;height:120px;" title="${h.hour}시 · ${fmtTokens(h.tokens || 0)} · ${h.calls || 0}회">
-      <div style="width:72%;height:${pct}%;background:#d97757;border-radius:2px 2px 0 0;${h.tokens ? 'min-height:2px;' : ''}"></div>
-      <div class="text-[8px] text-[var(--text-dim)] mt-0.5">${h.hour % 3 === 0 ? h.hour : ''}</div>
-    </div>`;
-  }).join('');
-
-  // day × hour heatmap
+  // day × hour heatmap (interactive: hover highlight + shared tooltip).
+  // Every hour 0–23 is labelled on the axis (no skipping).
   const cellMap = {}; let cMax = 1;
   for (const c of dayHour) { cellMap[c.date + '|' + c.hour] = c.tokens; if (c.tokens > cMax) cMax = c.tokens; }
   const dates = daily.map(d => d.date);
   const hourHeader = '<div style="width:60px;flex:none;"></div>' + Array.from({ length: 24 }, (_, h) =>
-    `<div class="text-[8px] text-center text-[var(--text-dim)]" style="flex:1;margin:0 1px;">${h % 3 === 0 ? h : ''}</div>`).join('');
+    `<div class="text-[8px] text-center text-[var(--text-dim)]" style="flex:1;margin:0 1px;">${h}</div>`).join('');
   const heatRows = dates.map(date => {
     const cells = Array.from({ length: 24 }, (_, h) => {
       const v = cellMap[date + '|' + h] || 0;
       const a = v ? (0.12 + 0.88 * v / cMax) : 0;
-      return `<div style="flex:1;height:13px;margin:1px;border-radius:2px;background:rgba(217,119,87,${a.toFixed(3)});" title="${date} ${h}시 · ${fmtTokens(v)}"></div>`;
+      return `<div class="ub-cell" data-d="${date}" data-h="${h}" data-tok="${v}" style="flex:1;height:13px;margin:1px;border-radius:2px;background:rgba(217,119,87,${a.toFixed(3)});cursor:default;"></div>`;
     }).join('');
     return `<div class="flex items-center"><div class="text-[9px] mono text-[var(--text-dim)]" style="width:60px;flex:none;">${date.slice(5)}</div>${cells}</div>`;
   }).join('');
@@ -22823,18 +22814,74 @@ async function loadUsageBreakdown(cwd, days) {
   body.innerHTML = `
     <div class="text-xs text-[var(--text-dim)] mb-3">${escapeHtml(scopeLabel)} · ${r.days}일 · 합계 <span class="mono font-bold" style="color:#d97757">${fmtTokens(tot.tokens || 0)}</span> · ${tot.calls || 0}회 · ${tot.sessions || 0}세션 <span class="text-[10px]">(도구 호출 turn_tokens 기준 근사)</span></div>
     <div class="mb-4">
-      <div class="text-[11px] font-semibold mb-1">시간대별 (0–23시)</div>
-      <div class="flex items-end gap-0.5">${hourBars}</div>
+      <div class="text-[11px] font-semibold mb-1">시간대별 (0–23시) <span class="text-[10px] text-[var(--text-dim)] font-normal">· 막대에 마우스를 올리면 상세</span></div>
+      <div style="position:relative;height:150px;"><canvas id="ubHourChart"></canvas></div>
     </div>
     ${dates.length ? `<div class="mb-1">
-      <div class="text-[11px] font-semibold mb-1">일자 × 시간대 히트맵</div>
+      <div class="text-[11px] font-semibold mb-1">일자 × 시간대 히트맵 <span class="text-[10px] text-[var(--text-dim)] font-normal">· 셀에 마우스를 올리면 상세</span></div>
       <div class="flex items-center">${hourHeader}</div>
-      <div class="max-h-[300px] overflow-y-auto pr-1">${heatRows}</div>
+      <div id="ubHeat" class="max-h-[300px] overflow-y-auto pr-1">${heatRows}</div>
     </div>` : '<div class="empty text-xs">기간 내 데이터 없음</div>'}
     <div class="mt-4">
       <div class="text-[11px] font-semibold mb-2">🤝 에이전트별 토큰</div>
       <div class="max-h-[260px] overflow-y-auto">${agentRows}</div>
-    </div>`;
+    </div>
+    <div id="ubTip" style="position:fixed;z-index:2000;pointer-events:none;display:none;background:var(--bg-soft,#1a1a1c);border:1px solid var(--border,#3a3a3d);border-radius:6px;padding:4px 8px;font-size:11px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,0.45);"></div>`;
+
+  // interactive hour-of-day chart (all 0–23 labels, hover tooltips)
+  const hc = document.getElementById('ubHourChart');
+  if (hc && typeof _renderChart === 'function') {
+    const light = document.body.classList.contains('theme-light');
+    const axis = light ? '#666' : '#9aa0aa';
+    const grid = light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)';
+    _renderChart(hc, {
+      type: 'bar',
+      data: {
+        labels: hourly.map(h => String(h.hour)),
+        datasets: [{
+          data: hourly.map(h => h.tokens || 0),
+          backgroundColor: 'rgba(217,119,87,0.55)', borderColor: '#d97757', borderWidth: 1, borderRadius: 3,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: items => (items[0] ? items[0].label : '') + '시',
+              label: c => fmtTokens(c.parsed.y) + ' · ' + ((hourly[c.dataIndex] || {}).calls || 0) + '회',
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { autoSkip: false, maxRotation: 0, minRotation: 0, color: axis, font: { size: 9 } }, grid: { display: false } },
+          y: { ticks: { color: axis, callback: v => fmtTokens(v), maxTicksLimit: 5 }, grid: { color: grid }, beginAtZero: true },
+        },
+      },
+    });
+  }
+
+  // interactive heatmap — hover highlight + cursor-following tooltip
+  const heat = document.getElementById('ubHeat');
+  const tip = document.getElementById('ubTip');
+  if (heat && tip) {
+    heat.addEventListener('mouseover', e => {
+      const cell = e.target.closest('.ub-cell'); if (!cell) return;
+      cell.style.outline = '1px solid var(--text, #fff)';
+      cell.style.outlineOffset = '-1px';
+      tip.style.display = 'block';
+      tip.innerHTML = `<b>${escapeHtml(cell.dataset.d)} · ${cell.dataset.h}시</b><br>${fmtTokens(+cell.dataset.tok || 0)}`;
+    });
+    heat.addEventListener('mousemove', e => {
+      tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 160) + 'px';
+      tip.style.top = (e.clientY + 14) + 'px';
+    });
+    heat.addEventListener('mouseout', e => {
+      const cell = e.target.closest('.ub-cell'); if (cell) cell.style.outline = '';
+      tip.style.display = 'none';
+    });
+  }
 }
 
 // v2.43.2 — drill into one project's token usage. Opens a modal with the
