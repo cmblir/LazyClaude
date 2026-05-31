@@ -10,6 +10,37 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.35] — 2026-06-01  🧰 Claude harness-tools catalog (caveman / ccusage / …) — install & run from the dashboard
+
+New **하네스 도구** tab (build group) that surfaces popular community Claude
+harness / token-saving tools and lets you install or run them in one click —
+addressing "too many output tokens, wire up the popular harness tools".
+
+### Backend — `server/harness_tools.py`
+
+- Curated catalog (verified against official repos, 2026-06): **caveman**
+  (output-token compression skill, ~65%), **ccusage** (local-JSONL usage/cost
+  CLI), **claude-code-router** + **RTK** (cross-linked to their existing tabs),
+  and the **awesome-claude-code / -toolkit / -skills** curated lists.
+- `GET /api/harness-tools/list` returns the catalog with per-tool installed
+  detection (`_which` / skill-path) + category labels.
+- `POST /api/harness-tools/run` runs a tool's install/run command in Terminal.app
+  via the same `_run_in_terminal` path RTK uses. **Security:** only commands
+  hardcoded in the catalog run (id is validated, no user input enters the
+  command); link-only and unknown ids are rejected.
+
+### Frontend
+
+- `VIEWS.harness` — cards grouped by category (토큰 절감 / 사용량 관측 /
+  모델 라우팅 / 큐레이션 목록), each with description, repo link, the exact
+  install command (copyable), an installed badge, and a 설치/실행 button that
+  confirms then opens Terminal. RTK / ccr cards deep-link to their dedicated
+  tabs. Registered in `NAV` + `nav_catalog.py` (chatbot routing).
+
+Verified in-app: 7 cards render, install/run/tab/copy actions wire correctly,
+1280 / 375 with no horizontal overflow, 0 console errors, `i18n-verify` green.
+
+---
 ## [3.99.34] — 2026-06-01  🎛️ interactive hour-of-day chart + uniform mascot sizing
 
 ### Usage breakdown — interactive + correct axis

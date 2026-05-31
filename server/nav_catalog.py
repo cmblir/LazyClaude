@@ -157,6 +157,12 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "(rtk-ai/rtk) 를 한 탭에서 설치·활성화·통계 조회.",
         ["rtk", "token", "토큰 최적화", "rust token killer", "claude token",
          "token optimization", "비용 절감", "cost reduction", "rtk-ai"]),
+    ("harness",       "work",
+        "하네스 도구 — caveman(출력 토큰 압축)·ccusage(사용량 분석)·"
+        "claude-code-router·awesome-claude-code 등 인기 Claude 하네스 도구 "
+        "카탈로그. 저장소·설치 명령을 보고 Terminal 에서 바로 설치·실행.",
+        ["하네스", "harness", "caveman", "ccusage", "토큰 절감", "token saver",
+         "claude tools", "도구 카탈로그", "codeburn", "awesome claude code"]),
     ("sessionReplay", "work",
         "Session Replay — Claude Code JSONL 세션 로그를 타임라인으로 재생 · "
         "툴 호출 하이라이트 · 누적 토큰 차트.",
@@ -390,7 +396,7 @@ def get_tab_desc(tab_id: str, lang: str = "ko") -> str:
 
 
 # v2.26.0 — 레거시 TAB_CATALOG 엔트리 group 을 신규 6 카테고리로 매핑
-_WORK_TO_BUILD = {"workflows", "promptLibrary", "rtk", "projectAgents",
+_WORK_TO_BUILD = {"workflows", "promptLibrary", "rtk", "harness", "projectAgents",
                   "agents", "skills", "commands", "agentSdkScaffold"}
 _ADVANCED_TO_MAIN = {"plans"}
 

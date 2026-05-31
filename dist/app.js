@@ -70,6 +70,11 @@ const NAV = [
     docUrl: 'https://www.rtk-ai.app/guide'
   },
   {
+    id: 'harness', icon: '🧰', label: '하네스 도구', group: 'build',
+    desc: 'caveman·ccusage 등 인기 Claude 토큰절감/관측 도구 카탈로그 — 바로 설치·실행',
+    docUrl: null
+  },
+  {
     id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE + 'sub-agents'
   },
@@ -22024,6 +22029,91 @@ async function _srLoad(path) {
 // ────────────────────────────────────────────────────────────────
 // RTK OPTIMIZER (v2.24.0) — rtk-ai/rtk 토큰 절감 프록시 통합
 // ────────────────────────────────────────────────────────────────
+// ── Claude 하네스 도구 카탈로그 ──────────────────────────────────────────
+// 인기 토큰절감/관측/라우팅 도구를 모아 바로 설치·실행. 설치/실행 명령은
+// 백엔드 카탈로그(harness_tools.py)에 하드코딩된 것만 Terminal 에서 돌린다.
+VIEWS.harness = async () => {
+  const d = await api('/api/harness-tools/list');
+  state.data.harness = d;
+  if (!d || !d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml((d && d.error) || '')}</div>`;
+  const tools = d.tools || [];
+  const cats = d.categories || [];
+
+  const card = (tl) => {
+    const installed = tl.installed === true
+      ? `<span class="text-[10px] px-1.5 py-0.5 rounded ml-1" style="background:rgba(134,239,172,0.15);color:#86efac">설치됨</span>` : '';
+    const cmd = tl.install || tl.run || '';
+    let action = '';
+    if (tl.openTab) {
+      action = `<button class="btn text-xs" onclick="go('${tl.openTab}')">전용 탭 열기 →</button>`;
+    } else if (cmd) {
+      action = `<button class="btn btn-primary text-xs" onclick="runHarnessTool('${tl.id}', this)">${tl.install ? '설치' : '실행'}</button>
+        <button class="btn text-xs" onclick="copyHarnessCmd('${tl.id}')">복사</button>`;
+    }
+    return `<div class="card p-4 flex flex-col">
+      <div class="font-semibold text-sm">${escapeHtml(tl.name)}${installed}</div>
+      <div class="text-[10px] text-[var(--text-dim)] mt-0.5">${escapeHtml(tl.categoryLabel || '')}${tl.lang ? ' · ' + escapeHtml(tl.lang) : ''}${tl.license ? ' · ' + escapeHtml(tl.license) : ''}</div>
+      <p class="text-xs text-[var(--text-mute)] mt-2 flex-1">${escapeHtml(tl.desc || '')}</p>
+      ${tl.use ? `<p class="text-[10px] text-[var(--text-dim)] mt-1">사용: ${escapeHtml(tl.use)}</p>` : ''}
+      ${cmd ? `<div class="mono text-[10px] bg-black/30 rounded px-2 py-1 mt-2 overflow-x-auto whitespace-nowrap">${escapeHtml(cmd)}</div>` : ''}
+      <div class="flex gap-2 mt-3 flex-wrap">
+        ${action}
+        <a class="btn text-xs" href="${escapeHtml(tl.repo || '#')}" target="_blank" rel="noopener noreferrer">저장소 ↗</a>
+      </div>
+    </div>`;
+  };
+
+  const groups = cats.map(c => {
+    const inCat = tools.filter(t2 => t2.category === c.id);
+    if (!inCat.length) return '';
+    return `<div class="mb-5">
+      <h3 class="text-sm font-semibold mb-2">${escapeHtml(c.label)} <span class="text-[10px] text-[var(--text-dim)] font-normal">(${inCat.length})</span></h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">${inCat.map(card).join('')}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">🧰 Claude 하네스 도구</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">인기 토큰 절감 · 사용량 관측 · 모델 라우팅 도구를 바로 설치·실행. 설치/실행은 Terminal 창에서 진행돼요.${d.npxAvailable ? '' : ' <span style="color:var(--danger)">npx/bunx 미설치 — 일부 실행 불가</span>'}</p>
+      </div>
+    </div>
+    ${groups}
+    <p class="text-[10px] text-[var(--text-dim)] mt-2">⚠️ 설치 명령은 외부 스크립트를 실행합니다. 각 저장소를 확인한 뒤 진행하세요. RTK·claude-code-router 는 전용 탭에서 더 자세히 설정할 수 있어요.</p>`;
+};
+
+function copyHarnessCmd(id) {
+  const tl = ((state.data.harness || {}).tools || []).find(x => x.id === id);
+  const c = tl && (tl.install || tl.run);
+  if (c) { navigator.clipboard.writeText(c); toast(t('복사됨'), 'ok'); }
+}
+
+async function runHarnessTool(id, btn) {
+  const tl = ((state.data.harness || {}).tools || []).find(x => x.id === id);
+  if (!tl) return;
+  const cmd = tl.install || tl.run || '';
+  const verb = tl.install ? t('설치') : t('실행');
+  const ok = await confirmModal(`Terminal 창을 열고 다음을 실행합니다:\n\n${cmd}\n\n계속할까요?`);
+  if (!ok) return;
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '여는 중…'; }
+  try {
+    const r = await api('/api/harness-tools/run', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (r && r.ok) toast(`${tl.name} ${verb} — Terminal 창이 열렸어요`, 'ok');
+    else toast((r && r.error) || t('실행 실패'), 'err');
+  } catch (e) {
+    toast(t('실행 실패') + ': ' + e.message, 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+  // refresh installed badges a few seconds after the terminal install
+  setTimeout(() => { if ((state.route || location.hash).includes('harness')) go('harness'); }, 5000);
+}
+
 VIEWS.rtk = async () => {
   const d = await api('/api/rtk/status');
   if (!d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml(d.error || '')}</div>`;
