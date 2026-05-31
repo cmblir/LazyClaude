@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.37] — 2026-06-01  🦀 mascot sizing now normalises on the claw'd *body*, not the full bbox
+
+Verifying the new mascots against the rotation surfaced a real inconsistency:
+all four (run/flag/party/stand) are in `_MASCOT_FRIENDS`, but their on-screen
+claw'd **bodies** were not uniform — `flag` (0.38) and `party` (0.32) bodies
+came out much smaller than `run` (0.56), because the previous normalisation
+sized on the *full bounding box*, so a tall flag pole / wide confetti shrank the
+actual character to keep the bbox at target.
+
+- `tools/process_mascot_gifs.py` now normalises on the **body height** — the
+  largest connected component with thin rows (pole/antenna) trimmed and detached
+  props (confetti) excluded — targeting ~0.50 of the canvas (the existing
+  claw'd set's median; range 0.37–0.60). The full content still drives a no-clip
+  guard, so a genuinely tall prop just lands the body slightly lower (like the
+  existing `idea`/`bird`).
+- Regenerated `flag` / `party` / `run` / `stand`: body heights are now 0.50 /
+  0.43 / 0.50 / 0.48 — tightly clustered and matching the existing set.
+
+Verified: all four present in the rotation (`_MASCOT_FRIENDS`, 12 total) and
+their claw'd bodies render at a consistent size next to the existing cast.
+
+---
 ## [3.99.36] — 2026-06-01  🦀 higher-quality mascots + per-project hour-of-day line chart
 
 ### Mascots — re-applied from clean transparent sources

@@ -75,8 +75,28 @@ def _bbox(opaque: np.ndarray):
     return int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
 
 
+def _body_height(opaque: np.ndarray):
+    """Height (px) of the claw'd *body* — the largest connected component with
+    thin rows trimmed (a flag pole, raised stick, etc.). Confetti and other
+    detached props are separate, smaller components and are ignored. This is the
+    size we normalise on so the base character looks consistent across poses,
+    regardless of props that inflate the full bounding box. None if empty."""
+    if not opaque.any():
+        return None
+    lbl, k = ndimage.label(opaque)
+    if k == 0:
+        return None
+    sizes = ndimage.sum(np.ones_like(lbl), lbl, range(1, k + 1))
+    body = lbl == (int(np.argmax(sizes)) + 1)
+    roww = body.sum(axis=1)
+    rows = np.where(roww >= 0.20 * roww.max())[0]  # drop thin pole/antenna rows
+    if len(rows) == 0:
+        return None
+    return int(rows.max() - rows.min() + 1)
+
+
 def process(path: str, out_path: str, pad_frac: float = 0.10, max_side: int = 256,
-            target_h_frac: float = 0.56) -> dict:
+            target_h_frac: float = 0.50) -> dict:
     frames, durs = load_frames(path)
     keyed = []
     for arr in frames:
@@ -94,29 +114,28 @@ def process(path: str, out_path: str, pad_frac: float = 0.10, max_side: int = 25
     cys = [(b[1] + b[3]) / 2 for b in bbs]
     recenter = (max(cxs) - min(cxs) > 0.18 * w) or (max(cys) - min(cys) > 0.18 * h)
 
-    # Representative (median) per-frame character height drives the apparent
-    # size; the crop boxes that actually get placed drive the no-clip guard.
-    per_h = sorted(b[3] - b[1] + 1 for b in bbs)
+    # The full-content crop boxes (incl. props) drive the no-clip guard…
     per_w = [b[2] - b[0] + 1 for b in bbs]
-    rep_h = per_h[len(per_h) // 2]
     if recenter:
         crops = bbs
-        crop_max_h = per_h[-1]
+        crop_max_h = max(b[3] - b[1] + 1 for b in bbs)
         crop_max_w = max(per_w)
     else:
         crops = [union] * len(keyed)
         crop_max_h = union[3] - union[1] + 1
         crop_max_w = union[2] - union[0] + 1
-    # Normalise apparent size: pick the square canvas so the *typical* (median)
-    # character height is a fixed fraction of the canvas (target_h_frac). The
-    # sprite is shown height-filling a square box, so equal median-char-height /
-    # canvas across mascots → equal on-screen size — this is what keeps the new
-    # poses consistent with claw'd. Sizing on the median (not the max) keeps a
-    # pose whose animation has tall outlier frames (e.g. a squash/stretch) from
-    # looking shrunken; the max(...) guards ensure the tallest/widest crop still
-    # fits without clipping.
+    # …but the representative (median) BODY height — claw'd's blob, props
+    # excluded — drives the normalised size. The sprite fills a square box at a
+    # fixed height, so equal body-height/canvas across mascots → equal on-screen
+    # claw'd size, even for poses with a tall flag pole / confetti that would
+    # otherwise shrink the body under a full-bbox scheme. Median (not max) keeps
+    # squash/stretch frames from shrinking the rest; the max(...) guards ensure
+    # the tallest/widest *full* content still fits without clipping (a very tall
+    # prop just means the body lands a touch below target, like idea/bird).
+    body_hs = sorted(h2 for h2 in (_body_height(a[:, :, 3] > 16) for a in keyed) if h2)
+    rep_body_h = body_hs[len(body_hs) // 2] if body_hs else crop_max_h
     if target_h_frac:
-        side = max(int(round(rep_h / target_h_frac)),
+        side = max(int(round(rep_body_h / target_h_frac)),
                    crop_max_h,
                    int(round(crop_max_w / 0.86)))
     else:
@@ -146,8 +165,8 @@ def main() -> None:
     ap.add_argument("--out", required=True, help="output directory (e.g. dist/mascots)")
     ap.add_argument("--max-side", type=int, default=256,
                     help="max output canvas side in px (480 matches the existing claw'd set)")
-    ap.add_argument("--target-h-frac", type=float, default=0.56,
-                    help="median character height as a fraction of the canvas (size normalisation)")
+    ap.add_argument("--target-h-frac", type=float, default=0.50,
+                    help="median claw'd BODY height as a fraction of the canvas (props excluded; matches the existing set ~0.50)")
     ap.add_argument("specs", nargs="+", metavar="name=source.gif",
                     help="one or more <mascot-name>=<source-gif> pairs")
     args = ap.parse_args()
