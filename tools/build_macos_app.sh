@@ -20,6 +20,11 @@ OUT_DIR="${APP_OUT:-$ROOT/dist}"
 APP="$OUT_DIR/LazyClaude.app"
 VERSION="$(cat "$ROOT/VERSION" | tr -d '[:space:]')"
 
+# SELF_CONTAINED=1 copies the project source into the bundle so the .app runs
+# without a separate repo checkout (used by the downloadable DMG). The default
+# (0) keeps the thin bundle that runs against an external ~/Lazyclaude checkout.
+SELF_CONTAINED="${SELF_CONTAINED:-0}"
+
 echo "▶ building $APP (v$VERSION)"
 
 # ── 1. icns from existing PNGs ──────────────────────────────────────────────
@@ -80,7 +85,7 @@ LAUNCHER="$APP/Contents/MacOS/LazyClaude"
 cat > "$LAUNCHER" <<'SH'
 #!/usr/bin/env bash
 # LazyClaude .app launcher.
-#   - finds the project directory (LAZYCLAUDE_HOME env > ~/Lazyclaude > ~/lazyclaude)
+#   - finds the project directory (bundled Resources/app > LAZYCLAUDE_HOME env > ~/Lazyclaude > ~/lazyclaude)
 #   - starts python3 server.py in the background
 #   - opens the dashboard in the default browser
 #   - on receiving SIGTERM/SIGINT (Quit, killall LazyClaude, etc.) it terminates the server too
@@ -90,13 +95,17 @@ LOG_DIR="$HOME/Library/Logs/LazyClaude"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/server.log"
 
-# Resolve the LazyClaude project path. Tries:
-#   1. $LAZYCLAUDE_HOME (env)
-#   2. ~/Lazyclaude
-#   3. ~/lazyclaude
-#   4. /Applications/LazyClaude.app/../Lazyclaude  (uncommon)
+# Resolve the LazyClaude project path. Tries, in order:
+#   1. the copy bundled inside this .app (Contents/Resources/app) — present in
+#      self-contained builds (the DMG); absent in the thin `make app` build
+#   2. $LAZYCLAUDE_HOME (env)
+#   3. ~/Lazyclaude
+#   4. ~/lazyclaude
+SELF="${BASH_SOURCE[0]:-$0}"
+HERE="$(cd "$(dirname "$SELF")" && pwd)"
+BUNDLED="$(cd "$HERE/../Resources/app" 2>/dev/null && pwd || true)"
 PROJ=""
-for cand in "${LAZYCLAUDE_HOME:-}" "$HOME/Lazyclaude" "$HOME/lazyclaude"; do
+for cand in "$BUNDLED" "${LAZYCLAUDE_HOME:-}" "$HOME/Lazyclaude" "$HOME/lazyclaude"; do
   if [[ -n "$cand" && -f "$cand/server.py" ]]; then PROJ="$cand"; break; fi
 done
 if [[ -z "$PROJ" ]]; then
@@ -146,6 +155,24 @@ done
 wait "$SERVER_PID"
 SH
 chmod +x "$LAUNCHER"
+
+# ── 4b. self-contained payload (DMG builds) ─────────────────────────────────
+# Copy only what server.py needs at runtime into Contents/Resources/app:
+#   server.py, the server/ package, dist/ (the SPA + locales + assets),
+#   VERSION + CHANGELOG.md (read by server/version.py), and LICENSE.
+# Everything else (node_modules, tests, tools, .git, docs) is dev-only.
+if [[ "$SELF_CONTAINED" == "1" ]]; then
+  echo "  · bundling project source (self-contained)"
+  PAYLOAD="$APP/Contents/Resources/app"
+  mkdir -p "$PAYLOAD"
+  rsync -a --exclude '__pycache__' --exclude '*.pyc' "$ROOT/server.py" "$PAYLOAD/"
+  rsync -a --exclude '__pycache__' --exclude '*.pyc' "$ROOT/server/" "$PAYLOAD/server/"
+  rsync -a "$ROOT/dist/" "$PAYLOAD/dist/" \
+    --exclude 'LazyClaude.app' --exclude '*.dmg'
+  for f in VERSION CHANGELOG.md LICENSE; do
+    [[ -f "$ROOT/$f" ]] && cp "$ROOT/$f" "$PAYLOAD/$f"
+  done
+fi
 
 # ── 5. summary ──────────────────────────────────────────────────────────────
 SIZE=$(du -sh "$APP" | awk '{print $1}')

@@ -1,4 +1,4 @@
-.PHONY: help i18n-refresh i18n-verify i18n-scan run dev pwa-icons app install-mac uninstall-mac
+.PHONY: help i18n-refresh i18n-verify i18n-scan run dev pwa-icons app dmg install-mac uninstall-mac
 
 help:
 	@echo "Targets:"
@@ -9,6 +9,7 @@ help:
 	@echo "  dev                  — LOG_LEVEL=DEBUG 로 서버 실행"
 	@echo "  pwa-icons            — regenerate PWA PNG icons from docs/logo/mascot.svg"
 	@echo "  app                  — build dist/LazyClaude.app (macOS bundle)"
+	@echo "  dmg                  — build build/LazyClaude-<version>.dmg (downloadable)"
 	@echo "  install-mac          — build + copy LazyClaude.app to /Applications/"
 	@echo "  uninstall-mac        — rm -rf /Applications/LazyClaude.app"
 
@@ -32,6 +33,9 @@ pwa-icons:
 
 app: pwa-icons
 	bash tools/build_macos_app.sh
+
+dmg: pwa-icons
+	bash scripts/build-dmg.sh
 
 install-mac: app
 	@if [ -d /Applications/LazyClaude.app ]; then \

@@ -42,6 +42,23 @@ LOG_LEVEL=DEBUG python3 server.py
 CLAUDE_HOME=/path/to/.claude python3 server.py
 ```
 
+### macOS app (`.dmg`)
+
+Prefer a double-click app over the terminal? Build a self-contained DMG:
+
+```bash
+make dmg
+# → build/LazyClaude-<version>.dmg
+```
+
+The DMG ships `LazyClaude.app` with the project source bundled inside, so it runs without a separate checkout. It still uses the **system `python3`** (LazyClaude is stdlib-only — no Python runtime is bundled), so Python 3 must be installed (`xcode-select --install` or `brew install python3`).
+
+Open the DMG → drag **LazyClaude.app** to **Applications** → launch it. The app starts the local server and opens `http://127.0.0.1:19500` in your browser; server logs go to `~/Library/Logs/LazyClaude/server.log`. Quit it from the Dock to stop the server.
+
+> The app is **unsigned**, so the first launch needs **right-click → Open** (or `xattr -dr com.apple.quarantine /Applications/LazyClaude.app`) to get past Gatekeeper.
+
+For local development you can instead use `make install-mac`, which installs a thin bundle that runs directly against your repo checkout (no bundled copy).
+
 ---
 
 ## � Screenshots

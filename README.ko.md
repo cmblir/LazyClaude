@@ -42,6 +42,23 @@ LOG_LEVEL=DEBUG python3 server.py
 CLAUDE_HOME=/path/to/.claude python3 server.py
 ```
 
+### macOS 앱 (`.dmg`)
+
+터미널 대신 더블클릭 앱을 원하면 자급자족형 DMG를 빌드하세요:
+
+```bash
+make dmg
+# → build/LazyClaude-<version>.dmg
+```
+
+DMG에는 프로젝트 소스가 내장된 `LazyClaude.app`이 들어있어 별도 클론 없이 실행됩니다. 다만 **시스템 `python3`** 를 사용하므로(LazyClaude는 stdlib 전용 — Python 런타임은 번들하지 않음) Python 3가 설치돼 있어야 합니다 (`xcode-select --install` 또는 `brew install python3`).
+
+DMG 열기 → **LazyClaude.app** 을 **Applications** 로 드래그 → 실행. 앱이 로컬 서버를 띄우고 브라우저로 `http://127.0.0.1:19500` 을 엽니다. 서버 로그는 `~/Library/Logs/LazyClaude/server.log` 에 쌓이고, Dock에서 종료하면 서버도 멈춥니다.
+
+> 앱은 **서명되지 않았으므로** 첫 실행은 **우클릭 → 열기** (또는 `xattr -dr com.apple.quarantine /Applications/LazyClaude.app`) 로 Gatekeeper를 통과시켜야 합니다.
+
+로컬 개발용으로는 `make install-mac` 도 있는데, 이는 내 저장소 체크아웃을 직접 바라보는 얇은 번들을 설치합니다(소스 미내장).
+
 ---
 
 ## 🔄 Auto-Resume + 라이브 TTY 주입 (v3.65.0+)

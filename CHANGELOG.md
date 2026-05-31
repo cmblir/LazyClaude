@@ -10,6 +10,74 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.31] — 2026-06-01  🐾 four new corner mascots (flag / party / run / stand)
+
+Added four new characters to the rotating corner-mascot cast, bringing
+`_MASCOT_FRIENDS` from 8 to 12: `flag` (checker-flag finish), `party`
+(confetti), `run` (run-in-place), `stand` (four-legged idle).
+
+### Asset processing
+
+The sources arrived as animated GIFs on an opaque pale dithered background
+(yellow/lavender), at mixed aspect ratios — one was a 2510×508 "run across the
+screen" canvas. The existing mascots are transparent, ~square sprites shown
+~63px tall, so the sources were processed to match via the new
+`tools/process_mascot_gifs.py` (dev tool — Pillow/numpy/scipy):
+
+- **Background keyed out per frame** with a 4-connectivity flood fill from the
+  border over pale pixels. Connectivity (not a flat colour key) is what keeps
+  the checker flag's interior white — it's enclosed by black and only reachable
+  through the character, never from the border.
+- **Cropped to the character** — union bbox when it stays put; per-frame
+  recenter when it translates (the run canvas → run-in-place).
+- **Square-padded with transparency**, re-encoded as transparent animated GIFs
+  (~57–93 KB each, in line with the existing mascots).
+
+### Wiring
+
+- `dist/mascots/{flag,party,run,stand}.gif` added; `_MASCOT_FRIENDS` in
+  `dist/app.js` extended (the `_mascotImgSrc` builder already resolves any
+  name → `/mascots/<name>.gif`, and `_MASCOT_ALL` derives from it, so no other
+  edits were needed).
+- Bumped the `app.js` cache-bust query so returning browsers pick up the new
+  cast without a hard refresh.
+
+Verified in-app: all four serve 200 at 256², the rotation paints them into the
+corner sprite, transparent over the dark UI, across 1280 / 768 / 375 viewports
+with no horizontal overflow and no console errors.
+
+---
+## [3.99.30] — 2026-05-31  📦 downloadable macOS `.dmg` + cleaner window title
+
+Two small, user-facing changes.
+
+### Browser tab title
+
+The browser tab read `LazyClaude — 최적화 대시보드`; it now reads just
+`LazyClaude`. Only the static `<title>` in `dist/index.html` carried the
+suffix (the sidebar brand was already plain "LazyClaude"), so this is a
+one-line change with no i18n impact — `<title>` is not routed through `t()`.
+
+### `make dmg` — a downloadable app
+
+`make dmg` (→ `scripts/build-dmg.sh`) now produces
+`build/LazyClaude-<version>.dmg`: a drag-to-Applications disk image carrying a
+self-contained `LazyClaude.app`. The bundle ships the project source in
+`Contents/Resources/app`, so it runs without a repo checkout. It is a *light*
+launcher — it uses the system `python3` (LazyClaude is stdlib-only) rather than
+bundling a Python runtime, which keeps the DMG ~2.6 MB.
+
+Implementation reuses the existing `tools/build_macos_app.sh` via a new
+`SELF_CONTAINED=1` mode; the launcher now resolves its project directory from
+the bundled `Resources/app` first, falling back to the external `~/Lazyclaude`
+checkout that `make app` / `make install-mac` still target. Packaging uses the
+built-in `hdiutil` — no extra build dependencies.
+
+The `.app` is unsigned, so the first launch needs right-click → Open (or
+`xattr -dr com.apple.quarantine /Applications/LazyClaude.app`). Documented in
+the README Quick start.
+
+---
 ## [3.99.29] — 2026-05-18  ✂️ lazyclaw split out into its own repository
 
 `lazyclaw` (the standalone terminal CLI) is now developed and published
