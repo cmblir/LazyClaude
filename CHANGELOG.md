@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.36] — 2026-06-01  🦀 higher-quality mascots + per-project hour-of-day line chart
+
+### Mascots — re-applied from clean transparent sources
+
+- Replaced `flag` / `party` / `run` / `stand` with the user's new
+  `transparent_gifs_v2` sources (already transparent, 100–287 frames, crisp
+  pixel art) instead of the earlier background-keyed/256px versions that looked
+  rough. Re-rendered at **480²** (matching the existing claw'd set) with the
+  same median-height size normalisation (~0.56), NEAREST downscale to keep the
+  pixel art crisp. `tools/process_mascot_gifs.py` gained `--max-side` /
+  `--target-h-frac` flags.
+
+### Usage breakdown — hour-of-day is now a per-project line chart
+
+- The 시간대별 chart is a **line chart** instead of bars. When **전체** is
+  selected it draws **one line per project** (top 6, distinct colours + legend)
+  so you can compare projects' hour-of-day token curves; selecting a single
+  project draws that project's filled line.
+- Backend `/api/usage/breakdown` returns `hourlyByProject` (per-project 24-hour
+  series, top 6 by tokens) for the all-projects scope.
+- **Fixed:** selecting a project left the chart blank — `_renderChart` was
+  patching the previous (detached) canvas because the id was reused. Each render
+  now uses a unique canvas id, so a fresh chart always draws on the live canvas.
+
+Verified in-app: 전체 → 6-line chart (all 0–23 labels, legend), project select →
+single line that actually draws (no blank), new mascots crisp & uniform-sized,
+0 console errors.
+
+---
 ## [3.99.35] — 2026-06-01  🧰 Claude harness-tools catalog (caveman / ccusage / …) — install & run from the dashboard
 
 New **하네스 도구** tab (build group) that surfaces popular community Claude

@@ -22901,11 +22901,18 @@ async function loadUsageBreakdown(cwd, days) {
   }).join('') : '<div class="empty text-xs">에이전트 위임 기록 없음</div>';
 
   const scopeLabel = cwd ? (cwd.split('/').pop() || cwd) : '전체 프로젝트';
+  // hour-of-day line chart: one line per project when "전체" is selected,
+  // otherwise a single line for the chosen project. Unique canvas id each render
+  // so _renderChart never patches a stale (detached) canvas → no blank chart.
+  const hbp = r.hourlyByProject || [];
+  const multiLine = !cwd && hbp.length > 0;
+  const hcId = 'ubHourChart_' + (window.__ubHourSeq = (window.__ubHourSeq || 0) + 1);
+  const LINE_COLORS = ['#d97757', '#7dd3fc', '#a78bfa', '#86efac', '#fcd34d', '#f472b6'];
   body.innerHTML = `
     <div class="text-xs text-[var(--text-dim)] mb-3">${escapeHtml(scopeLabel)} · ${r.days}일 · 합계 <span class="mono font-bold" style="color:#d97757">${fmtTokens(tot.tokens || 0)}</span> · ${tot.calls || 0}회 · ${tot.sessions || 0}세션 <span class="text-[10px]">(도구 호출 turn_tokens 기준 근사)</span></div>
     <div class="mb-4">
-      <div class="text-[11px] font-semibold mb-1">시간대별 (0–23시) <span class="text-[10px] text-[var(--text-dim)] font-normal">· 막대에 마우스를 올리면 상세</span></div>
-      <div style="position:relative;height:150px;"><canvas id="ubHourChart"></canvas></div>
+      <div class="text-[11px] font-semibold mb-1">시간대별 (0–23시) <span class="text-[10px] text-[var(--text-dim)] font-normal">· ${multiLine ? '전체 — 프로젝트별 선 ' + hbp.length + '개 (마우스 올리면 비교)' : '선에 마우스를 올리면 상세'}</span></div>
+      <div style="position:relative;height:${multiLine ? 210 : 150}px;"><canvas id="${hcId}"></canvas></div>
     </div>
     ${dates.length ? `<div class="mb-1">
       <div class="text-[11px] font-semibold mb-1">일자 × 시간대 히트맵 <span class="text-[10px] text-[var(--text-dim)] font-normal">· 셀에 마우스를 올리면 상세</span></div>
@@ -22918,29 +22925,38 @@ async function loadUsageBreakdown(cwd, days) {
     </div>
     <div id="ubTip" style="position:fixed;z-index:2000;pointer-events:none;display:none;background:var(--bg-soft,#1a1a1c);border:1px solid var(--border,#3a3a3d);border-radius:6px;padding:4px 8px;font-size:11px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,0.45);"></div>`;
 
-  // interactive hour-of-day chart (all 0–23 labels, hover tooltips)
-  const hc = document.getElementById('ubHourChart');
+  // interactive hour-of-day LINE chart — all 0–23 labels, hover tooltips.
+  // 전체: one line per project (compare). 프로젝트 선택: single filled line.
+  const hc = document.getElementById(hcId);
   if (hc && typeof _renderChart === 'function') {
     const light = document.body.classList.contains('theme-light');
     const axis = light ? '#666' : '#9aa0aa';
     const grid = light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)';
+    const labels = hourly.map(h => String(h.hour));
+    const datasets = multiLine
+      ? hbp.map((p, i) => ({
+        label: p.name, data: p.hourly,
+        borderColor: LINE_COLORS[i % LINE_COLORS.length], backgroundColor: 'transparent',
+        fill: false, tension: 0.35, pointRadius: 0, borderWidth: 2,
+      }))
+      : [{
+        label: scopeLabel, data: hourly.map(h => h.tokens || 0),
+        borderColor: '#d97757', backgroundColor: 'rgba(217,119,87,0.14)',
+        fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2,
+      }];
     _renderChart(hc, {
-      type: 'bar',
-      data: {
-        labels: hourly.map(h => String(h.hour)),
-        datasets: [{
-          data: hourly.map(h => h.tokens || 0),
-          backgroundColor: 'rgba(217,119,87,0.55)', borderColor: '#d97757', borderWidth: 1, borderRadius: 3,
-        }],
-      },
+      type: 'line',
+      data: { labels, datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: false },
+          legend: { display: multiLine, position: 'bottom', labels: { color: axis, boxWidth: 10, font: { size: 9 } } },
           tooltip: {
             callbacks: {
               title: items => (items[0] ? items[0].label : '') + '시',
-              label: c => fmtTokens(c.parsed.y) + ' · ' + ((hourly[c.dataIndex] || {}).calls || 0) + '회',
+              label: c => (multiLine ? c.dataset.label + ': ' : '') + fmtTokens(c.parsed.y)
+                + (multiLine ? '' : ' · ' + ((hourly[c.dataIndex] || {}).calls || 0) + '회'),
             },
           },
         },

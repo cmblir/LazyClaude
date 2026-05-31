@@ -411,6 +411,7 @@ def api_usage_breakdown(query: dict) -> dict:
             f"       COUNT(DISTINCT tu.session_id) sessions {base}", params).fetchone()
         # project list for the scope dropdown (all-scope only)
         projects = []
+        hourly_by_project: list[dict] = []
         if scope == "all":
             for r in c.execute(
                 "SELECT COALESCE(NULLIF(cwd,''), project_dir) key, MAX(cwd) cwd "
@@ -420,6 +421,29 @@ def api_usage_breakdown(query: dict) -> dict:
                 cwd = r["cwd"] or r["key"] or ""
                 projects.append({"cwd": cwd, "name": Path(cwd).name if cwd else (r["key"] or "—")})
 
+            # per-project hour-of-day series — one line per project on the
+            # "전체" chart. Aggregate (project, hour) → tokens, keep the top
+            # projects by total so the chart stays readable.
+            proj_key = "COALESCE(NULLIF(s.cwd,''), s.project_dir)"
+            rows = c.execute(
+                f"SELECT {proj_key} proj, MAX(s.cwd) cwd, "
+                f"       CAST(strftime('%H', tu.ts/1000, 'unixepoch', 'localtime') AS INT) hr, "
+                f"       SUM(tu.turn_tokens) tok {base} GROUP BY proj, hr", params).fetchall()
+            agg: dict[str, dict] = {}
+            for r in rows:
+                key = r["proj"] or ""
+                p = agg.setdefault(key, {"cwd": r["cwd"] or key, "total": 0,
+                                          "hourly": [0] * 24})
+                tokv = int(r["tok"] or 0)
+                p["hourly"][int(r["hr"])] = tokv
+                p["total"] += tokv
+            top = sorted(agg.values(), key=lambda x: x["total"], reverse=True)[:6]
+            hourly_by_project = [
+                {"name": Path(p["cwd"]).name if p["cwd"] else "—",
+                 "cwd": p["cwd"], "hourly": p["hourly"], "total": p["total"]}
+                for p in top
+            ]
+
     return {
         "ok": True,
         "scope": scope,
@@ -427,6 +451,7 @@ def api_usage_breakdown(query: dict) -> dict:
         "totals": {"tokens": int(tot["tok"] or 0), "calls": int(tot["calls"] or 0),
                     "sessions": int(tot["sessions"] or 0)},
         "hourly": hourly,
+        "hourlyByProject": hourly_by_project,
         "daily": daily,
         "dayHour": day_hour,
         "byAgent": by_agent,

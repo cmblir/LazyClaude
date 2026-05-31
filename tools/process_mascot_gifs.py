@@ -144,6 +144,10 @@ def process(path: str, out_path: str, pad_frac: float = 0.10, max_side: int = 25
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True, help="output directory (e.g. dist/mascots)")
+    ap.add_argument("--max-side", type=int, default=256,
+                    help="max output canvas side in px (480 matches the existing claw'd set)")
+    ap.add_argument("--target-h-frac", type=float, default=0.56,
+                    help="median character height as a fraction of the canvas (size normalisation)")
     ap.add_argument("specs", nargs="+", metavar="name=source.gif",
                     help="one or more <mascot-name>=<source-gif> pairs")
     args = ap.parse_args()
@@ -153,7 +157,7 @@ def main() -> None:
         if not src:
             ap.error(f"bad spec {spec!r} — expected name=source.gif")
         out_path = os.path.join(args.out, f"{name}.gif")
-        st = process(src, out_path)
+        st = process(src, out_path, max_side=args.max_side, target_h_frac=args.target_h_frac)
         print(f"{name:8} {st}  ->  {out_path} ({os.path.getsize(out_path):,} bytes)")
 
 
