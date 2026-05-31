@@ -23,11 +23,15 @@ from typing import Any
 
 from .logger import log
 
-# 가격표 — 추정 소스용 (source 엔트리에 usd 없으면 usage.tokens 로 계산)
+# 가격표 — 추정 소스용 (source 엔트리에 usd 없으면 usage.tokens 로 계산).
+# Verified against the official models overview (2026-06): Opus 4.5–4.8 = $5/$25,
+# Sonnet 4.6 = $3/$15, Haiku 4.5 = $1/$5.
 _PRICING = {
-    "claude-opus-4-7":    {"in": 15.0, "out": 75.0},
+    "claude-opus-4-8":    {"in": 5.0,  "out": 25.0},
+    "claude-opus-4-7":    {"in": 5.0,  "out": 25.0},
+    "claude-opus-4-6":    {"in": 5.0,  "out": 25.0},
     "claude-sonnet-4-6":  {"in": 3.0,  "out": 15.0},
-    "claude-haiku-4-5":   {"in": 0.8,  "out": 4.0},
+    "claude-haiku-4-5":   {"in": 1.0,  "out": 5.0},
 }
 
 

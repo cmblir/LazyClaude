@@ -929,9 +929,10 @@ def api_model_config() -> dict:
         if isinstance(s, dict) and key in s:
             entries[key] = s[key]
     known_models = [
-        {"id": "claude-opus-4-7", "label": "Opus 4.7 (1M context)", "note": "최강 성능, 느림/비쌈"},
-        {"id": "claude-opus-4-6", "label": "Opus 4.6", "note": "Fast mode 기본 모델"},
-        {"id": "claude-sonnet-4-6", "label": "Sonnet 4.6", "note": "균형형"},
+        {"id": "claude-opus-4-8", "label": "Opus 4.8 (1M context)", "note": "최신 · 최강 (현재 기본)"},
+        {"id": "claude-opus-4-7", "label": "Opus 4.7 (1M context)", "note": "legacy"},
+        {"id": "claude-opus-4-6", "label": "Opus 4.6", "note": "Fast mode 기본 모델 · legacy"},
+        {"id": "claude-sonnet-4-6", "label": "Sonnet 4.6 (1M context)", "note": "균형형"},
         {"id": "claude-haiku-4-5", "label": "Haiku 4.5 (20251001)", "note": "가장 빠름/저렴"},
         {"id": "default", "label": "기본 (Claude Code 선택)", "note": "settings.model 비워두기"},
     ]

@@ -10,6 +10,39 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.33] — 2026-06-01  🤖 model catalog: add Opus 4.8, correct stale Opus/Sonnet/Haiku pricing & context
+
+The model catalog topped out at Opus 4.7 and carried stale pricing — a problem
+for a dashboard whose job is managing Claude usage. Verified every value
+against the official models overview (platform.claude.com, 2026-06) and fixed:
+
+- **Added Claude Opus 4.8** (`claude-opus-4-8`) — now the current default model
+  (1M context, 128k output, $5/$25, adaptive thinking, effort defaults to high).
+- **Corrected Opus pricing**: Opus 4.7 and 4.6 were listed at the obsolete
+  $15/$75 (that rate was Opus 4.1 and earlier); Opus 4.5–4.8 are all **$5/$25**.
+- **Fixed Sonnet 4.6 context**: 200k → **1,000,000** tokens (it was under-reported).
+- **Fixed Haiku 4.5 pricing**: $0.8/$4.0 → **$1/$5**.
+- Repointed the `opus` alias to `claude-opus-4-8`, kept `opus-4.7` / `opus-4.6`
+  selectable as legacy, and added the CLI `--model` flag mapping for 4.8.
+
+### Files
+
+- `server/ai_providers.py` — `_MODELS`, `_ALIASES`, `_CLI_FLAG_ALIASES`.
+- `server/cost_timeline.py` — `_PRICING` estimation table (added 4.8, fixed
+  Opus/Haiku rates).
+- `server/system.py` — settings model picker (`known_models`).
+- `server/workflows.py` — workflow assignee choices (`_ASSIGNEES`).
+
+Source: https://platform.claude.com/docs/en/about-claude/models/overview
+Verified: list_models exposes Opus 4.8, `opus` resolves to 4.8, a 1M-in/1M-out
+Opus 4.8 estimate is $30.00, and all touched modules import + compile cleanly.
+
+NOTE: the per-lab model selectors (thinking / vision / computer-use / memory /
+advisor / model-bench / server-tools / pinned-model lists) still list 4.7 as
+the top Opus — those are tracked as separate follow-ups from the feature-gap
+research (adaptive-thinking migration, server-tools version bump, etc.).
+
+---
 ## [3.99.32] — 2026-06-01  📊 hour-of-day × per-agent token breakdown (project-scoped)
 
 Added a time-of-day + per-agent token analytics section to the Usage tab,

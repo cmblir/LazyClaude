@@ -366,20 +366,28 @@ class ClaudeCliProvider(BaseProvider):
     homepage = "https://docs.anthropic.com/en/docs/claude-code"
     icon = "🟠"
 
+    # Pricing/context verified against the official models overview
+    # (platform.claude.com/docs/en/about-claude/models/overview, 2026-06):
+    # Opus 4.5–4.8 are all $5/$25 (the old $15/$75 was Opus 4.1 and earlier),
+    # Sonnet 4.6 has a 1M-token context, Haiku 4.5 is $1/$5. cache_read ≈ 0.1×
+    # input, cache_create ≈ 1.25× input.
     _MODELS = [
-        ModelInfo("claude-opus-4-7", "Opus 4.7 (1M)", 1_000_000,
-                  15.0, 75.0, 1.5, 18.75, note="최강 성능"),
-        ModelInfo("claude-opus-4-6", "Opus 4.6", 1_000_000,
-                  15.0, 75.0, 1.5, 18.75, note="Fast mode 기본"),
-        ModelInfo("claude-sonnet-4-6", "Sonnet 4.6", 200_000,
+        ModelInfo("claude-opus-4-8", "Opus 4.8 (1M)", 1_000_000,
+                  5.0, 25.0, 0.5, 6.25, note="최신 · 최강 (현재 기본)"),
+        ModelInfo("claude-opus-4-7", "Opus 4.7 (1M, legacy)", 1_000_000,
+                  5.0, 25.0, 0.5, 6.25, note="legacy"),
+        ModelInfo("claude-opus-4-6", "Opus 4.6 (legacy)", 1_000_000,
+                  5.0, 25.0, 0.5, 6.25, note="Fast mode 기본 · legacy"),
+        ModelInfo("claude-sonnet-4-6", "Sonnet 4.6 (1M)", 1_000_000,
                   3.0, 15.0, 0.3, 3.75, note="균형형"),
         ModelInfo("claude-haiku-4-5", "Haiku 4.5", 200_000,
-                  0.8, 4.0, 0.08, 1.0, note="가장 빠름/저렴"),
+                  1.0, 5.0, 0.1, 1.25, note="가장 빠름/저렴"),
     ]
 
     # 별칭 매핑 — 워크플로우에서 짧은 이름 사용 가능
     _ALIASES = {
-        "opus": "claude-opus-4-7",
+        "opus": "claude-opus-4-8",
+        "opus-4.8": "claude-opus-4-8",
         "opus-4.7": "claude-opus-4-7",
         "opus-4.6": "claude-opus-4-6",
         "sonnet": "claude-sonnet-4-6",
@@ -402,6 +410,7 @@ class ClaudeCliProvider(BaseProvider):
     # with the short alias "sonnet". Verified empirically. Map full names
     # back to aliases before passing to the CLI.
     _CLI_FLAG_ALIASES = {
+        "claude-opus-4-8":   "opus",
         "claude-opus-4-7":   "opus",
         "claude-opus-4-6":   "opus",
         "claude-sonnet-4-6": "sonnet",

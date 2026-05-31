@@ -52,7 +52,7 @@ _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
                # (n8n parity). Pass-through executor; no ports.
                "sticky"}
 _INPUT_MODES = {"concat", "first", "json"}
-_ASSIGNEES = {"opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
+_ASSIGNEES = {"opus-4.8", "opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
 _WF_ID_RE = re.compile(r"^wf-[0-9]{10,14}-[a-z0-9]{3,6}$")
 _NODE_ID_RE = re.compile(r"^n-[A-Za-z0-9_-]{1,40}$")
