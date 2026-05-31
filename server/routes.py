@@ -258,7 +258,7 @@ from .system import (
     api_output_style_delete, api_output_style_save, api_output_styles_list,
     api_plans_list, api_scheduled_tasks, api_statusline_info,
     api_task_delete, api_task_save, api_tasks_list, api_telemetry_summary,
-    api_usage_summary, api_usage_project, get_device_info, get_recommended_settings,
+    api_usage_summary, api_usage_project, api_usage_breakdown, get_device_info, get_recommended_settings,
     get_system_status,
 )
 
@@ -357,6 +357,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/subagent/model-choices": lambda q: api_subagent_model_choices(),
     "/api/usage/summary": lambda q: api_usage_summary(),
     "/api/usage/project": api_usage_project,
+    "/api/usage/breakdown": api_usage_breakdown,
     "/api/memory/list": api_memory_list,
     "/api/memory/get": api_memory_get,
     "/api/tasks/list": lambda q: api_tasks_list(),

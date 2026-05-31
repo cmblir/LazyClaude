@@ -22598,6 +22598,24 @@ VIEWS.usage = async () => {
       : `<div class="empty text-xs">데이터 없음 (세션 재인덱스 필요할 수 있음)</div>`}
     </div>
 
+    <!-- 시간대별 · 에이전트별 (프로젝트/전체 필터) -->
+    <div class="card p-5 mb-4">
+      <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <h3 class="font-semibold text-sm">🕘 시간대별 · 에이전트별 토큰</h3>
+        <div class="flex items-center gap-2 flex-wrap text-xs">
+          <select id="ubScope" class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-xs max-w-[220px]" aria-label="프로젝트 범위">
+            <option value="">전체 프로젝트</option>
+          </select>
+          <select id="ubDays" class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-xs" aria-label="기간">
+            <option value="7">7일</option>
+            <option value="30" selected>30일</option>
+            <option value="90">90일</option>
+          </select>
+        </div>
+      </div>
+      <div id="ubBody"><div class="empty text-xs">로드 중…</div></div>
+    </div>
+
     <!-- 도구별 · 에이전트별 토큰 -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
       <div class="card p-5">
@@ -22723,7 +22741,101 @@ AFTER.usage = () => {
       },
     });
   }
+
+  // hour-of-day / per-agent breakdown — populate scope dropdown, bind, initial load
+  const scopeSel = document.getElementById('ubScope');
+  const daysSel = document.getElementById('ubDays');
+  if (scopeSel) {
+    const projs = (d && d.tokens && d.tokens.byProject) || [];
+    for (const p of projs) {
+      const pcwd = p.cwd || p.key || '';
+      if (!pcwd) continue;
+      const opt = document.createElement('option');
+      opt.value = pcwd;
+      opt.textContent = p.name || pcwd.split('/').pop() || pcwd;
+      scopeSel.appendChild(opt);
+    }
+    const reload = () => loadUsageBreakdown(scopeSel.value, daysSel ? daysSel.value : 30);
+    scopeSel.addEventListener('change', reload);
+    if (daysSel) daysSel.addEventListener('change', reload);
+    loadUsageBreakdown('', 30);
+  }
 };
+
+// Hour-of-day × per-agent token breakdown for the Usage tab. Fetches
+// /api/usage/breakdown (project-scoped or all) and renders into #ubBody:
+// a 24-bucket hour-of-day profile, a day×hour heatmap, and a per-agent list.
+async function loadUsageBreakdown(cwd, days) {
+  const body = document.getElementById('ubBody');
+  if (!body) return;
+  body.innerHTML = '<div class="empty text-xs">로드 중…</div>';
+  let r;
+  try {
+    r = await api('/api/usage/breakdown?days=' + encodeURIComponent(days || 30)
+      + (cwd ? '&cwd=' + encodeURIComponent(cwd) : ''));
+  } catch (e) {
+    body.innerHTML = '<div class="empty text-xs">로드 실패: ' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+  if (!r || !r.ok) {
+    body.innerHTML = '<div class="empty text-xs">' + escapeHtml((r && r.error) || '데이터 없음') + '</div>';
+    return;
+  }
+  const hourly = r.hourly || [], daily = r.daily || [], dayHour = r.dayHour || [];
+  const byAgent = r.byAgent || [], tot = r.totals || {};
+
+  // hour-of-day profile (24 bars)
+  const hMax = Math.max(1, ...hourly.map(h => h.tokens || 0));
+  const hourBars = hourly.map(h => {
+    const pct = h.tokens ? Math.max(3, Math.round(h.tokens / hMax * 100)) : 0;
+    return `<div class="flex flex-col items-center justify-end" style="flex:1;height:120px;" title="${h.hour}시 · ${fmtTokens(h.tokens || 0)} · ${h.calls || 0}회">
+      <div style="width:72%;height:${pct}%;background:#d97757;border-radius:2px 2px 0 0;${h.tokens ? 'min-height:2px;' : ''}"></div>
+      <div class="text-[8px] text-[var(--text-dim)] mt-0.5">${h.hour % 3 === 0 ? h.hour : ''}</div>
+    </div>`;
+  }).join('');
+
+  // day × hour heatmap
+  const cellMap = {}; let cMax = 1;
+  for (const c of dayHour) { cellMap[c.date + '|' + c.hour] = c.tokens; if (c.tokens > cMax) cMax = c.tokens; }
+  const dates = daily.map(d => d.date);
+  const hourHeader = '<div style="width:60px;flex:none;"></div>' + Array.from({ length: 24 }, (_, h) =>
+    `<div class="text-[8px] text-center text-[var(--text-dim)]" style="flex:1;margin:0 1px;">${h % 3 === 0 ? h : ''}</div>`).join('');
+  const heatRows = dates.map(date => {
+    const cells = Array.from({ length: 24 }, (_, h) => {
+      const v = cellMap[date + '|' + h] || 0;
+      const a = v ? (0.12 + 0.88 * v / cMax) : 0;
+      return `<div style="flex:1;height:13px;margin:1px;border-radius:2px;background:rgba(217,119,87,${a.toFixed(3)});" title="${date} ${h}시 · ${fmtTokens(v)}"></div>`;
+    }).join('');
+    return `<div class="flex items-center"><div class="text-[9px] mono text-[var(--text-dim)]" style="width:60px;flex:none;">${date.slice(5)}</div>${cells}</div>`;
+  }).join('');
+
+  // per-agent bars
+  const aMax = Math.max(1, ...byAgent.map(a => a.tokens || 0));
+  const agentRows = byAgent.length ? byAgent.map(a => {
+    const pct = Math.max(2, Math.round((a.tokens || 0) / aMax * 100));
+    return `<div class="mb-2">
+      <div class="flex justify-between text-xs mb-1"><span class="mono">${escapeHtml(a.name)} <span class="text-[var(--text-dim)]">×${a.calls || 0}</span></span><span class="mono font-bold" style="color:#a78bfa">${fmtTokens(a.tokens || 0)}</span></div>
+      <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%;height:100%;background:#a78bfa;"></div></div>
+    </div>`;
+  }).join('') : '<div class="empty text-xs">에이전트 위임 기록 없음</div>';
+
+  const scopeLabel = cwd ? (cwd.split('/').pop() || cwd) : '전체 프로젝트';
+  body.innerHTML = `
+    <div class="text-xs text-[var(--text-dim)] mb-3">${escapeHtml(scopeLabel)} · ${r.days}일 · 합계 <span class="mono font-bold" style="color:#d97757">${fmtTokens(tot.tokens || 0)}</span> · ${tot.calls || 0}회 · ${tot.sessions || 0}세션 <span class="text-[10px]">(도구 호출 turn_tokens 기준 근사)</span></div>
+    <div class="mb-4">
+      <div class="text-[11px] font-semibold mb-1">시간대별 (0–23시)</div>
+      <div class="flex items-end gap-0.5">${hourBars}</div>
+    </div>
+    ${dates.length ? `<div class="mb-1">
+      <div class="text-[11px] font-semibold mb-1">일자 × 시간대 히트맵</div>
+      <div class="flex items-center">${hourHeader}</div>
+      <div class="max-h-[300px] overflow-y-auto pr-1">${heatRows}</div>
+    </div>` : '<div class="empty text-xs">기간 내 데이터 없음</div>'}
+    <div class="mt-4">
+      <div class="text-[11px] font-semibold mb-2">🤝 에이전트별 토큰</div>
+      <div class="max-h-[260px] overflow-y-auto">${agentRows}</div>
+    </div>`;
+}
 
 // v2.43.2 — drill into one project's token usage. Opens a modal with the
 // project's totals + daily timeline + tool/agent breakdown + every session

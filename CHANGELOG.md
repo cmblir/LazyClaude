@@ -10,6 +10,36 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.32] — 2026-06-01  📊 hour-of-day × per-agent token breakdown (project-scoped)
+
+Added a time-of-day + per-agent token analytics section to the Usage tab,
+filterable by a single project or all projects.
+
+### Backend
+
+- New `GET /api/usage/breakdown?cwd=<optional>&days=<N>` (`api_usage_breakdown`
+  in `server/system.py`, registered in `server/routes.py`). Returns, for the
+  selected scope and lookback window: a 24-bucket hour-of-day profile, per-day
+  totals, a day×hour heatmap matrix, a per-agent (subagent_type) split, window
+  totals, and the project list for the scope dropdown.
+- Source is `tool_uses.ts` (epoch ms) + `turn_tokens` + `subagent_type` — the
+  only table carrying timestamp, agent, and token attribution together. This is
+  an activity-weighted distribution (tool-less turns are not counted), labelled
+  as such in the UI; the page's summary cards still report exact session totals.
+  Project scope reuses the same `$HOME`-sandboxed `cwd` validation as
+  `/api/usage/project`.
+
+### Frontend
+
+- New section in `VIEWS.usage` ("🕘 시간대별 · 에이전트별 토큰") with a
+  project-or-all scope selector + 7/30/90-day selector, an hour-of-day bar
+  profile, a day×hour heatmap, and a per-agent bar list. Re-fetches on filter
+  change. Bumped the `app.js` cache-bust query.
+
+Verified in-app across 1280 / 768 / 375 with no horizontal overflow and no
+console errors; scope + day filters re-query and re-render correctly.
+
+---
 ## [3.99.31] — 2026-06-01  🐾 four new corner mascots (flag / party / run / stand)
 
 Added four new characters to the rotating corner-mascot cast, bringing

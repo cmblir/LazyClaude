@@ -330,6 +330,110 @@ def api_usage_project(query: dict) -> dict:
     }
 
 
+def api_usage_breakdown(query: dict) -> dict:
+    """시간대별(hour-of-day) × 에이전트별 × 일자별 토큰 분해 — 프로젝트 필터/전체.
+
+    GET ``/api/usage/breakdown?cwd=<optional>&days=<N>``
+
+        cwd  : project filter (sessions.cwd). empty/missing → all projects.
+        days : lookback window in days (default 30, clamped 1..365).
+
+    Token source is ``tool_uses.turn_tokens`` (each assistant turn's tokens
+    split across that turn's tool calls) keyed by ``tool_uses.ts`` (epoch ms).
+    That table is the only one carrying timestamp + subagent_type + token
+    attribution together, so it drives the hour-of-day and per-agent split.
+    NOTE: turns with no tool call are not in tool_uses, so this is an
+    activity-weighted distribution, not an exact ledger — the page's summary
+    cards still report exact per-session totals.
+    """
+    def _qs(key: str, default: str = "") -> str:
+        v = query.get(key) if isinstance(query, dict) else None
+        if isinstance(v, list):
+            v = v[0] if v else None
+        return v if isinstance(v, str) else default
+
+    cwd_raw = (_qs("cwd") or "").strip()
+    try:
+        days = int(_qs("days", "30") or 30)
+    except ValueError:
+        days = 30
+    days = max(1, min(days, 365))
+    since_ms = int((time.time() - days * 86400) * 1000)
+
+    where = ["tu.ts >= ?"]
+    params: list = [since_ms]
+    scope = "all"
+    if cwd_raw:
+        try:
+            abs_cwd = str(Path(os.path.expanduser(cwd_raw)).resolve())
+        except Exception:
+            return {"ok": False, "error": "invalid cwd"}
+        home = str(Path.home())
+        if not (abs_cwd == home or abs_cwd.startswith(home + os.sep)):
+            return {"ok": False, "error": "cwd outside home"}
+        where.append("(s.cwd = ? OR (s.cwd = '' AND s.project_dir = ?))")
+        params += [abs_cwd, cwd_raw]
+        scope = abs_cwd
+    wsql = " AND ".join(where)
+
+    _db_init()
+    with _db() as c:
+        base = ("FROM tool_uses tu JOIN sessions s ON tu.session_id = s.session_id "
+                f"WHERE {wsql}")
+        # hour-of-day profile (local time, 0..23)
+        hrows = {int(r["hr"]): r for r in c.execute(
+            f"SELECT CAST(strftime('%H', tu.ts/1000, 'unixepoch', 'localtime') AS INT) hr, "
+            f"       SUM(tu.turn_tokens) tok, COUNT(*) calls {base} GROUP BY hr", params).fetchall()}
+        hourly = []
+        for h in range(24):
+            r = hrows.get(h)
+            hourly.append({"hour": h,
+                           "tokens": int(r["tok"] or 0) if r else 0,
+                           "calls": int(r["calls"] or 0) if r else 0})
+        # per-day totals
+        daily = [{"date": r["d"], "tokens": int(r["tok"] or 0), "calls": int(r["calls"] or 0)}
+                 for r in c.execute(
+            f"SELECT date(tu.ts/1000, 'unixepoch', 'localtime') d, "
+            f"       SUM(tu.turn_tokens) tok, COUNT(*) calls {base} GROUP BY d ORDER BY d", params).fetchall()]
+        # day × hour heatmap cells
+        day_hour = [{"date": r["d"], "hour": int(r["hr"]), "tokens": int(r["tok"] or 0)}
+                    for r in c.execute(
+            f"SELECT date(tu.ts/1000, 'unixepoch', 'localtime') d, "
+            f"       CAST(strftime('%H', tu.ts/1000, 'unixepoch', 'localtime') AS INT) hr, "
+            f"       SUM(tu.turn_tokens) tok {base} GROUP BY d, hr", params).fetchall()]
+        # per-agent (subagent_type) split
+        by_agent = [{"name": r["name"], "tokens": int(r["tok"] or 0), "calls": int(r["calls"] or 0)}
+                    for r in c.execute(
+            f"SELECT tu.subagent_type name, SUM(tu.turn_tokens) tok, COUNT(*) calls {base} "
+            f"  AND tu.subagent_type != '' GROUP BY tu.subagent_type ORDER BY tok DESC LIMIT 30", params).fetchall()]
+        tot = c.execute(
+            f"SELECT COALESCE(SUM(tu.turn_tokens),0) tok, COUNT(*) calls, "
+            f"       COUNT(DISTINCT tu.session_id) sessions {base}", params).fetchone()
+        # project list for the scope dropdown (all-scope only)
+        projects = []
+        if scope == "all":
+            for r in c.execute(
+                "SELECT COALESCE(NULLIF(cwd,''), project_dir) key, MAX(cwd) cwd "
+                "FROM sessions WHERE total_tokens > 0 "
+                "GROUP BY COALESCE(NULLIF(cwd,''), project_dir) "
+                "ORDER BY SUM(total_tokens) DESC LIMIT 50").fetchall():
+                cwd = r["cwd"] or r["key"] or ""
+                projects.append({"cwd": cwd, "name": Path(cwd).name if cwd else (r["key"] or "—")})
+
+    return {
+        "ok": True,
+        "scope": scope,
+        "days": days,
+        "totals": {"tokens": int(tot["tok"] or 0), "calls": int(tot["calls"] or 0),
+                    "sessions": int(tot["sessions"] or 0)},
+        "hourly": hourly,
+        "daily": daily,
+        "dayHour": day_hour,
+        "byAgent": by_agent,
+        "projects": projects,
+    }
+
+
 def api_memory_list(query: dict) -> dict:
     """~/.claude/projects/*/memory/*.md 전부 나열."""
     out = []
