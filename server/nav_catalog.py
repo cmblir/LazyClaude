@@ -233,6 +233,22 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "마이그레이션 어드바이저 (읽기 전용).",
         ["출력 스타일", "output style", "output-style", "deprecation", "폐기",
          "migration", "마이그레이션", "점검"]),
+    ("teamLeaderboard", "observe",
+        "팀 리더보드 — 조직 Admin Analytics API(usage_report/claude_code)에서 사용자/액터별 "
+        "세션·코드 라인·커밋·PR·토큰·추정 비용을 기간별로 집계해 순위. 조직 admin 키 필요, "
+        "개인 계정 불가, 읽기 전용.",
+        ["팀 리더보드", "leaderboard", "리더보드", "team", "사용자별", "actor",
+         "랭킹", "기여도", "코드 라인", "커밋", "analytics", "admin api"]),
+    ("marketplaceDiscover", "config",
+        "플러그인 마켓 — 설치된 마켓플레이스(.claude-plugin/marketplace.json)의 플러그인을 "
+        "둘러보고 설치 상태 확인 + 설치 명령 안내 (Discover).",
+        ["플러그인", "plugin", "마켓플레이스", "marketplace", "discover", "둘러보기",
+         "설치", "install", "스킬", "skill"]),
+    ("bashSandbox",   "config",
+        "Bash 샌드박스 — Bash 도구의 OS 수준 격리(파일·네트워크) 설정을 읽고 안전하게 "
+        "편집(타임스탬프 백업 + 값 검증). settings.json 의 sandbox 키.",
+        ["bash", "샌드박스", "sandbox", "격리", "isolation", "네트워크", "파일시스템",
+         "permissions", "settings", "보안"]),
     ("sessionReplay", "work",
         "Session Replay — Claude Code JSONL 세션 로그를 타임라인으로 재생 · "
         "툴 호출 하이라이트 · 누적 토큰 차트.",

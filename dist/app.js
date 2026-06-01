@@ -137,6 +137,18 @@ const NAV = [
     desc: '/output-style 명령 폐기 진단 + 마이그레이션 어드바이저 (읽기 전용)', docUrl: null
   },
   {
+    id: 'teamLeaderboard', icon: '🏆', label: '팀 리더보드', group: 'observe',
+    desc: '조직 Admin Analytics API — 사용자별 세션·코드라인·커밋·토큰·비용 순위 (admin 키 필요)', docUrl: null
+  },
+  {
+    id: 'marketplaceDiscover', icon: '🛍️', label: '플러그인 마켓', group: 'config',
+    desc: '설치된 마켓플레이스 플러그인 둘러보기·설치 상태·설치 명령', docUrl: null
+  },
+  {
+    id: 'bashSandbox', icon: '🧰', label: 'Bash 샌드박스', group: 'config',
+    desc: 'Bash 도구 OS 샌드박스(파일·네트워크 격리) 설정 읽기/안전 편집', docUrl: null
+  },
+  {
     id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE + 'sub-agents'
   },
@@ -717,6 +729,7 @@ const MODE_TABS = {
     'system', 'telemetry', 'metrics', 'costsTimeline', 'otel', 'adminUsage',
     'budgets', 'rateLimit', 'today', 'contextInspector', 'checkpoints',
     'reports', 'anomalies', 'memoryAudit', 'outputStyleAudit',
+    'teamLeaderboard', 'marketplaceDiscover', 'bashSandbox',
     'securityScan', 'claudeDocs', 'zclaude', 'homunculus', 'routines',
     'usage', 'ideStatus', 'scheduled', 'bashHistory', 'cliSessions', 'openPorts',
   ]),
@@ -24888,6 +24901,534 @@ async function osAuditCopy(i, kind, btn) {
     document.body.removeChild(ta);
   }
 }
+
+
+// ═══ batch5: team leaderboard · marketplace discover · bash sandbox ═══
+// ─────────────────────────────────────────────────────────────────────────
+// Team Leaderboard — per-actor Claude Code activity ranking (Admin Analytics)
+// Backend: server/team_analytics.py  → /api/team/status, /api/team/leaderboard
+// ─────────────────────────────────────────────────────────────────────────
+VIEWS.teamLeaderboard = async () => {
+  return `
+  <div class="page" id="teamLbPage">
+    <header class="page-head">
+      <h1>${escapeHtml(t('팀 리더보드'))}</h1>
+      <p class="muted">${escapeHtml(t('조직 Admin API(Claude Code Analytics)에서 사용자별 세션·코드 라인·커밋·PR·토큰·추정 비용을 가져와 순위를 매깁니다. 조직 Admin 키(sk-ant-admin...)가 필요합니다.'))}</p>
+    </header>
+    <div id="teamLbBody"><div class="muted" style="padding:24px">${escapeHtml(t('불러오는 중…'))}</div></div>
+  </div>`;
+};
+
+AFTER.teamLeaderboard = () => { _teamLbInit(); };
+
+// Module-scoped UI state for the query builder (days + sort).
+const _teamLbState = { days: 7, sort: 'cost' };
+
+async function _teamLbInit() {
+  const body = document.getElementById('teamLbBody');
+  if (!body) return;
+  let status;
+  try {
+    status = await api('/api/team/status');
+  } catch (e) {
+    body.innerHTML = `<div class="card err-card">${escapeHtml(t('상태 조회 실패'))}: ${escapeHtml(String(e))}</div>`;
+    return;
+  }
+  if (!status || !status.configured) {
+    _teamLbRenderNoKey(body, status || {});
+    return;
+  }
+  _teamLbRenderShell(body, status);
+  _teamLbLoad();
+}
+
+// No org admin key → empty state that routes the user to the Admin Usage tab,
+// where the same key is configured (shared ~/.claude-dashboard-admin.json).
+function _teamLbRenderNoKey(body, status) {
+  const limits = Array.isArray(status.limits) ? status.limits : [];
+  body.innerHTML = `
+    <div class="card" style="max-width:620px">
+      <h2 style="margin-top:0">${escapeHtml(t('조직 Admin 키가 필요합니다'))}</h2>
+      <p class="muted">${escapeHtml(t('팀 리더보드는 Claude Code Analytics Admin API를 사용합니다. 표준 API 키가 아닌 조직 Admin 키(sk-ant-admin...)가 필요하며 개인 계정에서는 사용할 수 없습니다.'))}</p>
+      <div class="row" style="gap:8px;margin-top:12px">
+        <button class="btn btn-primary" id="teamLbGoAdmin">${escapeHtml(t('Admin 사용량 탭에서 키 설정'))}</button>
+      </div>
+      ${limits.length ? `<div style="margin-top:16px">
+        <div class="muted" style="font-size:.85em;margin-bottom:4px">${escapeHtml(t('제약'))}</div>
+        <ul class="muted" style="margin:0;padding-left:18px;font-size:.85em">
+          ${limits.map(l => `<li>${escapeHtml(l)}</li>`).join('')}
+        </ul></div>` : ''}
+    </div>`;
+  const goBtn = body.querySelector('#teamLbGoAdmin');
+  if (goBtn) goBtn.addEventListener('click', () => { if (typeof go === 'function') go('adminUsage'); });
+}
+
+function _teamLbRenderShell(body, status) {
+  const dayOpts = [1, 7, 14, 30];
+  const sortOpts = [
+    ['cost', t('추정 비용')], ['tokens', t('토큰')], ['sessions', t('세션')],
+    ['lines', t('코드 라인')], ['commits', t('커밋')], ['prs', t('PR')],
+  ];
+  body.innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="row" style="gap:16px;flex-wrap:wrap;align-items:flex-end">
+        <label class="field" style="min-width:120px">
+          <span>${escapeHtml(t('기간'))}</span>
+          <select id="teamLbDays">
+            ${dayOpts.map(d => `<option value="${d}" ${d === _teamLbState.days ? 'selected' : ''}>${d} ${escapeHtml(t('일'))}</option>`).join('')}
+          </select>
+        </label>
+        <label class="field" style="min-width:160px">
+          <span>${escapeHtml(t('정렬 기준'))}</span>
+          <select id="teamLbSort">
+            ${sortOpts.map(([v, lbl]) => `<option value="${v}" ${v === _teamLbState.sort ? 'selected' : ''}>${escapeHtml(lbl)}</option>`).join('')}
+          </select>
+        </label>
+        <button class="btn btn-primary" id="teamLbReload">${escapeHtml(t('새로고침'))}</button>
+        <span class="muted" style="font-size:.82em">${escapeHtml(t('키'))}: ${escapeHtml(status.maskedKey || '')}</span>
+      </div>
+    </div>
+    <div id="teamLbResult"><div class="muted" style="padding:24px">${escapeHtml(t('불러오는 중…'))}</div></div>`;
+
+  body.querySelector('#teamLbDays').addEventListener('change', (e) => {
+    _teamLbState.days = parseInt(e.target.value, 10) || 7;
+  });
+  body.querySelector('#teamLbSort').addEventListener('change', (e) => {
+    _teamLbState.sort = e.target.value || 'cost';
+  });
+  body.querySelector('#teamLbReload').addEventListener('click', () => _teamLbLoad());
+}
+
+async function _teamLbLoad() {
+  const slot = document.getElementById('teamLbResult');
+  if (!slot) return;
+  slot.innerHTML = `<div class="muted" style="padding:24px">${escapeHtml(t('불러오는 중…'))}</div>`;
+  const qs = `?days=${encodeURIComponent(_teamLbState.days)}&sort=${encodeURIComponent(_teamLbState.sort)}`;
+  let res;
+  try {
+    res = await api('/api/team/leaderboard' + qs);
+  } catch (e) {
+    slot.innerHTML = `<div class="card err-card">${escapeHtml(t('리더보드 조회 실패'))}: ${escapeHtml(String(e))}</div>`;
+    return;
+  }
+  if (res && res.configured === false) { _teamLbInit(); return; }
+  if (!res || !res.ok) {
+    const detail = (res && (res.hint || res.detail || res.error)) || t('알 수 없는 오류');
+    slot.innerHTML = `<div class="card err-card">${escapeHtml(t('리더보드를 가져오지 못했습니다'))}: ${escapeHtml(String(detail))}</div>`;
+    return;
+  }
+  _teamLbRenderResult(slot, res);
+}
+
+function _teamLbNum(n) { return (Number(n) || 0).toLocaleString(); }
+function _teamLbUsd(n) { return '$' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function _teamLbTok(n) { return (typeof fmtTokens === 'function') ? fmtTokens(Number(n) || 0) : _teamLbNum(n); }
+
+function _teamLbRenderResult(slot, res) {
+  const lb = res.leaderboard || {};
+  const rows = Array.isArray(lb.rows) ? lb.rows : [];
+  const totals = lb.totals || {};
+  const win = res.window || {};
+
+  if (!rows.length) {
+    slot.innerHTML = `
+      <div class="card" style="text-align:center;padding:32px">
+        <p class="muted">${escapeHtml(t('이 기간에 기록된 팀 활동이 없습니다.'))}</p>
+        <p class="muted" style="font-size:.82em">${escapeHtml(t('데이터는 약 1시간 지연되며 오늘은 집계에서 제외됩니다.'))}</p>
+      </div>`;
+    return;
+  }
+
+  const sortField = lb.sortBy || 'estimatedUsd';
+  const barField = (sortField === 'estimatedUsd') ? 'estimatedUsd' : sortField;
+  const maxVal = rows.reduce((m, r) => Math.max(m, Number(r[barField]) || 0), 0) || 1;
+
+  const warnBanner = res.partial && res.warning
+    ? `<div class="card" style="border-left:3px solid var(--warn,#c80);margin-bottom:12px"><span class="muted">${escapeHtml(res.warning)}</span></div>`
+    : '';
+
+  const summary = `
+    <div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:16px">
+      ${_teamLbStat(t('사용자'), _teamLbNum(totals.actors))}
+      ${_teamLbStat(t('세션'), _teamLbNum(totals.sessions))}
+      ${_teamLbStat(t('코드 라인 (+)'), _teamLbNum(totals.linesAdded))}
+      ${_teamLbStat(t('커밋'), _teamLbNum(totals.commits))}
+      ${_teamLbStat(t('PR'), _teamLbNum(totals.pullRequests))}
+      ${_teamLbStat(t('토큰'), _teamLbTok(totals.totalTokens))}
+      ${_teamLbStat(t('추정 비용'), _teamLbUsd(totals.estimatedUsd))}
+    </div>`;
+
+  const medal = (rank) => rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ('#' + rank);
+
+  const tableRows = rows.map((r) => {
+    const pct = Math.max(2, Math.round((Number(r[barField]) || 0) / maxVal * 100));
+    const kindBadge = r.kind === 'api'
+      ? `<span class="badge" title="${escapeHtml(t('API 키 액터'))}">API</span>`
+      : (r.kind === 'user' ? '' : `<span class="badge muted">?</span>`);
+    const acc = (r.acceptRate == null) ? '—' : (Math.round(r.acceptRate * 100) + '%');
+    return `
+      <tr>
+        <td style="white-space:nowrap">${escapeHtml(medal(r.rank))}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <strong>${escapeHtml(r.name)}</strong> ${kindBadge}
+          </div>
+          <div class="team-lb-bar" style="margin-top:4px;height:6px;background:var(--bg-soft,#eee);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:var(--accent,#4a7);"></div>
+          </div>
+        </td>
+        <td style="text-align:right">${_teamLbNum(r.sessions)}</td>
+        <td style="text-align:right;white-space:nowrap" title="${escapeHtml(t('순증감'))}: ${_teamLbNum(r.linesNet)}">+${_teamLbNum(r.linesAdded)} / -${_teamLbNum(r.linesRemoved)}</td>
+        <td style="text-align:right">${_teamLbNum(r.commits)}</td>
+        <td style="text-align:right">${_teamLbNum(r.pullRequests)}</td>
+        <td style="text-align:right">${_teamLbTok(r.totalTokens)}</td>
+        <td style="text-align:right;white-space:nowrap">${_teamLbUsd(r.estimatedUsd)}</td>
+        <td style="text-align:right" title="${escapeHtml(t('도구 수락률'))}">${escapeHtml(acc)}</td>
+      </tr>`;
+  }).join('');
+
+  const dates = Array.isArray(win.dates) && win.dates.length
+    ? `${escapeHtml(win.dates[0])} → ${escapeHtml(win.dates[win.dates.length - 1])}`
+    : `${escapeHtml(String(win.days || ''))} ${escapeHtml(t('일'))}`;
+
+  slot.innerHTML = `
+    ${warnBanner}
+    ${summary}
+    <div class="card" style="overflow-x:auto">
+      <table class="data-table" style="width:100%;min-width:760px">
+        <thead>
+          <tr>
+            <th style="text-align:left">#</th>
+            <th style="text-align:left">${escapeHtml(t('사용자'))}</th>
+            <th style="text-align:right">${escapeHtml(t('세션'))}</th>
+            <th style="text-align:right">${escapeHtml(t('코드 라인 (+/-)'))}</th>
+            <th style="text-align:right">${escapeHtml(t('커밋'))}</th>
+            <th style="text-align:right">${escapeHtml(t('PR'))}</th>
+            <th style="text-align:right">${escapeHtml(t('토큰'))}</th>
+            <th style="text-align:right">${escapeHtml(t('추정 비용'))}</th>
+            <th style="text-align:right">${escapeHtml(t('수락률'))}</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:.8em">${escapeHtml(t('기간'))}: ${dates} · ${escapeHtml(t('레코드'))}: ${_teamLbNum(win.recordCount)} · ${escapeHtml(t('추정 비용은 Anthropic이 제공하는 추정치이며 실제 청구와 다를 수 있습니다.'))}</p>`;
+}
+
+function _teamLbStat(label, value) {
+  return `
+    <div class="card" style="flex:1;min-width:120px;padding:12px 14px">
+      <div class="muted" style="font-size:.78em">${escapeHtml(label)}</div>
+      <div style="font-size:1.3em;font-weight:600;margin-top:2px">${escapeHtml(String(value))}</div>
+    </div>`;
+}
+VIEWS.marketplaceDiscover = async () => {
+  const q = (state.data.mktDiscQuery || '').trim();
+  let d;
+  try {
+    d = await api('/api/marketplace/discover' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
+  } catch (e) {
+    return `
+      <div class="mb-4"><h1 class="text-2xl font-bold">🛍️ ${escapeHtml(t('플러그인 마켓'))}</h1></div>
+      <div class="card empty p-8 text-center">
+        <div class="text-3xl mb-2">⚠️</div>
+        <div class="text-sm text-[var(--text-mute)]">${escapeHtml(t('마켓플레이스 정보를 불러오지 못했습니다'))}</div>
+        <div class="text-[11px] mono text-[var(--text-dim)] mt-2 break-all">${escapeHtml(String(e && e.message || e))}</div>
+        <button class="btn text-xs mt-4" onclick="renderView()">${escapeHtml(t('다시 시도'))}</button>
+      </div>`;
+  }
+
+  if (!d || d.ok !== true) {
+    return `
+      <div class="mb-4"><h1 class="text-2xl font-bold">🛍️ ${escapeHtml(t('플러그인 마켓'))}</h1></div>
+      <div class="card empty p-8 text-center">
+        <div class="text-3xl mb-2">⚠️</div>
+        <div class="text-sm text-[var(--text-mute)]">${escapeHtml((d && d.error) || t('마켓플레이스 정보를 불러오지 못했습니다'))}</div>
+      </div>`;
+  }
+
+  const c = d.counts || {};
+  const marketplaces = Array.isArray(d.marketplaces) ? d.marketplaces : [];
+  state.data.mktDiscData = marketplaces;
+  const sel = state.data.mktDiscSel || '';
+
+  const header = `
+    <div class="mb-4 flex items-start justify-between gap-2 flex-wrap">
+      <div class="min-w-0">
+        <h1 class="text-2xl font-bold">🛍️ ${escapeHtml(t('플러그인 마켓'))}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">
+          ${escapeHtml(String(c.marketplaces || 0))}${escapeHtml(t('개 마켓플레이스'))} ·
+          ${escapeHtml(String(c.plugins || 0))}${escapeHtml(t('개 플러그인'))} ·
+          ${escapeHtml(String(c.installed || 0))}${escapeHtml(t('개 설치됨'))}
+          ${c.needsRefresh ? ' · <span style="color:#fbbf24">' + escapeHtml(String(c.needsRefresh)) + escapeHtml(t('개 새로고침 필요')) + '</span>' : ''}
+        </p>
+      </div>
+      <div class="flex gap-2 flex-shrink-0">
+        <a class="btn text-xs" href="${DOCS_BASE}discover-plugins" target="_blank" rel="noopener noreferrer">📖 ${escapeHtml(t('공식 문서'))} ↗</a>
+      </div>
+    </div>`;
+
+  if (!marketplaces.length) {
+    return header + `
+      <div class="card empty p-8 text-center">
+        <div class="text-3xl mb-2">🪧</div>
+        <div class="text-sm text-[var(--text-mute)] mb-1">${escapeHtml(t('구성된 마켓플레이스가 없습니다'))}</div>
+        <div class="text-[11px] text-[var(--text-dim)] mb-4">${escapeHtml(t('터미널에서 마켓플레이스를 추가하면 여기에 나타납니다'))}</div>
+        <div class="flex items-center justify-center gap-2">
+          <code class="code-terminal px-2 py-1.5 rounded text-xs font-mono">claude plugin marketplace add &lt;owner/repo&gt;</code>
+          <button class="btn text-[11px]" onclick="_copyToClipboard(this, 'claude plugin marketplace add &lt;owner/repo&gt;')">📋 ${escapeHtml(t('복사'))}</button>
+        </div>
+      </div>`;
+  }
+
+  state.data.mktDiscNoCli = !d.claudeCliInstalled;
+
+  const chips = `
+    <div class="card p-3 mb-4 flex flex-wrap items-center gap-2">
+      <input id="mktDiscQ" class="input max-w-[260px] text-xs"
+             placeholder="${escapeHtml(t('검색: security, design, lsp...'))}"
+             value="${escapeHtml(state.data.mktDiscQuery || '')}" />
+      <button class="chip ${!sel ? 'chip-accent' : ''}" onclick="setMktDiscSel('')">${escapeHtml(t('전체'))} ${escapeHtml(String(c.plugins || 0))}</button>
+      ${marketplaces.map(m => `<button class="chip ${m.id === sel ? 'chip-accent' : ''}" onclick="setMktDiscSel(${JSON.stringify(m.id)})">${escapeHtml(m.name)} ${escapeHtml(String(m.pluginCount || 0))}</button>`).join('')}
+    </div>`;
+
+  const noCliBanner = !d.claudeCliInstalled ? `
+    <div class="card p-3 mb-4 text-xs" style="border-color:rgba(251,191,36,0.4);background:rgba(251,191,36,0.08);">
+      ⚠️ ${escapeHtml(t('Claude Code CLI 가 설치되어 있지 않아 설치 명령을 실행할 수 없습니다. 명령을 복사해 직접 실행하세요.'))}
+    </div>` : '';
+
+  const shown = sel ? marketplaces.filter(m => m.id === sel) : marketplaces;
+
+  const sections = shown.map(m => {
+    const mp = `
+      <div class="flex items-baseline justify-between gap-2 mb-2 mt-1 flex-wrap">
+        <div class="min-w-0">
+          <span class="font-semibold text-sm">${escapeHtml(m.name)}</span>
+          ${m.sourceType ? `<span class="chip text-[9px] ml-1">${escapeHtml(m.sourceType)}</span>` : ''}
+          ${m.repo ? `<span class="text-[10px] mono text-[var(--text-dim)] ml-1 truncate">${escapeHtml(m.repo)}</span>` : ''}
+        </div>
+        <span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(String(m.installedCount || 0))}/${escapeHtml(String(m.pluginCount || 0))} ${escapeHtml(t('설치됨'))}</span>
+      </div>`;
+
+    if (m.needsRefresh) {
+      const rc = m.refreshCommand || ('claude plugin marketplace update ' + m.id);
+      return mp + `
+        <div class="card p-4 mb-5" style="border-color:rgba(251,191,36,0.35);">
+          <div class="text-xs text-[var(--text-mute)] mb-2">⟳ ${escapeHtml(t('이 마켓플레이스의 매니페스트가 로컬에 캐시되어 있지 않습니다. 새로고침하세요.'))}</div>
+          <div class="flex items-center gap-2">
+            <code class="code-terminal px-2 py-1.5 rounded text-xs font-mono flex-1 min-w-0" style="word-break:break-all;">${escapeHtml(rc)}</code>
+            <button class="btn text-[11px] flex-shrink-0" onclick="_copyToClipboard(this, ${JSON.stringify(rc).replace(/"/g, '&quot;')})">📋 ${escapeHtml(t('복사'))}</button>
+          </div>
+        </div>`;
+    }
+
+    if (!m.plugins || !m.plugins.length) {
+      return mp + `<div class="card empty mb-5">${escapeHtml(t('표시할 플러그인 없음'))}</div>`;
+    }
+
+    const cards = m.plugins.map(p => {
+      const cmd = p.installCommand || '';
+      const cmdJson = JSON.stringify(cmd).replace(/"/g, '&quot;');
+      return `
+        <div class="card p-4 hover-lift flex flex-col">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold text-sm truncate">${escapeHtml(p.name)}</div>
+              <div class="text-[10px] mono text-[var(--text-dim)] truncate">${escapeHtml(p.marketplace)}${p.version ? ' · v' + escapeHtml(p.version) : ''}</div>
+            </div>
+            ${p.installed
+              ? `<span class="chip text-[9px] flex-shrink-0" style="color:#34d399;border-color:rgba(52,211,153,0.4);">✓ ${escapeHtml(t('설치됨'))}</span>`
+              : `<span class="chip text-[9px] flex-shrink-0" style="color:#fbbf24;border-color:rgba(251,191,36,0.4);">${escapeHtml(t('미설치'))}</span>`}
+          </div>
+          <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3.2em;">${escapeHtml(p.description || '—')}</div>
+          <div class="flex gap-1 flex-wrap mb-2">
+            ${p.category ? `<span class="chip text-[9px]">${escapeHtml(p.category)}</span>` : ''}
+            ${(p.keywords || []).slice(0, 3).map(k => `<span class="chip text-[9px]">${escapeHtml(k)}</span>`).join('')}
+          </div>
+          ${p.author ? `<div class="text-[10px] text-[var(--text-dim)] mb-2 truncate">${escapeHtml(t('제작'))}: ${escapeHtml(p.author)}</div>` : ''}
+          <div class="mt-auto">
+            <div class="flex items-center gap-2 mb-2">
+              <code class="code-terminal px-2 py-1 rounded text-[10px] font-mono flex-1 min-w-0" style="word-break:break-all;">${escapeHtml(cmd || '—')}</code>
+              ${cmd ? `<button class="btn text-[10px] flex-shrink-0" onclick="_copyToClipboard(this, ${cmdJson})">📋</button>` : ''}
+            </div>
+            <div class="flex gap-2">
+              ${p.homepage ? `<a class="btn text-[10px] flex-1 text-center" href="${escapeHtml(p.homepage)}" target="_blank" rel="noopener noreferrer">🌐 ${escapeHtml(t('홈페이지'))}</a>` : ''}
+              ${(!p.installed && cmd && !state.data.mktDiscNoCli)
+                ? `<button class="btn-primary btn text-[10px] flex-1" onclick="installMarketplacePlugin(${JSON.stringify(p.name).replace(/"/g, '&quot;')}, ${JSON.stringify(p.marketplace).replace(/"/g, '&quot;')})">⬇️ ${escapeHtml(t('설치'))}</button>`
+                : ''}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    return mp + `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">${cards}</div>`;
+  }).join('');
+
+  const hasAnyPlugin = shown.some(m => (m.plugins || []).length);
+  const filteredEmpty = (q || sel) && !hasAnyPlugin
+    ? `<div class="card empty">${escapeHtml(t('필터 결과 없음'))}</div>`
+    : '';
+
+  return header + chips + noCliBanner + (filteredEmpty || sections) + `
+    <div class="mt-2 card p-4 text-xs text-[var(--text-mute)]">
+      💡 ${escapeHtml(t('설치 명령은 공식 문서에서 검증된 형식입니다'))}:
+      <code class="mono">claude plugin install &lt;name&gt;@&lt;marketplace&gt;</code>.
+      ${escapeHtml(t('설치 버튼은 큐레이션된 명령만 터미널에서 실행합니다.'))}
+    </div>`;
+};
+
+AFTER.marketplaceDiscover = () => {
+  const el = document.getElementById('mktDiscQ');
+  if (el) {
+    let deb;
+    el.addEventListener('input', e => {
+      clearTimeout(deb);
+      deb = setTimeout(() => { state.data.mktDiscQuery = e.target.value; renderView(); }, 250);
+    });
+  }
+};
+
+function setMktDiscSel(id) { state.data.mktDiscSel = id; renderView(); }
+
+async function installMarketplacePlugin(name, marketplace) {
+  const cmd = 'claude plugin install ' + name + '@' + marketplace;
+  const ok = await confirmModal({
+    title: t('플러그인 설치'),
+    message: t('터미널에서 다음 명령을 실행합니다') + ':\n\n' + cmd,
+    confirmLabel: t('터미널에서 실행'),
+    cancelLabel: t('취소'),
+  });
+  if (!ok) return;
+  let r;
+  try {
+    r = await api('/api/marketplace/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, marketplace }),
+    });
+  } catch (e) {
+    toast(t('설치 실패') + ': ' + String(e && e.message || e), 'err');
+    return;
+  }
+  if (r && r.ok) {
+    toast(t('터미널에서 설치를 진행하세요'), 'ok');
+  } else {
+    toast(t('설치 실패') + ': ' + ((r && (r.error_key && t(r.error_key) !== r.error_key ? t(r.error_key) : r.error)) || 'unknown'), 'err');
+  }
+}
+VIEWS.bashSandbox = async () => {
+  const d = await api('/api/bash-sandbox/get');
+  const sb = (d && d.sandbox) || {};
+  const expl = (d && d.explanations) || [];
+  const get = (path) => {
+    const segs = path.replace(/^sandbox\./, '').split('.');
+    let cur = sb;
+    for (const s of segs) { if (cur == null) return undefined; cur = cur[s]; }
+    return cur;
+  };
+
+  if (d && d.malformed) {
+    return `
+      <div class="page">
+        <h1>🧰 ${escapeHtml(t('Bash 샌드박스'))}</h1>
+        <div class="card" style="border-left:4px solid var(--danger,#e5484d)">
+          <h3>${escapeHtml(t('settings.json을 읽을 수 없습니다'))}</h3>
+          <p>${escapeHtml(t('settings.json이 올바른 JSON이 아닙니다. 손상을 막기 위해 편집을 비활성화했습니다. 파일을 수동으로 고친 뒤 새로고침하세요.'))}</p>
+          <p class="muted"><code>${escapeHtml(d.settings_path || '')}</code></p>
+          <p><a href="${escapeHtml(d.docs_url)}" target="_blank" rel="noopener">${escapeHtml(t('샌드박스 공식 문서'))}</a></p>
+        </div>
+      </div>`;
+  }
+
+  const explainer = `
+    <div class="card">
+      <h3>${escapeHtml(t('샌드박스란?'))}</h3>
+      <p>${escapeHtml(t('Claude Code의 Bash 샌드박스는 셸 명령을 OS 수준 격리(macOS Seatbelt / Linux·WSL2 bubblewrap) 안에서 실행해, 매번 권한을 묻지 않고도 파일·네트워크 접근 경계를 강제합니다. native Windows는 미지원(WSL2 사용).'))}</p>
+      <p class="muted">${escapeHtml(t('설정 파일'))}: <code>${escapeHtml(d.settings_path || '')}</code> · <a href="${escapeHtml(d.docs_url)}" target="_blank" rel="noopener">${escapeHtml(t('공식 문서'))}</a></p>
+      <p class="muted">${escapeHtml(t('저장 시 settings.json.bak.<시각> 백업을 먼저 만들고, 검증된 sandbox 키만 안전하게 병합 기록합니다. 관련 없는 설정은 절대 건드리지 않습니다.'))}</p>
+    </div>`;
+
+  const status = `
+    <div class="card">
+      <span class="badge ${sb.enabled ? 'badge-on' : 'badge-off'}">${sb.enabled ? escapeHtml(t('샌드박스 ON')) : escapeHtml(t('샌드박스 OFF'))}</span>
+    </div>`;
+
+  const fieldFor = (e) => {
+    const cur = get(e.path);
+    const idAttr = `sb-${e.key}`;
+    const meta = `<div class="sb-field-meta"><label for="${idAttr}"><b>${escapeHtml(t(e.label))}</b>${e.managed_only ? ` <span class="badge badge-off">managed</span>` : ''}</label><p class="muted">${escapeHtml(t(e.desc))}</p><code class="muted">${escapeHtml(e.path)}</code></div>`;
+    if (e.kind === 'bool') {
+      const checked = cur === true ? 'checked' : '';
+      return `<div class="sb-field">${meta}<div class="sb-field-input"><label class="switch"><input type="checkbox" id="${idAttr}" data-sbkey="${e.key}" data-sbkind="bool" ${checked}><span>${escapeHtml(t('사용'))}</span></label></div></div>`;
+    }
+    if (e.kind === 'int') {
+      const v = (typeof cur === 'number') ? cur : '';
+      return `<div class="sb-field">${meta}<div class="sb-field-input"><input type="number" min="1" max="65535" id="${idAttr}" data-sbkey="${e.key}" data-sbkind="int" value="${escapeHtml(String(v))}" placeholder="${escapeHtml(t('미설정'))}"></div></div>`;
+    }
+    const v = Array.isArray(cur) ? cur.join('\n') : '';
+    return `<div class="sb-field">${meta}<div class="sb-field-input"><textarea id="${idAttr}" data-sbkey="${e.key}" data-sbkind="array" rows="3" placeholder="${escapeHtml(t('한 줄에 하나'))}">${escapeHtml(v)}</textarea></div></div>`;
+  };
+
+  const fields = expl.map(fieldFor).join('');
+
+  return `
+    <div class="page bash-sandbox">
+      <h1>🧰 ${escapeHtml(t('Bash 샌드박스'))}</h1>
+      ${status}
+      ${explainer}
+      <form id="sb-form" class="card">
+        <h3>${escapeHtml(t('설정'))}</h3>
+        ${fields}
+        <div class="sb-actions">
+          <button type="submit" class="btn btn-primary" id="sb-save">${escapeHtml(t('저장'))}</button>
+          <span id="sb-msg" class="muted" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+    </div>`;
+};
+
+AFTER.bashSandbox = () => {
+  const form = document.getElementById('sb-form');
+  if (!form) return;
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const btn = document.getElementById('sb-save');
+    const msg = document.getElementById('sb-msg');
+    const payload = {};
+    form.querySelectorAll('[data-sbkey]').forEach((el) => {
+      const key = el.getAttribute('data-sbkey');
+      const kind = el.getAttribute('data-sbkind');
+      if (kind === 'bool') {
+        payload[key] = !!el.checked;
+      } else if (kind === 'int') {
+        const raw = el.value.trim();
+        payload[key] = raw === '' ? null : parseInt(raw, 10);
+      } else {
+        const lines = el.value.split('\n').map((s) => s.trim()).filter(Boolean);
+        payload[key] = lines.length ? lines : null;
+      }
+    });
+    btn.disabled = true;
+    if (msg) msg.textContent = t('저장 중…');
+    try {
+      const r = await api('/api/bash-sandbox/set', { method: 'POST', body: JSON.stringify(payload) });
+      if (r && r.ok) {
+        const note = r.backup ? `${t('저장됨')} · ${t('백업')}: ${r.backup.split('/').pop()}` : t('저장됨');
+        if (msg) msg.textContent = note;
+        if (typeof toast === 'function') toast(t('샌드박스 설정 저장됨'));
+        if (typeof go === 'function') go('bashSandbox');
+      } else {
+        const e = (r && r.error) || t('저장 실패');
+        if (msg) msg.textContent = e;
+        if (typeof toast === 'function') toast(e);
+      }
+    } catch (err) {
+      if (msg) msg.textContent = t('저장 실패');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+};
 
 // ── Caveman 전용 탭 ─────────────────────────────────────────────────────
 // caveman 스위트(스킬 7종) 상태·설치/재설치·압축 레벨 가이드.

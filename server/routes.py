@@ -100,6 +100,9 @@ from .reports import api_report_generate, api_report_html
 from .anomaly import api_anomalies
 from .memory_audit import api_memory_audit
 from .output_style_migrate import api_output_style_audit
+from .team_analytics import api_team_status, api_team_leaderboard
+from .marketplace_discover import api_marketplace_discover, api_marketplace_browse, api_marketplace_install
+from .bash_sandbox import api_bash_sandbox_get, api_bash_sandbox_set
 from .toolkits import (
     api_toolkit_status,
     api_toolkit_ecc_install, api_toolkit_ecc_uninstall,
@@ -490,6 +493,11 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/anomalies": api_anomalies,
     "/api/memory/audit": api_memory_audit,
     "/api/output-style/audit": api_output_style_audit,
+    "/api/team/status": lambda q: api_team_status(),
+    "/api/team/leaderboard": api_team_leaderboard,
+    "/api/marketplace/discover": api_marketplace_discover,
+    "/api/marketplace/browse": api_marketplace_browse,
+    "/api/bash-sandbox/get": api_bash_sandbox_get,
     "/api/toolkit/status": api_toolkit_status,
     "/api/session-replay/list": api_session_replay_list,
     "/api/session-replay/load": api_session_replay_load,
@@ -618,6 +626,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/eval/set/delete": api_eval_set_delete,
     "/api/eval/run": api_eval_run,
     "/api/cache-diag/run": api_cache_diag_run,
+    "/api/marketplace/install": api_marketplace_install,
+    "/api/bash-sandbox/set": api_bash_sandbox_set,
     "/api/toolkit/ecc/install": api_toolkit_ecc_install,
     "/api/toolkit/ecc/uninstall": api_toolkit_ecc_uninstall,
     "/api/toolkit/ecc/install-plugin": api_toolkit_ecc_install_plugin,

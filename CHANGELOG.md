@@ -10,6 +10,33 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.45] — 2026-06-01  🏆 team leaderboard · 🛍️ plugin marketplace discover · 🧰 bash sandbox manager (roadmap complete)
+
+Final three roadmap picks, backends built in parallel (workflow), shared-file integration by the main thread.
+
+- **🏆 팀 리더보드** (`server/team_analytics.py`, tab `teamLeaderboard`): per-actor
+  ranking (sessions / lines of code / commits / PRs / tokens / est. cost) from the
+  verified Claude Code Analytics Admin endpoint `GET /v1/organizations/usage_report/
+  claude_code`, reusing the admin key from the Admin tab. No-key state routes to the
+  Admin tab. (Needs a real org admin key — structurally verified.)
+- **🛍️ 플러그인 마켓** (`server/marketplace_discover.py`, tab `marketplaceDiscover`):
+  browse configured plugin marketplaces (`.claude-plugin/marketplace.json`) + their
+  plugins with installed-state + the exact `claude plugin install` command (run via
+  Terminal behind a confirm). (Live: 2 marketplaces / 205 plugins / 8 installed here.)
+- **🧰 Bash 샌드박스** (`server/bash_sandbox.py`, tab `bashSandbox`): read + safely edit
+  the documented Bash-tool OS sandbox settings (macOS Seatbelt / Linux bubblewrap;
+  file + network isolation) in `settings.json` — atomic write + timestamped backup +
+  value validation, never touches unrelated keys.
+
+Integration: routes.py (5 GET / 2 POST), NAV + MODE_TABS (claude) + nav_catalog for all 3.
+Verified in-app (Playwright): all 3 tabs render with live data; endpoints ok; 0 console
+errors; i18n green.
+
+**Roadmap complete.** All 21 items from the feature-gap research are now addressed across
+this session's batches (#4 Cmd+K was already implemented; #14 team / #2 admin / #13 cache-
+diag have live paths gated on a real admin key or beta access, structurally verified).
+
+---
 ## [3.99.44] — 2026-06-01  📤 reports/export · 🚨 anomaly detection · 🧠 memory audit · 🎨 output-style audit
 
 Four more roadmap picks, backends built in parallel (workflow), shared-file integration by the main thread. All read-only.
