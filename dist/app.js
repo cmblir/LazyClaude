@@ -90,6 +90,21 @@ const NAV = [
     docUrl: null
   },
   {
+    id: 'budgets', icon: '💰', label: '예산 · 알림', group: 'observe',
+    desc: '일·월 지출 한도(USD/토큰) 소스별 설정 + 임계치 알림 센터',
+    docUrl: null
+  },
+  {
+    id: 'rateLimit', icon: '⏳', label: '레이트리밋 · 쿼터', group: 'observe',
+    desc: '롤링 5시간 윈도우 + 주간 쿼터 + Opus 윈도우 근접도·리셋 ETA (로컬 best-effort)',
+    docUrl: null
+  },
+  {
+    id: 'today', icon: '🏠', label: '오늘', group: 'main',
+    desc: '오늘 하루 한눈에 — 토큰·비용·세션·상위 프로젝트·최근 활동',
+    docUrl: null
+  },
+  {
     id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE + 'sub-agents'
   },
@@ -668,6 +683,7 @@ const MODE_TABS = {
     'memory', 'memoryManager', 'tasks', 'plans', 'outputStyles', 'team',
     'eventForwarder', 'autoResumeManager', 'backupRestore', 'backups',
     'system', 'telemetry', 'metrics', 'costsTimeline', 'otel', 'adminUsage',
+    'budgets', 'rateLimit', 'today',
     'securityScan', 'claudeDocs', 'zclaude', 'homunculus', 'routines',
     'usage', 'ideStatus', 'scheduled', 'bashHistory', 'cliSessions', 'openPorts',
   ]),
@@ -2173,6 +2189,11 @@ const WF_NODE_TYPES = [
     id: 'sticky', icon: '🟨', label: '메모', portIn: false, portOut: false,
     desc: '캔버스 주석용 스티키 노트. 마크다운 텍스트 + 색상 5종(노랑/파랑/초록/분홍/회색). 실행에 영향 없음 (n8n parity).'
   },
+  // Feature #10 — Structured Output. Constrains a model call to a JSON Schema.
+  {
+    id: 'structured_output', icon: '🧬', label: '구조화 출력', portIn: true, portOut: true,
+    desc: 'JSON Schema 로 모델 응답을 강제하는 노드. subject/description + 입력을 프롬프트로 보내고 Anthropic output_config(json_schema) 로 스키마에 맞는 JSON 만 반환받음. 후속 노드는 검증된 JSON 을 받음.'
+  },
 ];
 const WF_TYPE_MAP = Object.fromEntries(WF_NODE_TYPES.map(x => [x.id, x]));
 
@@ -2198,8 +2219,8 @@ const WF_NODE_CATEGORIES = [
   },
   {
     id: 'data', icon: '🔧', label: '데이터 / HTTP',
-    desc: '변환 · 변수 · 외부 호출 · 서브워크플로우',
-    types: ['http', 'transform', 'variable', 'subworkflow']
+    desc: '변환 · 변수 · 외부 호출 · 서브워크플로우 · 구조화 출력',
+    types: ['http', 'transform', 'variable', 'subworkflow', 'structured_output']
   },
   {
     id: 'integ', icon: '🔗', label: '연동',
@@ -7487,6 +7508,33 @@ function _wfRenderEditorBody(winId) {
         🐳 ${t('docker 미설치 시 호스트 실행 폴백 없이 명확한 에러를 반환합니다 (조용한 권한 상승 방지).')}
       </div>
     `;
+  } else if (draft.type === 'structured_output') {
+    const _schemaStr = (typeof d.schemaText === 'string' && d.schemaText)
+      ? d.schemaText
+      : (d.schema && Object.keys(d.schema).length ? JSON.stringify(d.schema, null, 2) : '');
+    body += `
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('업무 (subject)')}</label>
+      <input class="input w-full mt-1" value="${escapeHtml(d.subject || '')}" oninput="_wfDraftSetData('${winId}','subject',this.value)" placeholder="${t('예: 이메일에서 핵심 정보 추출')}">
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('설명 (description)')}</label>
+      <textarea class="input w-full mt-1" rows="3" oninput="_wfDraftSetData('${winId}','description',this.value)" placeholder="${t('모델에 전달할 추가 지시')}">${escapeHtml(d.description || '')}</textarea>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('AI 프로바이더 : 모델')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','assignee',this.value)">
+        ${_wfAssigneeOptions(d.assignee || 'sonnet-4.6')}
+      </select>
+      <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('구조화 출력은 Anthropic 모델에서만 스키마가 강제됩니다. 다른 프로바이더는 베스트에포트.')}</div>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('입력 합치기 모드')}</label>
+      <select class="input w-full mt-1" onchange="_wfDraftSetData('${winId}','inputsMode',this.value)">
+        <option value="concat" ${(d.inputsMode || 'concat') === 'concat' ? 'selected' : ''}>${t('이어붙이기 (concat)')}</option>
+        <option value="first" ${d.inputsMode === 'first' ? 'selected' : ''}>${t('첫 입력만 (first)')}</option>
+        <option value="json" ${d.inputsMode === 'json' ? 'selected' : ''}>${t('JSON 배열 (json)')}</option>
+      </select>
+      <label class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-3 block">${t('JSON Schema')}</label>
+      <textarea class="input w-full mt-1 font-mono" rows="10" spellcheck="false"
+        placeholder='{"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}'
+        oninput="_wfSetSchemaFromText('${winId}', this.value, this)">${escapeHtml(_schemaStr)}</textarea>
+      <div id="wfSchemaErr_${winId}" class="text-[10px] mt-1" style="color:#f87171;"></div>
+      <div class="text-[10px] mt-3" style="color:var(--text-dim)">🧬 ${t('모델은 이 스키마에 맞는 JSON 만 반환합니다. 후속 노드는 검증된 JSON 문자열을 입력으로 받습니다.')}</div>
+    `;
   }
   formHost.innerHTML = body;
 }
@@ -7508,6 +7556,35 @@ function _wfDraftSetData(winId, field, value) {
   w._wfDraft.data = w._wfDraft.data || {};
   w._wfDraft.data[field] = value;
   _wfScheduleAutoSave(winId);
+}
+
+// Feature #10 — structured_output node: parse the JSON-schema textarea on every
+// input. Stores raw text (schemaText, preserves the cursor across re-renders)
+// and the parsed object (schema) via the real draft resolver _wfDraftSetData.
+function _wfSetSchemaFromText(winId, text, el) {
+  const errEl = document.getElementById('wfSchemaErr_' + winId);
+  _wfDraftSetData(winId, 'schemaText', text);
+  const raw = (text || '').trim();
+  if (!raw) {
+    _wfDraftSetData(winId, 'schema', {});
+    if (el) el.style.borderColor = '';
+    if (errEl) errEl.textContent = '';
+    return;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      _wfDraftSetData(winId, 'schema', parsed);
+      if (el) el.style.borderColor = '';
+      if (errEl) errEl.textContent = '';
+    } else {
+      if (el) el.style.borderColor = '#f87171';
+      if (errEl) errEl.textContent = t('스키마는 JSON 객체여야 합니다 (예: {"type":"object", ...}).');
+    }
+  } catch (e) {
+    if (el) el.style.borderColor = '#f87171';
+    if (errEl) errEl.textContent = t('JSON 파싱 오류') + ': ' + (e && e.message ? e.message : String(e));
+  }
 }
 
 function _wfScheduleAutoSave(winId) {
@@ -22651,6 +22728,553 @@ async function loadPromptCacheAnalytics() {
     });
   }
 }
+
+
+// ═══ batch2: budgets/alerts · rate-limit · today cockpit ═══
+// ════════════════════════════════════════════════════════════════
+// BUDGETS · ALERTS (feature #6) — spend caps + threshold alerts center
+// ════════════════════════════════════════════════════════════════
+const _BUDGET_SOURCES = [
+  ['all', '전체', '#d97757'],
+  ['claude-code', 'Claude Code 세션', '#7dd3fc'],
+  ['workflow', '워크플로우', '#a78bfa'],
+  ['labs', '플레이그라운드', '#86efac'],
+];
+
+function _budgetGauge(label, spent, cap, pct, isUsd) {
+  const has = cap && cap > 0;
+  const p = has ? Math.min(100, pct || 0) : 0;
+  const over = has && (pct || 0) >= 100;
+  const warn = has && (pct || 0) >= 80;
+  const barColor = over ? '#f87171' : warn ? '#fbbf24' : '#4ade80';
+  const fmtV = (v) => isUsd ? ('$' + (v || 0).toFixed(2)) : fmtTokens(v || 0);
+  return `
+    <div class="mb-2">
+      <div class="flex items-center justify-between text-[10px] mb-1">
+        <span class="text-[var(--text-dim)]">${escapeHtml(label)}</span>
+        <span class="font-mono ${over ? 'text-[#f87171]' : warn ? 'text-[#fbbf24]' : 'text-[var(--text-mute)]'}">
+          ${fmtV(spent)} ${has ? '/ ' + fmtV(cap) : '/ —'} ${has ? `(${(pct || 0).toFixed(0)}%)` : ''}
+        </span>
+      </div>
+      <div style="height:8px;border-radius:4px;background:var(--bg-soft);overflow:hidden;" role="progressbar" aria-valuenow="${has ? Math.round(p) : 0}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(label)}">
+        <div style="height:100%;width:${has ? p : 0}%;background:${barColor};transition:width .2s;"></div>
+      </div>
+    </div>`;
+}
+
+function _budgetCapEditor(src, label, color, cap) {
+  cap = cap || {};
+  const num = (v) => (v && v > 0) ? v : '';
+  return `
+    <div class="card p-3 mb-3">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${color};"></span>
+        <span class="text-[12px] font-semibold">${escapeHtml(label)}</span>
+        <span class="text-[10px] text-[var(--text-dim)] font-mono">${escapeHtml(src)}</span>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <label class="text-[10px] text-[var(--text-dim)] flex flex-col gap-1">${t('일 USD')}
+          <input type="number" min="0" step="0.01" data-bcap="${src}.dailyUsd" value="${num(cap.dailyUsd)}" placeholder="—"
+            class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-mono" aria-label="${escapeHtml(label)} 일 USD"></label>
+        <label class="text-[10px] text-[var(--text-dim)] flex flex-col gap-1">${t('월 USD')}
+          <input type="number" min="0" step="0.01" data-bcap="${src}.monthlyUsd" value="${num(cap.monthlyUsd)}" placeholder="—"
+            class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-mono" aria-label="${escapeHtml(label)} 월 USD"></label>
+        <label class="text-[10px] text-[var(--text-dim)] flex flex-col gap-1">${t('일 토큰')}
+          <input type="number" min="0" step="1000" data-bcap="${src}.dailyTokens" value="${num(cap.dailyTokens)}" placeholder="—"
+            class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-mono" aria-label="${escapeHtml(label)} 일 토큰"></label>
+        <label class="text-[10px] text-[var(--text-dim)] flex flex-col gap-1">${t('월 토큰')}
+          <input type="number" min="0" step="1000" data-bcap="${src}.monthlyTokens" value="${num(cap.monthlyTokens)}" placeholder="—"
+            class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-mono" aria-label="${escapeHtml(label)} 월 토큰"></label>
+      </div>
+    </div>`;
+}
+
+async function _budgetSave() {
+  const budget = state.data._budget || {};
+  const caps = {};
+  document.querySelectorAll('[data-bcap]').forEach((el) => {
+    const [src, key] = el.getAttribute('data-bcap').split('.');
+    caps[src] = caps[src] || { dailyUsd: 0, monthlyUsd: 0, dailyTokens: 0, monthlyTokens: 0 };
+    const v = parseFloat(el.value);
+    caps[src][key] = (isFinite(v) && v > 0) ? v : 0;
+  });
+  const enabled = !!(document.getElementById('budgetEnabled') || {}).checked;
+  const thrRaw = (document.getElementById('budgetThresholds') || {}).value || '';
+  const thresholds = thrRaw.split(',').map(s => parseFloat(s.trim()) / 100)
+    .filter(x => isFinite(x) && x > 0 && x <= 2);
+  const body = { enabled, caps };
+  if (thresholds.length) body.thresholds = thresholds;
+  try {
+    const r = await api('/api/budget/set', { method: 'POST', body: JSON.stringify(body) });
+    if (!r.ok) { toast((r.error || t('저장 실패')), 'error'); return; }
+    const n = r.newAlerts || 0;
+    toast(n > 0 ? `${t('예산 저장됨')} · ${n} ${t('새 알림')}` : t('예산 저장됨'), 'success');
+    go('budgets');
+  } catch (e) { toast(String(e && e.message || e), 'error'); }
+}
+
+async function _budgetDismiss(id) {
+  try {
+    const r = await api('/api/alert/dismiss', { method: 'POST', body: JSON.stringify({ id }) });
+    if (!r.ok) { toast(r.error || t('실패'), 'error'); return; }
+    go('budgets');
+  } catch (e) { toast(String(e && e.message || e), 'error'); }
+}
+
+async function _budgetDismissAll() {
+  const ok = await confirmModal({
+    title: t('모든 알림 해제'),
+    message: t('활성 알림을 모두 해제할까요?'),
+    confirmLabel: t('모두 해제'),
+  });
+  if (!ok) return;
+  try {
+    const r = await api('/api/alert/dismiss', { method: 'POST', body: JSON.stringify({ all: true }) });
+    if (!r.ok) { toast(r.error || t('실패'), 'error'); return; }
+    toast(`${r.dismissed || 0} ${t('알림 해제됨')}`, 'success');
+    go('budgets');
+  } catch (e) { toast(String(e && e.message || e), 'error'); }
+}
+
+VIEWS.budgets = async () => {
+  const [bd, al] = await Promise.all([
+    api('/api/budget/status'),
+    api('/api/alerts/list').catch(() => ({ ok: false, alerts: [] })),
+  ]);
+  if (!bd || !bd.ok) {
+    return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml((bd && bd.error) || '')}</div>`;
+  }
+  state.data._budget = bd.budget;
+  const status = bd.status || {};
+  const caps = (bd.budget && bd.budget.caps) || {};
+  const thresholds = (bd.budget && bd.budget.thresholds) || [0.8, 1.0];
+  const enabled = !!(bd.budget && bd.budget.enabled);
+  const sources = status.sources || [];
+  const srcMap = {}; sources.forEach(s => { srcMap[s.source] = s; });
+
+  // gauges (per source: daily + monthly, USD + tokens when a cap is set)
+  const gaugeCards = _BUDGET_SOURCES.map(([src, label, color]) => {
+    const s = srcMap[src] || { daily: {}, monthly: {} };
+    const d = s.daily || {}, m = s.monthly || {};
+    const anyCap = (d.capUsd > 0 || d.capTokens > 0 || m.capUsd > 0 || m.capTokens > 0);
+    return `
+      <div class="card p-3">
+        <div class="flex items-center gap-2 mb-2">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${color};"></span>
+          <span class="text-[12px] font-semibold">${escapeHtml(label)}</span>
+        </div>
+        ${anyCap ? `
+          ${d.capUsd > 0 ? _budgetGauge(t('오늘 USD'), d.spentUsd, d.capUsd, d.pctUsd, true) : ''}
+          ${m.capUsd > 0 ? _budgetGauge(t('이번 달 USD'), m.spentUsd, m.capUsd, m.pctUsd, true) : ''}
+          ${d.capTokens > 0 ? _budgetGauge(t('오늘 토큰'), d.spentTokens, d.capTokens, d.pctTokens, false) : ''}
+          ${m.capTokens > 0 ? _budgetGauge(t('이번 달 토큰'), m.spentTokens, m.capTokens, m.pctTokens, false) : ''}
+        ` : `
+          <div class="text-[10px] text-[var(--text-dim)]">${t('한도 미설정')} · ${t('오늘')} $${(d.spentUsd || 0).toFixed(2)} / ${fmtTokens(d.spentTokens || 0)}</div>`}
+      </div>`;
+  }).join('');
+
+  // alerts list
+  const alerts = (al && al.alerts) || [];
+  const levelBadge = (lv) => lv === 'critical'
+    ? `<span class="text-[10px] px-1.5 py-0.5 rounded" style="background:rgba(248,113,113,0.18);color:#fca5a5;">${t('초과')}</span>`
+    : `<span class="text-[10px] px-1.5 py-0.5 rounded" style="background:rgba(251,191,36,0.18);color:#fcd34d;">${t('경고')}</span>`;
+  const alertRows = alerts.map(a => `
+    <div class="flex items-start justify-between gap-3 py-2 border-b border-[var(--border)]">
+      <div class="flex items-start gap-2 min-w-0">
+        ${levelBadge(a.level)}
+        <div class="min-w-0">
+          <div class="text-[11px]">${escapeHtml(a.message || '')}</div>
+          <div class="text-[10px] text-[var(--text-dim)] font-mono mt-0.5">${new Date(a.ts).toLocaleString()}</div>
+        </div>
+      </div>
+      <button class="btn text-[10px] shrink-0" onclick="_budgetDismiss(${a.id})">${t('해제')}</button>
+    </div>`).join('') || `<div class="text-[11px] text-[var(--text-dim)] py-3">${t('활성 알림이 없습니다')}</div>`;
+
+  const editors = _BUDGET_SOURCES.map(([src, label, color]) =>
+    _budgetCapEditor(src, label, color, caps[src])).join('');
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">💰 ${t('예산 · 알림')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('일·월 지출 한도(USD/토큰)를 소스별로 설정하고 임계치 도달 시 알림을 받습니다.')}
+        ${status.estimated ? `<span class="text-[10px] text-[var(--text-dim)]">(${t('지출은 세션 토큰 × cost_timeline 요금 추정')})</span>` : ''}
+      </p>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <div class="flex items-center gap-3 flex-wrap">
+          <label class="flex items-center gap-2 text-[12px] cursor-pointer">
+            <input type="checkbox" id="budgetEnabled" ${enabled ? 'checked' : ''}>
+            <span>${t('예산 가드 활성화')}</span>
+          </label>
+          <label class="flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
+            ${t('임계치 %')}
+            <input type="text" id="budgetThresholds" value="${thresholds.map(x => Math.round(x * 100)).join(', ')}"
+              class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-mono w-24" placeholder="80, 100" aria-label="알림 임계치 퍼센트">
+          </label>
+        </div>
+        <button class="btn-primary btn text-sm" onclick="_budgetSave()">${t('저장')}</button>
+      </div>
+      ${editors}
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-3">${t('현재 사용량')}</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">${gaugeCards}</div>
+    </div>
+
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${t('알림 센터')} ${alerts.length ? `(${alerts.length})` : ''}</div>
+        ${alerts.length ? `<button class="btn text-[10px]" onclick="_budgetDismissAll()">${t('모두 해제')}</button>` : ''}
+      </div>
+      ${alertRows}
+    </div>
+  `;
+};
+// ───────── rateLimit — plan quota proximity (best-effort, local data) ─────────
+// Backend: GET /api/ratelimit/status (server/ratelimit.py).
+// Anthropic exposes no real-time quota API, so reset times come from the
+// "You've hit your … limit · resets …" messages in ~/.claude session logs,
+// usage is a token proxy from the sessions DB, and absolute limits are
+// explicitly unknown. The UI surfaces all three caveats honestly.
+
+function _rlFmtClock(ms) {
+  if (!ms) return '—';
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short', hour: '2-digit', minute: '2-digit'
+    }).format(new Date(ms));
+  } catch (_) { return '—'; }
+}
+
+// Radial gauge as inline SVG — no Chart.js dep, zero CLS (fixed viewBox).
+// pct null → an "unknown" dashed ring with a "?" so empty state reads clearly.
+function _rlGauge(pct, color, detected) {
+  const R = 52, C = 2 * Math.PI * R;
+  const known = (typeof pct === 'number' && isFinite(pct));
+  const frac = known ? Math.max(0, Math.min(1, pct / 100)) : 0;
+  const dash = `${(C * frac).toFixed(1)} ${(C * (1 - frac)).toFixed(1)}`;
+  const center = known
+    ? `<tspan x="60" y="56" style="font-size:26px;font-weight:700;">${Math.round(pct)}<tspan style="font-size:13px;">%</tspan></tspan>`
+    : `<tspan x="60" y="60" style="font-size:30px;font-weight:700;fill:var(--text-dim);">?</tspan>`;
+  return `
+    <svg viewBox="0 0 120 120" width="120" height="120" role="img"
+         aria-label="${known ? Math.round(pct) + ' 퍼센트' : t('근접도 알 수 없음')}" style="flex:none;">
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--border)" stroke-width="10"
+              ${known ? '' : 'stroke-dasharray="4 6"'} opacity="0.55"></circle>
+      ${known ? `<circle cx="60" cy="60" r="${R}" fill="none" stroke="${color}" stroke-width="10"
+              stroke-linecap="round" stroke-dasharray="${dash}"
+              transform="rotate(-90 60 60)"></circle>` : ''}
+      <text text-anchor="middle" fill="var(--text)" class="mono">${center}</text>
+    </svg>`;
+}
+
+function _rlWindowCard(w, accent) {
+  if (!w) return '';
+  const detected = !!w.detected;
+  const pct = w.pct;
+  const usage = fmtTokens(w.used || 0);
+  // Status pill — idle/empty vs detected reset, both honest.
+  const pill = detected
+    ? `<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:${accent}22;color:${accent};">${escapeHtml(t('리셋 시각 감지됨'))}</span>`
+    : `<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--border);color:var(--text-dim);">${escapeHtml(t('한도 도달 기록 없음'))}</span>`;
+  return `
+    <div class="card p-4 flex flex-col gap-3" style="min-width:0;">
+      <div class="flex items-start justify-between gap-2 flex-wrap">
+        <div class="min-w-0">
+          <div class="font-semibold text-sm truncate">${escapeHtml(t(w.label || ''))}</div>
+          <div class="text-[11px] text-[var(--text-dim)] mt-0.5">${escapeHtml(t('윈도우'))} ${Math.round((w.windowSeconds || 0) / 3600)}h</div>
+        </div>
+        ${pill}
+      </div>
+
+      <div class="flex items-center gap-4 flex-wrap">
+        ${_rlGauge(pct, accent, detected)}
+        <div class="flex-1 min-w-[140px] flex flex-col gap-2">
+          <div>
+            <div class="text-[10px] uppercase text-[var(--text-dim)]">${escapeHtml(t('리셋까지'))}</div>
+            <div class="text-base font-bold mt-0.5">${detected && w.resetEta ? escapeHtml(w.resetEta) : '<span class="text-[var(--text-dim)] text-sm">' + escapeHtml(t('알 수 없음')) + '</span>'}</div>
+            <div class="text-[11px] text-[var(--text-mute)] mono">${detected ? escapeHtml(_rlFmtClock(w.resetAt)) : ''}</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase text-[var(--text-dim)]">${escapeHtml(t('사용량 근사치'))}</div>
+            <div class="text-sm font-semibold mono mt-0.5" style="color:${accent};">${usage}<span class="text-[10px] text-[var(--text-dim)] font-normal"> ${escapeHtml(t('토큰'))} · ${w.usedSessions || 0} ${escapeHtml(t('세션'))}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-[10px] text-[var(--text-dim)] leading-snug border-t border-[var(--border)] pt-2">
+        ${escapeHtml(t('절대 한도(limit)는 로컬 데이터에 없어 알 수 없음 · 사용량은 토큰 합계 기반 proxy'))}
+        ${detected && w.lastHitText ? `<div class="mono mt-1 text-[var(--text-mute)] truncate" title="${escapeHtml(w.lastHitText)}">↳ ${escapeHtml(w.lastHitText)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+VIEWS.rateLimit = async () => {
+  let d;
+  try {
+    d = await api('/api/ratelimit/status');
+  } catch (e) {
+    return `${viewHeader('레이트리밋 · 쿼터', '롤링 5시간 윈도우 · 주간 쿼터 · 주간 Opus 윈도우 근접도 (로컬 데이터 기반 best-effort)', 'rateLimit')}
+      <div class="card empty p-6 text-center text-sm text-[var(--text-mute)]">${escapeHtml(t('레이트리밋 상태를 불러오지 못했습니다'))} · ${escapeHtml(String(e && e.message || e))}</div>`;
+  }
+  if (!d || !d.ok) {
+    return `${viewHeader('레이트리밋 · 쿼터', '롤링 5시간 윈도우 · 주간 쿼터 · 주간 Opus 윈도우 근접도 (로컬 데이터 기반 best-effort)', 'rateLimit')}
+      <div class="card empty p-6 text-center text-sm text-[var(--text-mute)]">${escapeHtml(t('데이터 없음'))}</div>`;
+  }
+  state.data.rateLimit = d;
+
+  const ACCENTS = { fiveHour: '#7dd3fc', weekly: '#a78bfa', opus: '#d97757' };
+
+  const emptyBanner = !d.anyDetected ? `
+    <div class="card p-4 mb-4 flex items-start gap-3" style="border-left:3px solid #fcd34d;">
+      <span class="text-lg" aria-hidden="true">💤</span>
+      <div class="text-sm text-[var(--text-mute)] leading-relaxed">
+        <strong class="text-[var(--text)]">${escapeHtml(t('최근 한도 도달 기록이 없습니다'))}</strong><br>
+        ${escapeHtml(t('아직 5시간/주간 한도에 부딪힌 적이 없거나 관련 세션 로그가 오래되어, 정확한 리셋 시각을 추출할 데이터가 없습니다. 아래 사용량 근사치는 세션 토큰 합계 기반입니다.'))}
+      </div>
+    </div>` : '';
+
+  return `
+    ${viewHeader('레이트리밋 · 쿼터', '롤링 5시간 윈도우 · 주간 쿼터 · 주간 Opus 윈도우 근접도 (로컬 데이터 기반 best-effort)', 'rateLimit')}
+
+    <div class="card p-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
+      <div class="text-[11px] text-[var(--text-dim)] flex items-center gap-2 flex-wrap">
+        <span>⏳ ${escapeHtml(t('마지막 갱신'))}: <span class="mono">${escapeHtml(_rlFmtClock(d.computedAt))}</span></span>
+        ${d.lastResetAt ? `<span>· ${escapeHtml(t('가장 빠른 리셋'))}: <span class="mono">${escapeHtml(_rlFmtClock(d.lastResetAt))}</span></span>` : ''}
+      </div>
+      <button class="btn text-xs" id="rlRefresh" type="button">🔄 ${escapeHtml(t('새로고침'))}</button>
+    </div>
+
+    ${emptyBanner}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-4">
+      ${_rlWindowCard(d.fiveHour, ACCENTS.fiveHour)}
+      ${_rlWindowCard(d.weekly, ACCENTS.weekly)}
+      ${_rlWindowCard(d.opus, ACCENTS.opus)}
+    </div>
+
+    <div class="card p-4 text-[11px] text-[var(--text-mute)] leading-relaxed" style="border-left:3px solid var(--border);">
+      <div class="font-semibold text-[var(--text)] text-xs mb-1">ℹ️ ${escapeHtml(t('이 위젯에 대하여'))}</div>
+      ${escapeHtml(d.note || t('Anthropic은 주간/5시간 쿼터의 실시간 잔량 API를 제공하지 않습니다. 이 위젯은 로컬 세션 로그 기반 best-effort 추정입니다.'))}
+    </div>`;
+};
+
+AFTER.rateLimit = () => {
+  const btn = document.getElementById('rlRefresh');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '⏳';
+      try { go('rateLimit'); }
+      finally { /* re-render replaces the button */ }
+    });
+  }
+};
+// ────────────────────────────────────────────────────────────────
+// TODAY — single-screen daily cockpit (feature #9)
+// Read-only roll-up from /api/today/summary (sessions SQLite + pricing).
+// ────────────────────────────────────────────────────────────────
+function _todayDeltaChip(delta, opts) {
+  // delta: { yesterday, diff, pct }. opts: { invertGood?, fmt }
+  if (!delta) return '';
+  const fmt = (opts && opts.fmt) || (n => String(n));
+  const diff = delta.diff || 0;
+  const pct = delta.pct;
+  if (diff === 0 && (pct === 0 || pct == null)) {
+    return `<span class="chip text-[10px]">${t('어제와 동일')}</span>`;
+  }
+  const up = diff > 0;
+  // For tokens/cost/sessions, more-than-yesterday is just informational, not
+  // "bad". We color up=accent (orange), down=mute — neutral framing.
+  const arrow = up ? '▲' : '▼';
+  const cls = up ? 'chip-accent' : '';
+  const pctStr = (pct == null) ? '' : ` (${pct > 0 ? '+' : ''}${pct}%)`;
+  const sign = up ? '+' : '−';
+  return `<span class="chip ${cls} text-[10px]">${arrow} ${sign}${fmt(Math.abs(diff))}${pctStr} ${t('vs 어제')}</span>`;
+}
+
+VIEWS.today = async () => {
+  const r = await cachedApi('/api/today/summary', 20000);
+  state.data.today = r;
+  if (!r || r.ok === false) {
+    return `
+      <div class="mb-4">
+        <h1 class="text-2xl font-bold">🏠 ${t('오늘')}</h1>
+      </div>
+      <div class="card p-6 text-sm" style="color:#fca5a5">
+        ${t('오늘 요약을 불러오지 못했습니다.')} ${escapeHtml((r && r.error) || '')}
+      </div>`;
+  }
+
+  const tok = r.tokens || {};
+  const delta = r.delta || {};
+  const usd = r.usd || 0;
+  const usdStr = '$' + (Math.round(usd * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // ── Stat cards ───────────────────────────────────────────────
+  const cards = `
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+      <div class="card p-4 hover-lift">
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('오늘 토큰')}</div>
+        <div class="text-3xl font-bold mono mt-1" style="color:#d97757">${fmtTokens(tok.total || 0)}</div>
+        <div class="mt-2">${_todayDeltaChip(delta.tokens, { fmt: fmtTokens })}</div>
+      </div>
+      <div class="card p-4 hover-lift">
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('추정 비용')}</div>
+        <div class="text-3xl font-bold mono mt-1" style="color:#86efac">${usdStr}</div>
+        <div class="mt-2">${_todayDeltaChip(delta.usd, { fmt: n => '$' + (Math.round(n * 100) / 100).toFixed(2) })}</div>
+      </div>
+      <div class="card p-4 hover-lift">
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('오늘 세션')}</div>
+        <div class="text-3xl font-bold mono mt-1" style="color:#7dd3fc">${r.sessions || 0}</div>
+        <div class="mt-2">${_todayDeltaChip(delta.sessions, { fmt: n => String(n) })}</div>
+      </div>
+      <div class="card p-4 hover-lift">
+        <div class="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">${t('최근 활동 프로젝트')}</div>
+        <div class="text-xl font-bold mt-2 truncate" title="${escapeHtml(r.mostRecentCwd || r.mostRecentProject || '')}">📁 ${escapeHtml(r.mostRecentProject || '—')}</div>
+        <div class="text-[10px] text-[var(--text-mute)] mt-1 truncate">${escapeHtml(r.mostRecentCwd || '')}</div>
+      </div>
+    </div>`;
+
+  // ── Token breakdown chips ────────────────────────────────────
+  const breakdown = `
+    <div class="flex flex-wrap gap-2 mb-5 text-xs">
+      <span class="chip">${t('입력')} <span class="mono font-bold" style="color:#86efac">${fmtTokens(tok.input || 0)}</span></span>
+      <span class="chip">${t('출력')} <span class="mono font-bold" style="color:#7dd3fc">${fmtTokens(tok.output || 0)}</span></span>
+      <span class="chip">${t('캐시 read')} <span class="mono font-bold" style="color:#a78bfa">${fmtTokens(tok.cacheRead || 0)}</span></span>
+      <span class="chip">${t('캐시 create')} <span class="mono font-bold" style="color:#fcd34d">${fmtTokens(tok.cacheCreate || 0)}</span></span>
+    </div>`;
+
+  // ── 14-day sparkline (chart) ─────────────────────────────────
+  const spark = `
+    <div class="card p-5 mb-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-sm">📈 ${t('최근 14일 토큰 추이')}</h3>
+        <a class="text-[11px]" href="#" onclick="go('analytics');return false;">${t('통계 전체 보기')} →</a>
+      </div>
+      <div style="position:relative; height:200px;"><canvas id="todaySparkChart"></canvas></div>
+    </div>`;
+
+  // ── Top 3 projects today ─────────────────────────────────────
+  const topMax = (r.topProjects && r.topProjects[0] && r.topProjects[0].tokens) || 1;
+  const topHtml = (r.topProjects || []).map(p => {
+    const pct = Math.max(2, Math.round((p.tokens || 0) / topMax * 100));
+    return `
+      <div class="mb-3 ${p.cwd ? 'cursor-pointer hover:bg-white/5 rounded p-1 -m-1' : ''}"
+           ${p.cwd ? `onclick="go('projects')"` : ''} title="${escapeHtml(p.cwd || '')}">
+        <div class="flex justify-between text-xs mb-1">
+          <span class="truncate mr-2">📁 ${escapeHtml(p.name)} <span class="text-[var(--text-dim)]">· ${p.sessions}${t('세션')}</span></span>
+          <span class="mono font-bold" style="color:#d97757">${fmtTokens(p.tokens || 0)}</span>
+        </div>
+        <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#d97757;"></div></div>
+      </div>`;
+  }).join('') || `<div class="empty text-xs">${t('오늘 활동 없음')}</div>`;
+
+  // ── Tokens by model today ────────────────────────────────────
+  const modelMax = (r.byModel && r.byModel[0] && r.byModel[0].tokens) || 1;
+  const modelHtml = (r.byModel || []).map(m => {
+    const pct = Math.max(2, Math.round((m.tokens || 0) / modelMax * 100));
+    return `
+      <div class="mb-3">
+        <div class="flex justify-between text-xs mb-1">
+          <span class="mono truncate mr-2">${escapeHtml(m.model)} <span class="text-[var(--text-dim)]">· ${m.sessions}${t('세션')}</span></span>
+          <span class="mono font-bold" style="color:#a78bfa">${fmtTokens(m.tokens || 0)} <span class="text-[var(--text-dim)]">· $${(Math.round((m.usd || 0) * 100) / 100).toFixed(2)}</span></span>
+        </div>
+        <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#a78bfa;"></div></div>
+      </div>`;
+  }).join('') || `<div class="empty text-xs">${t('오늘 활동 없음')}</div>`;
+
+  const midGrid = `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+      <div class="card p-5">
+        <h3 class="font-semibold text-sm mb-3">🏆 ${t('오늘 상위 프로젝트')}</h3>
+        ${topHtml}
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-sm mb-3">🧠 ${t('모델별 토큰 (오늘)')}</h3>
+        ${modelHtml}
+      </div>
+    </div>`;
+
+  // ── Recent activity list ─────────────────────────────────────
+  const recentHtml = (r.recent || []).map(s => `
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded">
+      <div class="flex-1 min-w-0">
+        <div class="text-xs truncate">${escapeHtml(s.prompt || '(요청 없음)')}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mt-0.5 truncate">
+          📁 ${escapeHtml(s.project || '—')} · ${escapeHtml(s.model || '—')} · 💬 ${s.messages} · 🛠 ${s.tools}
+        </div>
+      </div>
+      <div class="text-right shrink-0">
+        <div class="mono text-xs font-bold" style="color:#d97757">${fmtTokens(s.tokens || 0)}</div>
+        <div class="text-[10px] text-[var(--text-dim)]">${fmtRel(s.startedAt)}</div>
+      </div>
+    </div>`).join('') || `<div class="empty text-xs">${t('최근 세션 없음')}</div>`;
+
+  const recent = `
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-sm">🕒 ${t('최근 활동')}</h3>
+        <a class="text-[11px]" href="#" onclick="go('sessions');return false;">${t('세션 히스토리')} →</a>
+      </div>
+      <div class="space-y-1 max-h-[420px] overflow-y-auto">${recentHtml}</div>
+    </div>`;
+
+  return `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">🏠 ${t('오늘')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${t('오늘 하루 Claude Code 활동 한눈에')} · <span class="mono text-[var(--text-dim)]">${escapeHtml(r.today || '')}</span></p>
+      </div>
+      <button class="btn text-xs" onclick="go('today')">🔄 ${t('새로고침')}</button>
+    </div>
+    ${cards}
+    ${breakdown}
+    ${spark}
+    ${midGrid}
+    ${recent}`;
+};
+
+AFTER.today = () => {
+  const r = (state.data && state.data.today) || {};
+  if (!r || r.ok === false) return;
+  const ctx = document.getElementById('todaySparkChart');
+  if (!ctx) return;
+  const series = r.spark || [];
+  const labels = series.map(d => (d.date || '').slice(5));
+  const tokens = series.map(d => d.tokens || 0);
+  const axis = document.body.classList.contains('theme-light') ? '#666' : '#9aa0aa';
+  const grid = document.body.classList.contains('theme-light') ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)';
+  _renderChart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: t('토큰'),
+        data: tokens,
+        backgroundColor: 'rgba(217,119,87,0.55)',
+        borderColor: '#d97757',
+        borderWidth: 1,
+        borderRadius: 3,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => fmtTokens(c.parsed.y) + ' ' + t('토큰') } },
+      },
+      scales: {
+        x: { ticks: { color: axis, maxRotation: 0, autoSkip: true, maxTicksLimit: 7 }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: axis, callback: v => fmtTokens(v), maxTicksLimit: 5 }, grid: { color: grid } },
+      },
+    },
+  });
+};
 
 // ── Caveman 전용 탭 ─────────────────────────────────────────────────────
 // caveman 스위트(스킬 7종) 상태·설치/재설치·압축 레벨 가이드.

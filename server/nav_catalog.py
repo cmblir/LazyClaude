@@ -180,6 +180,19 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "토큰/USD 를 가져와 로컬 추정치와 drift 비교 (admin 키 필요).",
         ["admin", "usage", "cost", "billing", "anthropic", "조직", "청구",
          "비용", "사용량", "drift", "reconcile"]),
+    ("budgets",       "system",
+        "예산 · 알림 — 일·월 지출 한도(USD/토큰)를 소스별로 설정하고 임계치(80%/100%) "
+        "도달 시 알림을 기록·조회·해제. 지출은 세션 토큰을 cost_timeline 요금으로 추정.",
+        ["예산", "budget", "지출 한도", "spend cap", "알림", "alert", "비용 한도",
+         "threshold", "한도", "budget alert"]),
+    ("rateLimit",     "system",
+        "레이트리밋 · 쿼터 — 롤링 5시간 윈도우 · 주간 쿼터 · 주간 Opus 윈도우의 리셋 시각/"
+        "근접도. ~/.claude 세션 로그에서 한도 메시지를 추출하는 best-effort 위젯.",
+        ["레이트리밋", "rate limit", "쿼터", "quota", "5시간", "주간 한도",
+         "weekly limit", "Opus 한도", "리셋", "reset", "usage limit", "사용량 한도"]),
+    ("today",         "main",
+        "오늘 — 오늘 하루 토큰·비용·세션·상위 프로젝트·최근 활동을 한 화면에 요약한 코크핏.",
+        ["오늘", "today", "코크핏", "cockpit", "일일 요약", "데일리", "daily"]),
     ("sessionReplay", "work",
         "Session Replay — Claude Code JSONL 세션 로그를 타임라인으로 재생 · "
         "툴 호출 하이라이트 · 누적 토큰 차트.",

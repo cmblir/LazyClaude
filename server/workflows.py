@@ -50,7 +50,12 @@ _NODE_TYPES = {"start", "session", "subagent", "aggregate", "branch", "output",
                "docker_run",
                # QQ36 (v2.66.111) — sticky note for canvas annotations
                # (n8n parity). Pass-through executor; no ports.
-               "sticky"}
+               "sticky",
+               # Feature #10 — Structured Output node. Constrains an
+               # assignee model call to a JSON Schema via the Anthropic
+               # Messages API output_config.format=json_schema so
+               # downstream nodes receive validated JSON (not free text).
+               "structured_output"}
 _INPUT_MODES = {"concat", "first", "json"}
 _ASSIGNEES = {"opus-4.8", "opus-4.7", "sonnet-4.6", "haiku-4.5"}  # UI 선택지용; 검증 여기서는 free-form
 
@@ -823,6 +828,46 @@ def _sanitize_node(raw: Any) -> Optional[dict]:
             "memMb":      max(64, min(4096, int(d.get("memMb") or 512))),
             "cache":      bool(d.get("cache")),
             "cacheTtlSec": max(1, min(86400, int(d.get("cacheTtlSec") or 300))),
+        }
+    elif ntype == "structured_output":
+        # Feature #10 — Structured Output node. Runs the assignee model with
+        # the prompt (subject/description + upstream input) and constrains the
+        # response to `schema` (a JSON Schema object) via the Anthropic
+        # Messages API output_config.format=json_schema. Downstream nodes get
+        # the validated JSON string as the node output.
+        #
+        # `schema` may arrive either as a parsed dict (preferred — the
+        # inspector JSON.parse()es the textarea) or as a raw JSON string. We
+        # normalise to a dict; an unparseable / non-object schema is dropped to
+        # {} and the executor reports a clear validation error at run time
+        # (defence-in-depth — never silently send a bad schema to the API).
+        raw_schema = d.get("schema")
+        schema_obj: dict = {}
+        if isinstance(raw_schema, dict):
+            schema_obj = raw_schema
+        elif isinstance(raw_schema, str) and raw_schema.strip():
+            try:
+                parsed = json.loads(raw_schema)
+                if isinstance(parsed, dict):
+                    schema_obj = parsed
+            except Exception:
+                schema_obj = {}
+        # Cap serialized schema size to keep the workflows JSON bounded.
+        try:
+            if len(json.dumps(schema_obj)) > 16000:
+                schema_obj = {}
+        except Exception:
+            schema_obj = {}
+        out["data"] = {
+            "subject":     _clamp_str(d.get("subject"), 200),
+            "description": _clamp_str(d.get("description"), 4000),
+            "assignee":    _clamp_str(d.get("assignee"), 40),
+            "cwd":         _clamp_str(d.get("cwd"), 500),
+            # Upstream input source: how connected nodes' outputs are folded
+            # into the prompt before the schema-constrained call. Mirrors the
+            # session/subagent inputsMode contract.
+            "inputsMode":  d.get("inputsMode") if d.get("inputsMode") in _INPUT_MODES else "concat",
+            "schema":      schema_obj,
         }
     # start 는 data 비움
     # PP2/QQ3 (v2.66.72/.78) — preserve cross-type fields:
@@ -1714,6 +1759,13 @@ def _execute_node(node: dict, inputs: list[str], prev_session_ids: list[str] | N
     # ── Docker sandbox (v2.60.0) ──
     if ntype == "docker_run":
         return _execute_docker_run_node(data, inputs, _elapsed)
+
+    # ── Structured Output (Feature #10) — schema-constrained model call ──
+    if ntype == "structured_output":
+        return _execute_structured_output_node(
+            data, inputs, _elapsed,
+            run_id=run_id, node_timeout=node_timeout,
+        )
 
     # ── session / subagent — 멀티 프로바이더 실행 ──
     # QQ20 (v2.66.95) — pinned data short-circuit (n8n parity).
@@ -2793,6 +2845,139 @@ def _execute_docker_run_node(data: dict, inputs: list[str], _elapsed) -> dict:
             "durationMs": _elapsed(), "image": image,
             "exitCode": 0,
             "cached": False}
+
+
+def _execute_structured_output_node(data: dict, inputs: list[str], _elapsed,
+                                    run_id: str = "", node_timeout: int = 0) -> dict:
+    """Feature #10 — Structured Output node.
+
+    Runs the assignee model with the prompt (subject/description + upstream
+    input) constrained to ``data['schema']`` (a JSON Schema object) via the
+    Anthropic Messages API ``output_config.format = {type:'json_schema',
+    schema:...}``. The model is guaranteed to return JSON matching the schema,
+    so downstream nodes consume validated JSON instead of free text.
+
+    Verified request shape (platform.claude.com/docs/.../structured-outputs):
+        output_config: { format: { type: "json_schema", schema: <schema> } }
+    The constrained JSON comes back as the text content, which the Anthropic
+    provider already concatenates into ``AIResponse.output``. We parse it and
+    expose both the raw JSON string (``output`` — what downstream text-mode
+    nodes read) and the parsed object (``jsonOutput``) in the node result.
+
+    The schema-constrained ``output_config`` is only meaningful for the
+    Anthropic path; the provider passes ``extra['output_config']`` through
+    verbatim (other providers ignore it), so a non-Anthropic assignee degrades
+    to a best-effort plain call rather than erroring.
+    """
+    schema = data.get("schema")
+    if not isinstance(schema, dict) or not schema:
+        return {
+            "status": "err", "output": "", "durationMs": _elapsed(),
+            "sessionId": "",
+            "error": "structured_output node: 'schema' must be a non-empty "
+                     "JSON Schema object (e.g. {\"type\":\"object\","
+                     "\"properties\":{...}}).",
+        }
+
+    # Build the prompt exactly like the session/subagent path so inputsMode
+    # behaves consistently across node types.
+    prompt_parts: list[str] = []
+    if data.get("subject"):
+        prompt_parts.append(data["subject"])
+    if data.get("description"):
+        prompt_parts.append(data["description"])
+    if inputs:
+        mode = data.get("inputsMode", "concat")
+        if mode == "json":
+            joined = "\n# 입력(JSON)\n" + json.dumps(inputs, ensure_ascii=False)
+        elif mode == "first":
+            joined = "\n# 입력\n" + (inputs[0] if inputs else "")
+        else:
+            joined = "\n# 입력\n" + "\n---\n".join(inputs)
+        prompt_parts.append(joined)
+    prompt = "\n\n".join(p for p in prompt_parts if p).strip() or "."
+
+    cwd_raw = data.get("cwd") or str(Path.home())
+    cwd_safe = _under_home(cwd_raw) or str(Path.home())
+    assignee = (data.get("assignee") or "").strip() or "claude:sonnet"
+
+    # The provider's _call_messages passes extra['output_config'] through
+    # verbatim into the request body (see ai_providers.py). This is the
+    # documented GA shape — no beta header required.
+    extra = {
+        "output_config": {
+            "format": {
+                "type": "json_schema",
+                "schema": schema,
+            },
+        },
+        "__runId": run_id,
+    }
+
+    try:
+        from .ai_providers import execute_with_assignee
+        resp = execute_with_assignee(
+            assignee,
+            prompt,
+            cwd=cwd_safe,
+            timeout=node_timeout or _DEFAULT_NODE_TIMEOUT,
+            extra=extra,
+            fallback=True,
+        )
+    except Exception as e:
+        log.exception("structured_output execute failed: %s", e)
+        return {"status": "err", "output": "", "durationMs": _elapsed(),
+                "sessionId": "",
+                "error": f"structured_output provider execution failed: {e}"}
+
+    if resp.status != "ok":
+        return {
+            "status": "err",
+            "output": resp.output or "",
+            "durationMs": resp.duration_ms or _elapsed(),
+            "sessionId": resp.session_id,
+            "error": resp.error or "structured_output: provider returned error",
+            "provider": resp.provider, "model": resp.model,
+        }
+
+    raw_text = (resp.output or "").strip()
+    parsed: Any = None
+    parse_error = ""
+    try:
+        parsed = json.loads(raw_text)
+    except Exception as e:
+        parse_error = str(e)
+
+    if parse_error or not isinstance(parsed, (dict, list)):
+        # The model did not return parseable JSON. Surface as an error so the
+        # downstream contract (validated JSON) is never silently violated.
+        return {
+            "status": "err",
+            "output": raw_text,
+            "durationMs": resp.duration_ms or _elapsed(),
+            "sessionId": resp.session_id,
+            "error": ("structured_output: model output is not valid JSON"
+                      + (f" ({parse_error})" if parse_error else "")),
+            "provider": resp.provider, "model": resp.model,
+            "tokensIn": resp.tokens_in, "tokensOut": resp.tokens_out,
+            "costUsd": resp.cost_usd,
+        }
+
+    # Re-serialize canonically so downstream text-mode nodes always get a
+    # clean JSON string; expose the parsed object as `jsonOutput`.
+    canonical = json.dumps(parsed, ensure_ascii=False)
+    return {
+        "status": "ok",
+        "output": canonical,
+        "jsonOutput": parsed,
+        "durationMs": resp.duration_ms or _elapsed(),
+        "sessionId": resp.session_id,
+        "provider": resp.provider,
+        "model": resp.model,
+        "tokensIn": resp.tokens_in,
+        "tokensOut": resp.tokens_out,
+        "costUsd": resp.cost_usd,
+    }
 
 
 def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:

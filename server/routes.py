@@ -89,6 +89,9 @@ from .harness_tools import (
 )
 from .admin_api import api_admin_status, api_admin_set_key, api_admin_usage, api_admin_cost
 from .otel_ingest import api_otlp_ingest, api_otel_summary
+from .budget import api_budget_status, api_budget_set, api_alerts_list, api_alert_dismiss
+from .ratelimit import api_ratelimit_status
+from .cockpit import api_today_summary
 from .toolkits import (
     api_toolkit_status,
     api_toolkit_ecc_install, api_toolkit_ecc_uninstall,
@@ -464,6 +467,10 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/admin/usage": api_admin_usage,
     "/api/admin/cost": api_admin_cost,
     "/api/otel/summary": api_otel_summary,
+    "/api/budget/status": api_budget_status,
+    "/api/alerts/list": api_alerts_list,
+    "/api/ratelimit/status": api_ratelimit_status,
+    "/api/today/summary": lambda q: api_today_summary(),
     "/api/toolkit/status": api_toolkit_status,
     "/api/session-replay/list": api_session_replay_list,
     "/api/session-replay/load": api_session_replay_load,
@@ -586,6 +593,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/caveman/action": api_caveman_action,
     "/api/admin/set-key": api_admin_set_key,
     "/otlp": api_otlp_ingest,
+    "/api/budget/set": api_budget_set,
+    "/api/alert/dismiss": api_alert_dismiss,
     "/api/toolkit/ecc/install": api_toolkit_ecc_install,
     "/api/toolkit/ecc/uninstall": api_toolkit_ecc_uninstall,
     "/api/toolkit/ecc/install-plugin": api_toolkit_ecc_install_plugin,

@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.42] — 2026-06-01  💰 spend budgets+alerts · ⏳ rate-limit widget · 🏠 Today cockpit · 🧬 structured-output node
+
+Four more roadmap picks, backends built in parallel (workflow), shared-file integration by the main thread.
+
+- **💰 예산 · 알림** (`server/budget.py`, tab `budgets`): per-source daily/monthly
+  USD+token caps (chmod-600 JSON), threshold alerts (80%/100%, deduped per period)
+  in a lazily-created `budget_alerts` table, dismissable alerts center. Spend is
+  estimated from session tokens via cost_timeline pricing.
+- **⏳ 레이트리밋 · 쿼터** (`server/ratelimit.py`, tab `rateLimit`): rolling 5h
+  window + weekly cap + weekly Opus window proximity + reset ETA, best-effort from
+  `~/.claude` session logs (Anthropic exposes no real-time quota API).
+- **🏠 오늘** (`server/cockpit.py`, tab `today`): single-screen daily cockpit —
+  today's tokens/USD (+Δ vs yesterday), session count, top projects, tokens-by-model,
+  14-day spark, recent activity. Read-only over the sessions table.
+- **🧬 구조화 출력** workflow node (`server/workflows.py` + WF palette/inspector):
+  constrains a model call to a JSON Schema via Messages-API
+  `output_config.format={type:"json_schema",schema}` (GA) so downstream nodes get
+  validated JSON, not free text. The 4 node-lifecycle edits + a JSON-schema inspector
+  form (wired through the real `_wfDraftSetData` draft resolver).
+
+Integration: routes.py (5 GET/2 POST), NAV + MODE_TABS (claude) + nav_catalog for the
+3 tabs; WF_NODE_TYPES / WF_NODE_CATEGORIES / inspector splices for the node.
+Verified in-app (Playwright): 3 tabs render with live data (today shows real
+269.84M tokens / $238.60 / 53 sessions), endpoints return ok, structured_output node
+registered in the palette + sanitizes, 0 console errors, i18n green.
+NOTE: admin/otel live paths still need a real admin key / real telemetry; rate-limit
+limits are unknown unless a cap message appears in logs (marked best-effort).
+
+---
 ## [3.99.41] — 2026-06-01  📡 OTLP telemetry backend · 🏢 Admin Usage/Cost connector · 📈 prompt-cache analytics
 
 Three roadmap picks built in parallel (workflow), shared-file integration done by the main thread.
