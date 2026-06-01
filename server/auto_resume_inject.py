@@ -50,6 +50,9 @@ Permissions:
 """
 from __future__ import annotations
 
+import glob
+import os
+import re
 import shutil
 import subprocess
 from typing import Optional
@@ -131,6 +134,147 @@ def _command_of(pid: int) -> str:
         ).strip()
     except Exception:
         return ""
+
+
+def _pid_ancestry(pid: int, max_depth: int = 30) -> set[int]:
+    """Return {pid, parent, grandparent, ...} up to the root."""
+    out: set[int] = set()
+    cur: Optional[int] = pid
+    for _ in range(max_depth):
+        if cur is None or cur <= 1 or cur in out:
+            break
+        out.add(cur)
+        cur = _ppid_of(cur)
+    return out
+
+
+def _tmux_sockets() -> list[Optional[str]]:
+    """All candidate tmux socket paths for this user, plus the default."""
+    socks: list[Optional[str]] = []
+    try:
+        socks.extend(sorted(glob.glob(f"/tmp/tmux-{os.getuid()}/*")))
+    except Exception:
+        pass
+    socks.append(None)  # default socket (tmux figures it out)
+    # de-dup while preserving order
+    seen: set = set()
+    uniq: list[Optional[str]] = []
+    for s in socks:
+        if s not in seen:
+            seen.add(s)
+            uniq.append(s)
+    return uniq
+
+
+def _tmux_target(pid: int) -> Optional[tuple[str, str]]:
+    """If ``pid`` (or an ancestor) runs inside a tmux pane, return
+    (socket, pane_id), else None.
+
+    ``tmux -S <socket> send-keys -t <pane_id>`` then delivers keystrokes to
+    that EXACT pane — focus-independent and terminal-agnostic (the gold-
+    standard way to drive a live TUI, and it works inside Warp).
+
+    We ask tmux itself rather than reading the pid's environment: macOS does
+    not reliably expose another process's env via ``ps eww``. ``#{pane_pid}``
+    is the pane's root (login shell); the claude process is a descendant, so
+    we match any pane_pid that appears in the pid's ancestry.
+    """
+    if shutil.which("tmux") is None:
+        return None
+    ancestry = _pid_ancestry(pid)
+    if not ancestry:
+        return None
+    for sock in _tmux_sockets():
+        base = ["tmux", "-S", sock] if sock else ["tmux"]
+        try:
+            out = subprocess.check_output(
+                base + ["list-panes", "-a", "-F", "#{pane_pid} #{pane_id}"],
+                text=True, errors="replace", timeout=5, stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            continue
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) != 2:
+                continue
+            try:
+                pane_pid = int(parts[0])
+            except ValueError:
+                continue
+            if pane_pid in ancestry:
+                return (sock or "", parts[1])
+    return None
+
+
+def _tmux_inject(socket: str, pane: str, keystrokes: list[str]) -> tuple[bool, str]:
+    """Send each keystroke into a tmux pane: literal text, then Enter."""
+    tmux = shutil.which("tmux")
+    if tmux is None:
+        return False, "tmux not on PATH"
+    base = [tmux, "-S", socket] if socket else [tmux]
+    for k in keystrokes:
+        try:
+            r1 = subprocess.run(
+                base + ["send-keys", "-t", pane, "-l", "--", k],
+                capture_output=True, text=True, timeout=5,
+            )
+            if r1.returncode != 0:
+                return False, (r1.stderr or r1.stdout or "send-keys -l failed").strip()
+            r2 = subprocess.run(
+                base + ["send-keys", "-t", pane, "Enter"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if r2.returncode != 0:
+                return False, (r2.stderr or r2.stdout or "send-keys Enter failed").strip()
+        except subprocess.SubprocessError as e:
+            return False, f"tmux send-keys failed: {e}"
+    return True, f"tmux:{pane}"
+
+
+def _warp_session_uuid(pid: int, max_depth: int = 20) -> Optional[str]:
+    """Return the Warp session UUID that owns ``pid``, or None.
+
+    Warp exports ``WARP_TERMINAL_SESSION_UUID`` / ``WARP_FOCUS_URL`` into every
+    pane's shell environment. ``open warp://session/<uuid>`` then focuses that
+    EXACT pane — the missing piece that lets us keystroke into the right tab
+    instead of whatever Warp tab happens to be focused. We read the env of the
+    pid (or a parent shell) via ``ps eww`` (same-user only on macOS).
+    """
+    cur: Optional[int] = pid
+    seen: set[int] = set()
+    for _ in range(max_depth):
+        if cur is None or cur <= 1 or cur in seen:
+            break
+        seen.add(cur)
+        try:
+            env = subprocess.check_output(
+                ["ps", "eww", "-p", str(cur)], text=True, errors="replace", timeout=5
+            )
+        except Exception:
+            env = ""
+        m = re.search(r"WARP_TERMINAL_SESSION_UUID=([0-9a-fA-F-]+)", env)
+        if m:
+            return m.group(1)
+        m = re.search(r"WARP_FOCUS_URL=warp://session/([0-9a-fA-F-]+)", env)
+        if m:
+            return m.group(1)
+        cur = _ppid_of(cur)
+    return None
+
+
+def _warp_focus_session(uuid: str) -> tuple[bool, str]:
+    """Focus a specific Warp pane via its session URL. Brings Warp forward and
+    selects the matching tab/pane so a subsequent keystroke lands there."""
+    try:
+        p = subprocess.run(
+            ["open", f"warp://session/{uuid}"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if p.returncode != 0:
+            return False, (p.stderr or p.stdout or "open failed").strip()
+        return True, "warp-focused"
+    except Exception as e:
+        return False, f"open warp:// failed: {e}"
 
 
 def _detect_terminal_app(pid: int, max_depth: int = 20) -> Optional[str]:
@@ -395,6 +539,26 @@ return injectKeystrokesViaSE("{app_esc}")
     return True, f"system-events:{app_name}"
 
 
+# ───────── Warp (focus exact pane, then keystroke) ─────────
+
+def _warp_inject(uuid: str, keystrokes: list[str]) -> tuple[bool, str]:
+    """Warp injection: focus the pane via warp://session/<uuid>, then keystroke.
+
+    NOTE: this is best-effort only. In practice the focus-then-keystroke
+    sequence has proved UNRELIABLE (keystrokes can fail to land), so it is
+    gated behind ``allow_system_events`` — i.e. only the manual endpoint, where
+    the user is watching, tries it. The unattended worker uses the precise
+    strategies (tmux send-keys, iTerm2/Terminal.app tty-targeting) only.
+    """
+    ok, msg = _warp_focus_session(uuid)
+    if not ok:
+        return False, f"warp focus failed: {msg}"
+    ok2, msg2 = _system_events_inject("Warp", keystrokes)
+    if not ok2:
+        return False, f"warp pane focused but keystroke failed: {msg2}"
+    return True, "warp-session"
+
+
 # ───────── Main entrypoint ─────────
 
 def inject_live(
@@ -415,13 +579,14 @@ def inject_live(
                 injected FIRST as its own line — used to dismiss
                 rate-limit / login selection prompts before the
                 real prompt arrives. Pass None to skip.
-        allow_system_events: When Strategy A (TTY-targeted
-                AppleScript for iTerm2 / Terminal.app) doesn't
-                match, fall back to Strategy B (System Events
-                keystrokes targeting whichever terminal app
-                appears in the PID's process ancestry). Defaults
-                to True. Set False to disable the fallback if
-                the user worries about disturbing focus.
+        allow_system_events: Gates the IMPRECISE strategies — Warp
+                focus-by-session-URL (A2, flaky) and the BLIND
+                System Events keystroke fallback (B, types into
+                whatever pane is focused, can hit the WRONG one).
+                Unattended callers MUST pass False so only the
+                precise strategies run (tmux send-keys; iTerm2/
+                Terminal.app tty-targeting). Defaults to True for
+                the manual endpoint, where the user is watching.
 
     Returns:
         {
@@ -456,6 +621,26 @@ def inject_live(
     tried: list[str] = []
     last_err = ""
 
+    # Strategy 0 (highest priority): tmux send-keys. Pane-precise, focus-
+    # independent, works in ANY host terminal (including Warp) — the most
+    # reliable mechanism by far. If the session runs inside tmux, use it.
+    tmux_t = _tmux_target(pid)
+    if tmux_t:
+        socket, pane = tmux_t
+        tried.append(f"tmux:{pane}")
+        try:
+            ok, msg = _tmux_inject(socket, pane, keys)
+        except Exception as e:
+            ok, msg = False, f"tmux crashed: {e}"
+        if ok:
+            log.info("auto_resume.inject_live: success via %s (tty %s)", msg, tty_full)
+            return {
+                "ok": True, "mechanism": msg, "tty": tty_full,
+                "terminalApp": "tmux", "tried": tried, "error": None,
+            }
+        last_err = msg
+        log.info("auto_resume.inject_live: tmux send-keys failed (%s)", msg)
+
     # Detect the hosting terminal app upfront — used both to decide
     # whether to bother with Strategy A (skip if we already know the
     # terminal isn't iTerm/Terminal.app) and as the target for
@@ -488,13 +673,39 @@ def inject_live(
         last_err = msg
         log.info("auto_resume.inject_live: %s did not match (%s)", label, msg)
 
-    # Strategy B: System Events fallback.
+    # Strategy A2: Warp — focus the pane via warp://session/<uuid>, then
+    # keystroke. Best-effort only (has proved flaky), so it's gated behind
+    # allow_system_events alongside the blind fallback — the unattended worker
+    # (allow_system_events=False) skips it and relies on tmux/TTY instead.
+    if allow_system_events and detected_app in (None, "Warp"):
+        warp_uuid = _warp_session_uuid(pid)
+        if warp_uuid:
+            tried.append("warp-session")
+            try:
+                ok, msg = _warp_inject(warp_uuid, keys)
+            except Exception as e:
+                ok, msg = False, f"warp-session crashed: {e}"
+            if ok:
+                log.info(
+                    "auto_resume.inject_live: success via warp-session %s into %s",
+                    warp_uuid, tty_full,
+                )
+                return {
+                    "ok": True, "mechanism": "warp-session", "tty": tty_full,
+                    "terminalApp": "Warp", "tried": tried, "error": None,
+                }
+            last_err = msg
+            log.info("auto_resume.inject_live: warp-session failed (%s)", msg)
+
+    # Strategy B: BLIND System Events fallback — types into the FOCUSED pane,
+    # which may be the wrong one. Off for unattended callers.
     if not allow_system_events:
         return {
             "ok": False, "mechanism": None, "tty": tty_full,
             "terminalApp": detected_app, "tried": tried,
-            "error": (f"no AppleScript-tty match for {tty_full}; "
-                      f"System Events fallback disabled (allow_system_events=False)"),
+            "error": (f"no pane-precise injection available for {tty_full} "
+                      f"(terminal: {detected_app}); blind System Events fallback "
+                      f"disabled (allow_system_events=False). last: {last_err}"),
         }
     if not detected_app:
         return {

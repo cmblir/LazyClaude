@@ -79,6 +79,77 @@ class TestParseResetTime:
     def test_no_match_returns_none(self, fixed_now):
         assert _parse_reset_time("something completely unrelated", now_ts=fixed_now) is None
 
+    def test_session_limit_absolute_pm(self, fixed_now):
+        # The exact wording the user reported: "you've hit your session limit
+        # - resets 5:50pm" must parse to 17:50 (today or tomorrow if past).
+        result = _parse_reset_time(
+            "you've hit your session limit - resets 5:50pm", now_ts=fixed_now
+        )
+        assert result is not None
+        from datetime import datetime
+        dt = datetime.fromtimestamp(result / 1000.0)
+        assert (dt.hour, dt.minute) == (17, 50)
+
+    def test_absolute_hour_only_with_meridiem(self, fixed_now):
+        # Newer CLI wording drops the minutes: "resets 3am".
+        result = _parse_reset_time("5-hour limit reached . resets 3am", now_ts=fixed_now)
+        assert result is not None
+        from datetime import datetime
+        dt = datetime.fromtimestamp(result / 1000.0)
+        assert (dt.hour, dt.minute) == (3, 0)
+
+    def test_bare_number_without_meridiem_is_ambiguous(self, fixed_now):
+        # A lone number with neither minutes nor am/pm must NOT be read as a
+        # time (e.g. "resets 3 attempts later").
+        assert _parse_reset_time("resets 3 attempts later", now_ts=fixed_now) is None
+
+    def test_24h_clock_still_parses(self, fixed_now):
+        # 24-hour "resets at 14:30" (no meridiem, has minutes) still works.
+        result = _parse_reset_time("resets at 14:30", now_ts=fixed_now)
+        assert result is not None
+        from datetime import datetime
+        dt = datetime.fromtimestamp(result / 1000.0)
+        assert (dt.hour, dt.minute) == (14, 30)
+
+    def test_rollover_anchored_to_message_time_not_now(self, fixed_now):
+        # A reset whose clock time already passed relative to NOW but is still
+        # AFTER the message-emission anchor must resolve to the past (reset
+        # already happened), NOT roll forward 24h. This is the tpl_talk case:
+        # "resets 5:50pm" written at 5:15pm, read at 6:12pm.
+        from datetime import datetime, timedelta
+        anchor = fixed_now - 3600                       # message 1h ago
+        reset_dt = datetime.fromtimestamp(anchor) + timedelta(minutes=50)
+        clock = reset_dt.strftime("%I:%M%p").lstrip("0").lower()
+        result = _parse_reset_time(
+            "you've hit your session limit . resets %s" % clock,
+            now_ts=fixed_now, anchor_ts=anchor,
+        )
+        assert result is not None
+        assert result / 1000.0 < fixed_now, "reset already passed -> must be in the past"
+        assert (fixed_now - result / 1000.0) < 3600, "must not roll a full day forward"
+
+    def test_machine_epoch_reset_parsed(self, fixed_now):
+        # Claude Code's machine string: "...usage limit reached|<unix_epoch>".
+        epoch = 1780390200
+        result = _parse_reset_time(
+            "Claude AI usage limit reached|%d" % epoch, now_ts=fixed_now
+        )
+        assert result is not None
+        assert abs(result - epoch * 1000) < 10_000  # epoch ms + small margin
+
+    def test_after_midnight_reset_still_rolls_forward(self, fixed_now):
+        # Inverse guard: an 11pm message with "resets 3am" must roll to the
+        # next day relative to the anchor (genuine after-midnight reset).
+        from datetime import datetime
+        # Anchor at 23:00 local on fixed_now's date.
+        base = datetime.fromtimestamp(fixed_now).replace(hour=23, minute=0, second=0, microsecond=0)
+        anchor = base.timestamp()
+        result = _parse_reset_time("resets 3am", now_ts=anchor, anchor_ts=anchor)
+        assert result is not None
+        dt = datetime.fromtimestamp(result / 1000.0)
+        assert (dt.hour, dt.minute) == (3, 0)
+        assert result / 1000.0 > anchor, "3am after an 11pm anchor is tomorrow"
+
 
 # ───────── _exponential_backoff ─────────
 
@@ -383,6 +454,285 @@ class TestProcessOneLifecycle:
         assert e["state"] == "failed"
         assert e["lastExitReason"] == "auth_expired"
         assert e["enabled"] is False
+
+    # ── maxAttempts above the old 60 clamp ──
+
+    def test_api_set_respects_maxAttempts_above_60(self, tmp_path, monkeypatch):
+        # Regression: the old `min(60, raw_max)` silently truncated any value
+        # the user raised past 60. Now it must be stored verbatim.
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        self._stub_bind_path(ar, sid, monkeypatch)
+        result = ar.api_auto_resume_set({
+            "sessionId":    sid,
+            "cwd":          ar._load_all()[sid]["cwd"],
+            "maxAttempts":  200,
+            "useContinue":  False,
+            "extraArgs":    [],
+            "installHooks": False,
+        })
+        assert result.get("ok") is True, result
+        assert ar._load_all()[sid]["maxAttempts"] == 200
+        assert result["entry"]["maxAttempts"] == 200
+
+    def test_rebind_resets_attempts_to_zero(self, tmp_path, monkeypatch):
+        # Re-arming a session that previously exhausted must give a fresh
+        # budget, not carry the old attempts forward (the second half of the
+        # "stuck at 60" bug).
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        self._stub_bind_path(ar, sid, monkeypatch)
+        store = ar._load_all()
+        store[sid]["attempts"] = 60
+        store[sid]["state"] = "exhausted"
+        store[sid]["snapshotHashes"] = ["h", "h", "h"]
+        store[sid]["_resetParked"] = True
+        ar._dump_all(store)
+
+        result = ar.api_auto_resume_set({
+            "sessionId":    sid,
+            "cwd":          ar._load_all()[sid]["cwd"],
+            "maxAttempts":  100,
+            "useContinue":  False,
+            "extraArgs":    [],
+            "installHooks": False,
+        })
+        assert result.get("ok") is True, result
+        e = ar._load_all()[sid]
+        assert e["attempts"] == 0, "re-bind must reset attempts"
+        assert e["maxAttempts"] == 100
+        assert e["state"] == "watching"
+        assert e["snapshotHashes"] == []
+        assert e["_resetParked"] is False
+
+    def test_api_set_maxAttempts_zero_is_unlimited(self, tmp_path, monkeypatch):
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        self._stub_bind_path(ar, sid, monkeypatch)
+        result = ar.api_auto_resume_set({
+            "sessionId":    sid,
+            "cwd":          ar._load_all()[sid]["cwd"],
+            "maxAttempts":  0,
+            "useContinue":  False,
+            "extraArgs":    [],
+            "installHooks": False,
+        })
+        assert result.get("ok") is True, result
+        assert ar._load_all()[sid]["maxAttempts"] == 0
+
+    def test_api_set_maxAttempts_clamped_at_ceiling(self, tmp_path, monkeypatch):
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        self._stub_bind_path(ar, sid, monkeypatch)
+        result = ar.api_auto_resume_set({
+            "sessionId":    sid,
+            "cwd":          ar._load_all()[sid]["cwd"],
+            "maxAttempts":  10 ** 9,   # absurd typo
+            "useContinue":  False,
+            "extraArgs":    [],
+            "installHooks": False,
+        })
+        assert result.get("ok") is True, result
+        assert ar._load_all()[sid]["maxAttempts"] == ar.MAX_ATTEMPTS_CEILING
+
+    # ── "session limit -> resume at reset time" (park then inject) ──
+
+    def _write_cap_jsonl(self, ar, sid, content):
+        import json
+        import os
+        from pathlib import Path
+        jsonl = Path(ar._load_all()[sid]["jsonlPath"])
+        jsonl.write_text(
+            json.dumps({"role": "assistant", "content": content}) + "\n"
+        )
+        old = time.time() - 600   # 10 min ago -> trips idleSeconds gate
+        os.utime(jsonl, (old, old))
+
+    def test_future_reset_parks_without_burning_attempt(self, tmp_path, monkeypatch):
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        from datetime import datetime, timedelta
+        target = datetime.now() + timedelta(hours=2)
+        clock = target.strftime("%I:%M%p").lstrip("0").lower()   # e.g. "5:50pm"
+        self._write_cap_jsonl(
+            ar, sid, "you've hit your session limit - resets %s" % clock
+        )
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        assert e["state"] == "waiting", e
+        assert e["_resetParked"] is True
+        assert e["attempts"] == 0, "parking must NOT consume an attempt"
+        target_ms = int(target.timestamp() * 1000)
+        assert abs(e["nextAttemptAt"] - target_ms) < 5 * 60 * 1000, (
+            e["nextAttemptAt"], target_ms,
+        )
+        assert e["lastResetAt"] == e["nextAttemptAt"]
+
+    def test_parked_reset_elapsed_resumes_via_spawn(self, tmp_path, monkeypatch):
+        # Once parked (_resetParked=True) and the reset has elapsed, the next
+        # tick must RESUME — i.e. fall through to the truncate+`claude --resume`
+        # path — not re-park to tomorrow. (Live injection is no longer used: a
+        # usage-limited session is unrecoverable in place, Claude Code #58427.)
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        spawned = {"n": 0}
+        monkeypatch.setattr(
+            ar, "_spawn_resume",
+            lambda e: (spawned.__setitem__("n", spawned["n"] + 1) or (0, "", "")),
+        )
+        self._write_cap_jsonl(ar, sid, "you've hit your session limit - resets 5:50pm")
+        store = ar._load_all()
+        store[sid]["_resetParked"] = True
+        store[sid]["nextAttemptAt"] = int(time.time() * 1000) - 1000
+        store[sid]["spawnFallback"] = True
+        ar._dump_all(store)
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        assert spawned["n"] == 1, "parked + elapsed must resume (spawn), not re-park"
+        assert e["_resetParked"] is False, "flag must clear after resuming"
+        assert e["attempts"] == 1
+
+    def test_stale_reset_already_passed_resumes_now(self, tmp_path, monkeypatch):
+        # tpl_talk scenario: cap message written ~1h ago with a reset time that
+        # has already elapsed relative to now. Must resume immediately, NOT park
+        # ~24h via a tomorrow-rollover (anchored to the message time).
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        spawned = {"n": 0}
+        monkeypatch.setattr(
+            ar, "_spawn_resume",
+            lambda e: (spawned.__setitem__("n", spawned["n"] + 1) or (0, "", "")),
+        )
+        import json as _json
+        import os
+        from datetime import datetime, timedelta
+        from pathlib import Path
+        now = time.time()
+        msg_ts = now - 3600                              # message 1h ago
+        reset_dt = datetime.fromtimestamp(msg_ts) + timedelta(minutes=35)  # ~25m ago
+        clock = reset_dt.strftime("%I:%M%p").lstrip("0").lower()
+        j = Path(ar._load_all()[sid]["jsonlPath"])
+        j.write_text(_json.dumps({
+            "role": "assistant",
+            "content": "you've hit your session limit . resets %s (Asia/Seoul)" % clock,
+        }) + "\n")
+        os.utime(j, (msg_ts, msg_ts))                    # mtime = message time
+        store = ar._load_all()
+        store[sid]["spawnFallback"] = True
+        ar._dump_all(store)
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        assert spawned["n"] == 1, "reset already passed -> resume now (spawn), not park"
+        assert e.get("_resetParked") in (False, None), "must not park"
+        assert e["attempts"] == 1
+
+    def test_spawn_fallback_false_pauses(self, tmp_path, monkeypatch):
+        # spawnFallback=False: in-place resume is impossible (Claude Code
+        # #58427/#59520), so with the detached `claude --resume` opted out the
+        # worker must PAUSE rather than spawn.
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        monkeypatch.setattr(ar, "_live_cli_sessions", lambda: {sid: {"pid": 4242}})
+        spawned = {"n": 0}
+        monkeypatch.setattr(
+            ar, "_spawn_resume",
+            lambda e: (spawned.__setitem__("n", spawned["n"] + 1) or (0, "", "")),
+        )
+        self._write_cap_jsonl(ar, sid, "you've hit your session limit, try again later")
+        store = ar._load_all()
+        store[sid]["spawnFallback"] = False
+        store[sid]["pid"] = 4242
+        ar._dump_all(store)
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        assert spawned["n"] == 0, "spawnFallback=false must not spawn"
+        assert e["state"] == "failed"
+        assert e["enabled"] is False
+
+    def test_spawn_fallback_true_resumes_via_spawn(self, tmp_path, monkeypatch):
+        # spawnFallback=True (default): truncate synthetic tail + `claude
+        # --resume`. Here the fake claude exits 0 -> DONE.
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        monkeypatch.setattr(ar, "_live_cli_sessions", lambda: {sid: {"pid": 4242}})
+        self._write_cap_jsonl(ar, sid, "you've hit your session limit, try again later")
+        store = ar._load_all()
+        store[sid]["spawnFallback"] = True
+        store[sid]["pid"] = 4242
+        ar._dump_all(store)
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        assert e["state"] == "done", e
+        assert e["lastExitReason"] == "clean"
+        assert e["attempts"] == 1
+
+    def test_park_does_not_spawn_claude(self, tmp_path, monkeypatch):
+        # While parked we must NOT spawn `claude --resume`; assert the spawn
+        # path is never reached for a future-reset cap.
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        spawned = {"n": 0}
+        monkeypatch.setattr(
+            ar, "_spawn_resume",
+            lambda entry: (spawned.__setitem__("n", spawned["n"] + 1) or (0, "", "")),
+        )
+        from datetime import datetime, timedelta
+        target = datetime.now() + timedelta(hours=3)
+        clock = target.strftime("%I:%M%p").lstrip("0").lower()
+        self._write_cap_jsonl(
+            ar, sid, "you've hit your session limit - resets %s" % clock
+        )
+        ar._process_one(sid)
+        assert spawned["n"] == 0, "must not spawn while parked for a future reset"
+        assert ar._load_all()[sid]["state"] == "waiting"
+
+
+class TestTruncateSyntheticTail:
+    """Claude Code #58427/#59520 workaround — revert jsonl to last real msg_."""
+
+    def _line(self, **kw):
+        import json
+        return json.dumps(kw)
+
+    def test_truncates_synthetic_tail_to_last_real_msg(self, tmp_path, monkeypatch):
+        import server.auto_resume as ar
+        j = tmp_path / "s.jsonl"
+        j.write_text("\n".join([
+            self._line(type="assistant", message={"id": "msg_01REAL", "model": "claude-opus-4-8"}),
+            self._line(type="user", message={"role": "user", "content": "do it"}),
+            self._line(type="assistant", message={"id": "22ab97a8-uuid", "model": "<synthetic>"}, isApiErrorMessage=True),
+            self._line(type="assistant", message={"id": "e6f-uuid", "model": "<synthetic>"}, isApiErrorMessage=True),
+        ]) + "\n")
+        res = ar._truncate_synthetic_tail(str(j))
+        assert res["ok"] is True
+        assert res["removed"] == 3  # user + 2 synthetic after the last real msg_
+        # last line is now the real msg_ assistant
+        import json
+        lines = [l for l in j.read_text().splitlines() if l.strip()]
+        last = json.loads(lines[-1])
+        assert last["message"]["id"] == "msg_01REAL"
+        # backup exists
+        import os
+        assert os.path.exists(res["backup"])
+
+    def test_noop_when_tail_already_clean(self, tmp_path):
+        import server.auto_resume as ar
+        j = tmp_path / "s.jsonl"
+        j.write_text("\n".join([
+            self._line(type="assistant", message={"id": "msg_01A", "model": "claude-opus-4-8"}),
+            self._line(type="assistant", message={"id": "msg_01B", "model": "claude-opus-4-8"}),
+        ]) + "\n")
+        res = ar._truncate_synthetic_tail(str(j))
+        assert res["ok"] is True
+        assert res["removed"] == 0
+
+    def test_no_real_msg_returns_not_ok(self, tmp_path):
+        import server.auto_resume as ar
+        j = tmp_path / "s.jsonl"
+        j.write_text(self._line(type="assistant", message={"id": "uuid-only", "model": "<synthetic>"}) + "\n")
+        res = ar._truncate_synthetic_tail(str(j))
+        assert res["ok"] is False
+        assert "no real msg_" in res["reason"]
+
+    def test_missing_file(self, tmp_path):
+        import server.auto_resume as ar
+        res = ar._truncate_synthetic_tail(str(tmp_path / "nope.jsonl"))
+        assert res["ok"] is False
 
 
 # Needed for the integration tests above

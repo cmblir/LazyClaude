@@ -92,6 +92,14 @@ DEFAULT_IDLE_SECONDS = 90
 MIN_IDLE_SECONDS = 30
 
 DEFAULT_MAX_ATTEMPTS = 12  # 12 * 5min ≈ 1h floor; with backoff > 60h
+# Upper bound on a user-supplied maxAttempts. This is only a sanity ceiling
+# against absurd typos — NOT the old behaviour-shaping cap. Users who hit a
+# 5-hour limit repeatedly across many days legitimately need far more than the
+# previous 60-attempt clamp (which silently truncated any larger value the user
+# set). Real runaway protection comes from deadlineMs/durationSec (30-day cap)
+# and the snapshot-hash stall guard, not from this number. maxAttempts=0 still
+# means "unlimited until a clean exit".
+MAX_ATTEMPTS_CEILING = 100000
 SNAPSHOT_STALL_LIMIT = 3  # N identical hashes in a row -> stalled
 SNAPSHOT_HASH_HISTORY = 5  # how many tail hashes to keep
 
@@ -133,6 +141,8 @@ RATE_LIMIT_HINTS = (
     "5 hour limit",
     "weekly limit",
     "message limit",
+    "session limit",  # "you've hit your session limit - resets 5:50pm"
+    "opus limit",  # "You've hit your Opus limit"
     "claude usage",
     "try again",
     "please try later",
@@ -140,17 +150,19 @@ RATE_LIMIT_HINTS = (
     "limit exceeded",
     "quota exceeded",
     "429",
-    "resets at",
+    "resets at",  # NOT a bare "resets " — that false-matches normal prose
+    "will reset",
     "available again",
 )
 
 # Patterns inspected on stderr/stdout/jsonl tail to classify the exit reason.
 _PAT_RATE_LIMIT = re.compile(
-    r"(usage|rate|message|weekly|5[- ]?hour)\s*(limit|cap|quota)|"
+    r"(usage|rate|message|weekly|session|5[- ]?hour)\s*(limit|cap|quota)|"
     r"\b429\b|"
     r"too many requests|"
     r"please try later|"
-    r"resets?\s+(at|in)|"
+    r"resets?\s+(at|in|\d)|"  # "resets at 3am" / "resets in 5m" / "resets 5:50pm"
+    r"will reset|"
     r"available again",
     re.IGNORECASE,
 )
@@ -253,28 +265,54 @@ def _classify_exit(
 
 # Match a wide range of "resets at HH:MM[am/pm]" / "in N minutes" wording.
 _PAT_RESET_AT = re.compile(
-    r"(?:reset(?:s|ting)?|available\s+again|try\s+again|next\s+window).{0,30}?"
+    r"(?:reset(?:s|ting)?|will\s+reset|available\s+again|try\s+again|next\s+window).{0,30}?"
     r"(?:at\s+)?"
-    r"(\d{1,2})[:.](\d{2})\s*(am|pm|a\.m\.|p\.m\.)?",
+    r"(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?",
     re.IGNORECASE,
 )
 _PAT_RESET_IN = re.compile(
     r"(?:in|after|wait)\s+(\d+)\s*(second|sec|s|minute|min|m|hour|hr|h)s?\b",
     re.IGNORECASE,
 )
+# Machine-readable cap string Claude Code emits, e.g.
+# "Claude AI usage limit reached|1780390200" — the reset is a bare Unix epoch
+# (seconds) after a pipe. This carries no clock time, so the HH:MM patterns
+# below would miss it entirely.
+_PAT_RESET_EPOCH = re.compile(r"(?:reached|limit)\s*\|\s*(\d{9,11})")
 
 
-def _parse_reset_time(text: str, now_ts: Optional[float] = None) -> Optional[int]:
+def _parse_reset_time(
+    text: str,
+    now_ts: Optional[float] = None,
+    anchor_ts: Optional[float] = None,
+) -> Optional[int]:
     """Try to extract a precise next-attempt epoch_ms from a rate-limit message.
 
     Returns None if no usable hint is found — caller falls back to
     pollInterval / exponential backoff.
+
+    ``anchor_ts`` is the reference time the reset is measured FROM — i.e. when
+    the limit message was emitted (default: ``now_ts``). It matters for the
+    "next HH:MM" rollover: a "resets 5:50pm" message written at 5:15pm means
+    *today* 5:50pm even when we read it at 6:12pm (reset already happened ->
+    resume now). Anchoring the rollover to ``now`` instead would wrongly roll
+    it to *tomorrow* 5:50pm. A genuine after-midnight reset (11pm message,
+    "resets 3am") still rolls forward correctly because 3am is before the 11pm
+    anchor. Pass the session jsonl mtime as the anchor.
     """
     if not text:
         return None
     now_ts = now_ts if now_ts is not None else time.time()
+    anchor_ts = anchor_ts if anchor_ts is not None else now_ts
 
-    # "in N units" — relative offset
+    # Machine string "...limit reached|<unix_epoch>" — an absolute reset time.
+    m = _PAT_RESET_EPOCH.search(text)
+    if m:
+        epoch = int(m.group(1))
+        if 1_000_000_000 <= epoch <= 9_999_999_999:  # ~2001..2286, sane range
+            return epoch * 1000 + 5000
+
+    # "in N units" — relative offset, measured from the message (anchor) time.
     m = _PAT_RESET_IN.search(text)
     if m:
         n = int(m.group(1))
@@ -286,14 +324,20 @@ def _parse_reset_time(text: str, now_ts: Optional[float] = None) -> Optional[int
         else:
             sec = n
         # tiny safety margin so we don't fire one tick early
-        return int((now_ts + sec + 5) * 1000)
+        return int((anchor_ts + sec + 5) * 1000)
 
-    # "at HH:MM[am/pm]" — absolute clock time, today or tomorrow if past
+    # "at HH:MM[am/pm]" / "HH am|pm" — absolute clock time. The reset is the
+    # next occurrence of HH:MM AFTER the anchor (message) time, not after now.
+    # Minutes are optional ("resets 3am"); when absent we require a meridiem so
+    # a bare number ("resets 3 attempts later") is not mistaken for a time.
     m = _PAT_RESET_AT.search(text)
     if m:
         hour = int(m.group(1))
-        minute = int(m.group(2))
+        minute_raw = m.group(2)
         meridiem = (m.group(3) or "").lower().rstrip(".")
+        if minute_raw is None and not meridiem:
+            return None  # bare number, no minutes & no am/pm — too ambiguous
+        minute = int(minute_raw) if minute_raw is not None else 0
         if meridiem in ("pm", "p", "p.m"):
             if hour < 12:
                 hour += 12
@@ -306,9 +350,9 @@ def _parse_reset_time(text: str, now_ts: Optional[float] = None) -> Optional[int
             target_t = dt_time(hour=hour, minute=minute)
         except ValueError:
             return None
-        now_dt = datetime.fromtimestamp(now_ts)
-        target = datetime.combine(now_dt.date(), target_t)
-        if target <= now_dt:
+        anchor_dt = datetime.fromtimestamp(anchor_ts)
+        target = datetime.combine(anchor_dt.date(), target_t)
+        if target <= anchor_dt:
             target += timedelta(days=1)
         return int(target.timestamp() * 1000) + 5000
     return None
@@ -484,6 +528,7 @@ def _public_state(entry: dict) -> dict:
         "maxAttempts": entry.get("maxAttempts") if entry.get("maxAttempts") is not None else DEFAULT_MAX_ATTEMPTS,
         "deadlineMs": int(entry.get("deadlineMs") or 0),
         "useContinue": bool(entry.get("useContinue")),
+        "spawnFallback": bool(entry.get("spawnFallback", True)),
         "extraArgs": list(entry.get("extraArgs") or []),
         "installHooks": bool(entry.get("installHooks")),
         "notify": {
@@ -647,9 +692,12 @@ def api_auto_resume_set(body: dict) -> dict:
     poll = int(body.get("pollInterval") or DEFAULT_POLL_INTERVAL)
     poll = max(MIN_POLL_INTERVAL, min(MAX_POLL_INTERVAL, poll))
     idle = max(MIN_IDLE_SECONDS, int(body.get("idleSeconds") or DEFAULT_IDLE_SECONDS))
-    # maxAttempts=0 means unlimited (keep retrying until clean exit)
+    # maxAttempts=0 means unlimited (keep retrying until clean exit). Otherwise
+    # honour the user's value verbatim, clamped only by MAX_ATTEMPTS_CEILING so
+    # a typo can't loop for years. The old `min(60, ...)` silently truncated any
+    # value above 60, which is the bug the user hit when raising the binding count.
     raw_max = int(body.get("maxAttempts") if body.get("maxAttempts") is not None else DEFAULT_MAX_ATTEMPTS)
-    max_attempts = 0 if raw_max <= 0 else min(60, raw_max)
+    max_attempts = 0 if raw_max <= 0 else min(MAX_ATTEMPTS_CEILING, raw_max)
     # User-requested change: time-based deadline as the primary "give up" trigger.
     # Two ways to express it (both optional, both honoured):
     #   - deadlineMs: explicit epoch-ms cutoff
@@ -665,6 +713,10 @@ def api_auto_resume_set(body: dict) -> dict:
         capped_sec = min(int(duration_sec_raw), 30 * 24 * 3600)
         deadline_ms = _now_ms() + capped_sec * 1000
     use_continue = bool(body.get("useContinue"))
+    # spawnFallback (default True): when live TTY-targeted injection is not
+    # possible (non-iTerm2/Terminal.app terminals), allow the supervised
+    # `claude --resume` subprocess. Set False for strict inject-only bindings.
+    spawn_fallback = bool(body.get("spawnFallback", True))
     install_hooks = bool(body.get("installHooks"))
 
     prompt = (body.get("prompt") or "").strip() or DEFAULT_PROMPT
@@ -724,20 +776,27 @@ def api_auto_resume_set(body: dict) -> dict:
             "maxAttempts": max_attempts,
             "deadlineMs": deadline_ms or int(existing.get("deadlineMs") or 0),
             "useContinue": use_continue,
+            "spawnFallback": spawn_fallback,
             "extraArgs": extra_args,
             "installHooks": install_hooks,
             "notify": notify_clean,
             "createdAt": existing.get("createdAt") or _now_ms(),
-            "attempts": int(existing.get("attempts") or 0),
-            "lastAttemptAt": existing.get("lastAttemptAt") or 0,
+            # A (re-)bind is a fresh arm: reset the run counters so a prior
+            # exhausted/failed episode does not eat into the new budget. The
+            # old code carried `attempts` over, so re-binding a session that
+            # had already hit the cap left it at e.g. 60/100 — the second half
+            # of the "stuck at 60" bug the user reported.
+            "attempts": 0,
+            "lastAttemptAt": 0,
             "nextAttemptAt": _now_ms(),
-            "lastExitCode": existing.get("lastExitCode"),
-            "lastExitReason": existing.get("lastExitReason") or "",
-            "lastError": existing.get("lastError") or "",
-            "snapshotHashes": list(existing.get("snapshotHashes") or []),
+            "lastExitCode": None,
+            "lastExitReason": "",
+            "lastError": "",
+            "snapshotHashes": [],
             "state": STATE_WATCHING,
             "stopReason": "",
-            "lastResetAt": existing.get("lastResetAt") or 0,
+            "lastResetAt": 0,
+            "_resetParked": False,
             "pid": bind_pid if bind_pid is not None else existing.get("pid"),
             "terminal_app": bind_terminal_app or existing.get("terminal_app") or "",
             "terminalClosedAction": tca,
@@ -1053,6 +1112,91 @@ def api_auto_resume_hook_status(query: dict) -> dict:
     return _hooks_status(cwd)
 
 
+# ───────── Synthetic-tail truncation (Claude Code #58427/#59520 workaround) ─────────
+
+
+def _truncate_synthetic_tail(jsonl_path: str) -> dict:
+    """Make a usage-limited session resumable again.
+
+    Claude Code (#58427/#59520) leaves a session UNRECOVERABLE after a usage
+    limit / 429: it advances ``diagnostics.previous_message_id`` from the
+    *request* it sent, so when that request fails the pointer references a
+    synthetic assistant entry (``model: "<synthetic>"`` / non-``msg_`` id, e.g.
+    the "You've hit your session limit" notice or the API-error record). Every
+    later call — typed OR injected — then 400s. The documented workaround is to
+    truncate the jsonl back to the last REAL ``msg_`` assistant message so a
+    fresh ``claude --resume`` rebuilds a valid pointer.
+
+    Backs the file up to ``<jsonl>.synthtail-bak`` first. No-ops (removed=0)
+    when the tail is already clean. Returns
+    {ok, removed, backup, reason}.
+    """
+    p = Path(jsonl_path)
+    if not jsonl_path or not p.exists():
+        return {"ok": False, "removed": 0, "reason": "jsonl missing"}
+    try:
+        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception as e:
+        return {"ok": False, "removed": 0, "reason": f"read failed: {e}"}
+
+    last_real = -1
+    for i, ln in enumerate(lines):
+        s = ln.strip()
+        if not s:
+            continue
+        try:
+            o = json.loads(s)
+        except Exception:
+            continue
+        if o.get("type") != "assistant":
+            continue
+        mid = (o.get("message") or {}).get("id") or ""
+        if isinstance(mid, str) and mid.startswith("msg_"):
+            last_real = i
+
+    if last_real < 0:
+        return {"ok": False, "removed": 0, "reason": "no real msg_ assistant message found"}
+
+    # Is there a synthetic/api-error assistant entry AFTER the last real one?
+    # Only then is truncation warranted — don't chop legitimate trailing content.
+    has_synth_tail = False
+    for ln in lines[last_real + 1:]:
+        s = ln.strip()
+        if not s:
+            continue
+        try:
+            o = json.loads(s)
+        except Exception:
+            continue
+        if o.get("type") != "assistant":
+            continue
+        msg = o.get("message") or {}
+        mid = str(msg.get("id") or "")
+        if msg.get("model") == "<synthetic>" or o.get("isApiErrorMessage") or not mid.startswith("msg_"):
+            has_synth_tail = True
+            break
+
+    if not has_synth_tail:
+        return {"ok": True, "removed": 0, "reason": "no synthetic tail to truncate"}
+
+    backup = f"{p}.synthtail-bak"
+    try:
+        shutil.copy2(str(p), backup)
+    except Exception as e:
+        return {"ok": False, "removed": 0, "reason": f"backup failed: {e}"}
+
+    removed = len(lines) - (last_real + 1)
+    new_content = "\n".join(lines[: last_real + 1]) + "\n"
+    if not _safe_write(p, new_content):
+        return {"ok": False, "removed": 0, "backup": backup, "reason": "write failed"}
+    return {
+        "ok": True,
+        "removed": removed,
+        "backup": backup,
+        "reason": f"truncated {removed} synthetic/trailing line(s) to last msg_ assistant",
+    }
+
+
 # ───────── Mechanism #5: external wrapper restart loop ─────────
 
 
@@ -1152,6 +1296,7 @@ def _process_one(session_id: str) -> None:
         attempts = int(entry.get("attempts") or 0)
         max_attempts = int(entry.get("maxAttempts")) if entry.get("maxAttempts") is not None else DEFAULT_MAX_ATTEMPTS
         deadline_ms = int(entry.get("deadlineMs") or 0)
+        last_attempt_at = int(entry.get("lastAttemptAt") or 0)
 
     now_ms = _now_ms()
 
@@ -1230,6 +1375,23 @@ def _process_one(session_id: str) -> None:
                 _dump_all(store)
         return
 
+    try:
+        msg_ts = jsonl.stat().st_mtime  # when the last (cap) line was written
+    except Exception:
+        msg_ts = now_ms / 1000.0
+
+    # Re-injection guard. Once we resume a session, the cap message still sits
+    # in the jsonl tail and the session needs a few seconds to wake and write —
+    # without this, the 5s worker tick re-fires on the SAME stale message
+    # before any response lands (this is what produced repeated injections).
+    # Require NEW jsonl activity since our last attempt before acting again.
+    if last_attempt_at and int(msg_ts * 1000) <= last_attempt_at:
+        log.debug(
+            "auto_resume: %s no new activity since last attempt — not re-firing",
+            session_id,
+        )
+        return
+
     # 2-signal gate: idle long AND last activity smells like cap
     if not _looks_rate_limited(jsonl):
         log.debug(
@@ -1239,6 +1401,55 @@ def _process_one(session_id: str) -> None:
         )
         return
 
+    # Mechanism #2 (early) — "session limit -> resume AT the reset time".
+    # The cap message usually states a precise reset moment
+    # ("you've hit your session limit - resets 5:50pm"). If that moment is
+    # still in the future AND we have not already parked for this episode,
+    # schedule the next attempt EXACTLY at the reset and drop to WAITING:
+    # we do NOT inject/spawn now and we do NOT burn an attempt — we simply
+    # wait until 5:50pm, then resume the live session.
+    #
+    # The _resetParked flag is essential: when the worker wakes at the reset
+    # moment, the cap message still sits in the jsonl tail, so a naive
+    # re-parse of "5:50pm" would roll the clock to *tomorrow* and re-park for
+    # ~24h. The flag short-circuits that — once parked, the next eligible tick
+    # falls straight through to the resume path instead of re-parking.
+    reset_ms = _parse_reset_time(
+        _read_jsonl_tail(jsonl), now_ts=now_ms / 1000.0, anchor_ts=msg_ts
+    )
+    if reset_ms and reset_ms > now_ms:
+        # Decide AND mutate under one lock. Reading _resetParked from the
+        # stale pre-lock snapshot would race a concurrent tick (the pool can
+        # run several) into a double-park or a clobbered park; re-read it
+        # fresh from `store` here so the check and the write are atomic.
+        did_park = False
+        with _LOCK:
+            store = _load_all()
+            e0 = store.get(session_id)
+            if (
+                e0
+                and e0.get("enabled")
+                and not bool(e0.get("_resetParked"))
+                and e0.get("state")
+                not in (STATE_FAILED, STATE_EXHAUSTED, STATE_STOPPED, STATE_DONE)
+            ):
+                e0["nextAttemptAt"] = reset_ms
+                e0["lastResetAt"] = reset_ms
+                e0["_resetParked"] = True
+                e0["state"] = STATE_WAITING
+                e0["stopReason"] = ""
+                _dump_all(store)
+                did_park = True
+        if did_park:
+            log.info(
+                "auto_resume: %s session-limited — parked until reset (%ds away)",
+                session_id,
+                max(0, (reset_ms - now_ms) // 1000),
+            )
+            return
+        # else: already parked for this episode (reset elapsed, flag set) —
+        # fall through to the resume path instead of re-parking to tomorrow.
+
     with _LOCK:
         store = _load_all()
         if session_id not in store or not store[session_id].get("enabled"):
@@ -1246,60 +1457,46 @@ def _process_one(session_id: str) -> None:
         store[session_id]["state"] = STATE_RUNNING
         store[session_id]["lastAttemptAt"] = now_ms
         store[session_id]["attempts"] = attempts + 1
+        # Episode consumed — clear the park flag so a *future* cap message
+        # (with its own reset time) parks again instead of resuming instantly.
+        store[session_id]["_resetParked"] = False
         _dump_all(store)
         attempt_entry = dict(store[session_id])
 
-    # If the session is still live in a terminal, try TTY injection first.
-    # This handles the common case where the user's terminal is stuck at a
-    # "1) Yes  2) No" rate-limit selection prompt — keystrokes dismiss the
-    # prompt and submit the resume prompt directly into the live session.
-    if is_live:
-        live_rec = live_map.get(session_id) or {}
-        pid: Optional[int] = None
-        try:
-            pid = int(live_rec.get("pid")) if live_rec.get("pid") is not None else None
-        except Exception:
-            pid = None
-        if not pid:
-            try:
-                pid = (
-                    int(attempt_entry.get("pid"))
-                    if attempt_entry.get("pid") is not None
-                    else None
+    # A usage-limited Claude Code session is UNRECOVERABLE in place
+    # (Claude Code #58427/#59520 — the synthetic limit/error entry poisons
+    # `diagnostics.previous_message_id`, so any further input, typed OR injected,
+    # returns API 400). Live keystroke injection therefore CANNOT resume it. The
+    # only working recovery is to truncate the synthetic tail from the jsonl and
+    # start a FRESH `claude --resume`, which rebuilds a valid pointer.
+    if not bool(attempt_entry.get("spawnFallback", True)):
+        # spawnFallback=false: caller opted out of a detached process. Since
+        # in-place resume is impossible, there is nothing else to try.
+        with _LOCK:
+            store = _load_all()
+            if session_id in store:
+                store[session_id]["state"] = STATE_FAILED
+                store[session_id]["enabled"] = False
+                store[session_id]["stopReason"] = (
+                    "spawnFallback=false, but a usage-limited session can only be "
+                    "resumed via a fresh `claude --resume` (in-place resume is "
+                    "blocked by Claude Code #58427/#59520). Re-bind with "
+                    "spawnFallback=true to allow it."
                 )
-            except Exception:
-                pid = None
-        if pid:
-            try:
-                from .auto_resume_inject import inject_live as _inject
+                _dump_all(store)
+        log.warning(
+            "auto_resume: %s spawnFallback=false — cannot resume in place, pausing",
+            session_id,
+        )
+        return
 
-                prompt = attempt_entry.get("prompt") or DEFAULT_PROMPT
-                result = _inject(
-                    pid, prompt, press_choice="1", allow_system_events=True
-                )
-                if result.get("ok"):
-                    log.info(
-                        "auto_resume: %s inject_live succeeded via %s",
-                        session_id,
-                        result.get("mechanism"),
-                    )
-                    # Injection succeeded — revert to watching state and wait
-                    # for the session to produce new jsonl activity.
-                    with _LOCK:
-                        store = _load_all()
-                        if session_id in store:
-                            store[session_id]["state"] = STATE_WATCHING
-                            store[session_id]["lastError"] = ""
-                            _dump_all(store)
-                    return
-                else:
-                    log.info(
-                        "auto_resume: %s inject_live failed (%s), falling back to spawn",
-                        session_id,
-                        result.get("error", "?")[:200],
-                    )
-            except Exception as e:
-                log.warning("auto_resume: %s inject_live crashed: %s", session_id, e)
+    # Clean the synthetic tail so `claude --resume` gets a valid
+    # previous_message_id (the #58427/#59520 workaround). Backs up first.
+    trunc = _truncate_synthetic_tail(attempt_entry.get("jsonlPath") or "")
+    log.info(
+        "auto_resume: %s synthetic-tail truncate: %s (removed=%s)",
+        session_id, trunc.get("reason"), trunc.get("removed"),
+    )
 
     exit_code, err_tail, out_tail = _spawn_resume(attempt_entry)
     jsonl_tail_for_class = _read_jsonl_tail(jsonl)

@@ -123,14 +123,24 @@ class TestRunOsascript:
 class TestInjectLive:
     def _stub_environment(self, monkeypatch, tty="ttys999",
                           iterm_result=None, term_result=None,
-                          se_result=None, terminal_app=None):
+                          se_result=None, terminal_app=None,
+                          tmux_target=None, tmux_result=None,
+                          warp_uuid=None, warp_result=None):
         """Stub everything but the keystroke composition logic so we
         can assert what we'd hand to osascript."""
         monkeypatch.setattr(m.shutil, "which", lambda name: "/usr/bin/" + name)
         monkeypatch.setattr(m, "_tty_for_pid", lambda pid: tty)
         monkeypatch.setattr(m, "_detect_terminal_app", lambda pid, **kw: terminal_app)
+        # Pane-precise targets default to "not present" so existing tests fall
+        # straight through to the AppleScript strategies, independent of the
+        # machine's real tmux/Warp state.
+        monkeypatch.setattr(m, "_tmux_target", lambda pid, **kw: tmux_target)
+        monkeypatch.setattr(m, "_warp_session_uuid", lambda pid, **kw: warp_uuid)
 
-        captured = {"iterm2_calls": [], "terminal_calls": [], "se_calls": []}
+        captured = {
+            "iterm2_calls": [], "terminal_calls": [], "se_calls": [],
+            "tmux_calls": [], "warp_calls": [],
+        }
 
         def fake_iterm2(target_tty, keystrokes):
             captured["iterm2_calls"].append({"tty": target_tty, "keys": list(keystrokes)})
@@ -144,9 +154,19 @@ class TestInjectLive:
             captured["se_calls"].append({"app": app_name, "keys": list(keystrokes)})
             return se_result if se_result is not None else (True, f"system-events:{app_name}")
 
+        def fake_tmux(socket, pane, keystrokes):
+            captured["tmux_calls"].append({"socket": socket, "pane": pane, "keys": list(keystrokes)})
+            return tmux_result if tmux_result is not None else (True, f"tmux:{pane}")
+
+        def fake_warp(uuid, keystrokes):
+            captured["warp_calls"].append({"uuid": uuid, "keys": list(keystrokes)})
+            return warp_result if warp_result is not None else (True, "warp-session")
+
         monkeypatch.setattr(m, "_iterm2_inject", fake_iterm2)
         monkeypatch.setattr(m, "_terminal_app_inject", fake_terminal)
         monkeypatch.setattr(m, "_system_events_inject", fake_se)
+        monkeypatch.setattr(m, "_tmux_inject", fake_tmux)
+        monkeypatch.setattr(m, "_warp_inject", fake_warp)
         return captured
 
     def test_no_osascript_short_circuits(self, monkeypatch):
@@ -485,3 +505,125 @@ class TestApiInjectLive:
         r = api_auto_resume_inject_live({"sessionId": "ghost", "prompt": "go"})
         assert r["ok"] is False
         assert "no live PID" in r["error"]
+
+
+# ───────── tmux send-keys (pane-precise, focus-independent) ─────────
+
+class TestTmuxTarget:
+    def test_matches_pane_pid_directly(self, monkeypatch):
+        # The pid IS a pane root pid -> matched.
+        monkeypatch.setattr(m.shutil, "which", lambda n: "/usr/bin/tmux")
+        monkeypatch.setattr(m, "_tmux_sockets", lambda: ["/tmp/sock"])
+        monkeypatch.setattr(m, "_ppid_of", lambda pid: None)  # ancestry = {7000}
+        monkeypatch.setattr(subprocess, "check_output",
+                            lambda *a, **k: "7000 %0\n8001 %1\n")
+        assert m._tmux_target(7000) == ("/tmp/sock", "%0")
+
+    def test_matches_descendant_via_ancestry(self, monkeypatch):
+        # claude (9000) -> shell/pane_pid (8000). Ancestry walks up to 8000.
+        monkeypatch.setattr(m.shutil, "which", lambda n: "/usr/bin/tmux")
+        monkeypatch.setattr(m, "_tmux_sockets", lambda: ["/tmp/sock"])
+        monkeypatch.setattr(m, "_ppid_of", lambda pid: 8000 if pid == 9000 else None)
+        monkeypatch.setattr(subprocess, "check_output",
+                            lambda *a, **k: "8000 %2\n")
+        assert m._tmux_target(9000) == ("/tmp/sock", "%2")
+
+    def test_no_pane_match_returns_none(self, monkeypatch):
+        monkeypatch.setattr(m.shutil, "which", lambda n: "/usr/bin/tmux")
+        monkeypatch.setattr(m, "_tmux_sockets", lambda: ["/tmp/sock"])
+        monkeypatch.setattr(m, "_ppid_of", lambda pid: None)
+        monkeypatch.setattr(subprocess, "check_output",
+                            lambda *a, **k: "111 %0\n222 %1\n")
+        assert m._tmux_target(7000) is None
+
+    def test_no_tmux_binary_returns_none(self, monkeypatch):
+        monkeypatch.setattr(m.shutil, "which", lambda n: None)
+        assert m._tmux_target(7000) is None
+
+    def test_default_socket_reported_as_empty_string(self, monkeypatch):
+        # When matched on the default socket (None), return "" so _tmux_inject
+        # uses a bare `tmux` invocation.
+        monkeypatch.setattr(m.shutil, "which", lambda n: "/usr/bin/tmux")
+        monkeypatch.setattr(m, "_tmux_sockets", lambda: [None])
+        monkeypatch.setattr(m, "_ppid_of", lambda pid: None)
+        monkeypatch.setattr(subprocess, "check_output", lambda *a, **k: "7000 %4\n")
+        assert m._tmux_target(7000) == ("", "%4")
+
+
+class TestTmuxInject:
+    class _R:
+        def __init__(self, rc=0, err=""):
+            self.returncode = rc
+            self.stderr = err
+            self.stdout = ""
+
+    def test_sends_literal_then_enter(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(m.shutil, "which", lambda n: "/usr/bin/tmux")
+        monkeypatch.setattr(subprocess, "run",
+                            lambda args, **k: (calls.append(args) or self._R()))
+        ok, msg = m._tmux_inject("/tmp/sock", "%3", ["hello"])
+        assert ok is True and msg == "tmux:%3"
+        assert calls[0] == ["/usr/bin/tmux", "-S", "/tmp/sock", "send-keys", "-t", "%3", "-l", "--", "hello"]
+        assert calls[1] == ["/usr/bin/tmux", "-S", "/tmp/sock", "send-keys", "-t", "%3", "Enter"]
+
+    def test_no_tmux_binary(self, monkeypatch):
+        monkeypatch.setattr(m.shutil, "which", lambda n: None)
+        ok, msg = m._tmux_inject("/tmp/sock", "%3", ["x"])
+        assert ok is False and "tmux not on PATH" in msg
+
+    def test_nonzero_returns_error(self, monkeypatch):
+        monkeypatch.setattr(m.shutil, "which", lambda n: "/usr/bin/tmux")
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: self._R(rc=1, err="can't find pane"))
+        ok, msg = m._tmux_inject("/tmp/sock", "%3", ["x"])
+        assert ok is False and "can't find pane" in msg
+
+
+class TestInjectLivePrefersTmux:
+    def test_tmux_wins_over_applescript(self, monkeypatch):
+        monkeypatch.setattr(m.shutil, "which", lambda name: "/usr/bin/" + name)
+        monkeypatch.setattr(m, "_tty_for_pid", lambda pid: "ttys001")
+        monkeypatch.setattr(m, "_tmux_target", lambda pid, **kw: ("/tmp/sock", "%2"))
+        # If AppleScript were reached it'd raise — assert it isn't.
+        def boom(*a, **k):
+            raise AssertionError("AppleScript strategy must not run when tmux matches")
+        monkeypatch.setattr(m, "_detect_terminal_app", boom)
+        captured = {}
+        monkeypatch.setattr(m, "_tmux_inject",
+                            lambda sock, pane, keys: (captured.update(sock=sock, pane=pane, keys=list(keys)) or (True, f"tmux:{pane}")))
+        r = m.inject_live(7000, "continue the task", press_choice=None,
+                          allow_system_events=False)
+        assert r["ok"] is True
+        assert r["mechanism"] == "tmux:%2"
+        assert r["terminalApp"] == "tmux"
+        assert captured["sock"] == "/tmp/sock" and captured["pane"] == "%2"
+        assert captured["keys"] == ["continue the task"]
+
+    def test_tmux_failure_with_system_events_tries_warp(self, monkeypatch):
+        # tmux present but fails; with allow_system_events=True (manual endpoint)
+        # the best-effort Warp focus-URL path is attempted.
+        monkeypatch.setattr(m.shutil, "which", lambda name: "/usr/bin/" + name)
+        monkeypatch.setattr(m, "_tty_for_pid", lambda pid: "ttys001")
+        monkeypatch.setattr(m, "_tmux_target", lambda pid, **kw: ("/tmp/sock", "%2"))
+        monkeypatch.setattr(m, "_tmux_inject", lambda *a, **k: (False, "tmux server gone"))
+        monkeypatch.setattr(m, "_detect_terminal_app", lambda pid, **kw: "Warp")
+        monkeypatch.setattr(m, "_warp_session_uuid", lambda pid, **kw: "uuid-abc")
+        monkeypatch.setattr(m, "_warp_inject", lambda uuid, keys: (True, "warp-session"))
+        r = m.inject_live(7000, "go", press_choice=None, allow_system_events=True)
+        assert r["ok"] is True
+        assert r["mechanism"] == "warp-session"
+
+    def test_tmux_failure_unattended_does_not_use_warp(self, monkeypatch):
+        # The unattended worker (allow_system_events=False) must NOT fall back to
+        # the flaky Warp focus path — it returns failure instead.
+        monkeypatch.setattr(m.shutil, "which", lambda name: "/usr/bin/" + name)
+        monkeypatch.setattr(m, "_tty_for_pid", lambda pid: "ttys001")
+        monkeypatch.setattr(m, "_tmux_target", lambda pid, **kw: ("/tmp/sock", "%2"))
+        monkeypatch.setattr(m, "_tmux_inject", lambda *a, **k: (False, "tmux server gone"))
+        monkeypatch.setattr(m, "_detect_terminal_app", lambda pid, **kw: "Warp")
+        monkeypatch.setattr(m, "_warp_session_uuid", lambda pid, **kw: "uuid-abc")
+        def boom(*a, **k):
+            raise AssertionError("warp path must not run unattended")
+        monkeypatch.setattr(m, "_warp_inject", boom)
+        r = m.inject_live(7000, "go", press_choice=None, allow_system_events=False)
+        assert r["ok"] is False
