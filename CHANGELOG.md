@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.38] — 2026-06-01  🧰 fix: harness-tools tab was hidden in claude/workflow modes (MODE_TABS)
+
+The 하네스 도구 tab (with caveman etc.) was missing from the Build group for most
+users: a tab only shows in a non-`all` sidebar mode if its id is listed in
+`MODE_TABS[mode]`, and `harness` was never added there — so it only appeared in
+`all` mode (RTK, in `MODE_TABS.claude`, did show, which is why RTK was visible
+but harness wasn't).
+
+- Added `harness` to `MODE_TABS.claude` (next to `rtk`) and `MODE_TABS.workflow`
+  so it's discoverable in the modes people actually use.
+
+(Note for future tabs: a new tab needs three edits — `NAV`, `nav_catalog.py`,
+**and `MODE_TABS`** — the last is easy to miss.)
+
+Full Playwright re-verification of this session's work (fresh browser): harness
+tab visible in Build (claude mode) + renders 7 cards with working install/repo
+actions; usage hour-of-day is a line chart — 전체 draws 6 per-project lines with
+legend + all 0–23 labels, selecting a project draws a single non-blank line;
+day×hour heatmap interactive (648 cells); `/api/model/config` exposes
+claude-opus-4-8; all 4 new mascots in `_MASCOT_FRIENDS` (12), serve and render;
+0 console errors.
+
+---
 ## [3.99.37] — 2026-06-01  🦀 mascot sizing now normalises on the claw'd *body*, not the full bbox
 
 Verifying the new mascots against the rotation surfaced a real inconsistency:

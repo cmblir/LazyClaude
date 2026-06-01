@@ -647,7 +647,7 @@ const MODE_TABS = {
   claude: new Set([
     'features', 'onboarding', 'guideHub', 'overview', 'projects', 'analytics',
     'aiEval', 'sessions', 'agents', 'projectAgents', 'skills', 'commands',
-    'sessionReplay', 'rtk',
+    'sessionReplay', 'rtk', 'harness',
     'hooks', 'permissions', 'mcp', 'plugins', 'marketplaces', 'settings',
     'claudemd', 'envConfig', 'modelConfig', 'statusline',
     'memory', 'memoryManager', 'tasks', 'plans', 'outputStyles', 'team',
@@ -658,7 +658,7 @@ const MODE_TABS = {
   ]),
   workflow: new Set([
     'workflows', 'runCenter', 'promptLibrary', 'agentSdkScaffold',
-    'learner', 'artifacts', 'crewWizard',
+    'learner', 'artifacts', 'crewWizard', 'rtk', 'harness',
     'agents', 'projectAgents', 'skills', 'commands',
     'settings',
   ]),
