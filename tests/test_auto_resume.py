@@ -681,6 +681,57 @@ class TestProcessOneLifecycle:
         assert spawned["n"] == 0, "must not spawn while parked for a future reset"
         assert ar._load_all()[sid]["state"] == "waiting"
 
+    def test_inpane_relaunch_used_for_tmux_session(self, tmp_path, monkeypatch):
+        # When the session runs inside tmux, the worker resumes IN the pane
+        # (visible in the user's terminal) instead of a headless spawn.
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        monkeypatch.setattr(ar, "_live_cli_sessions", lambda: {sid: {"pid": 7777}})
+        import server.auto_resume_inject as ari
+        monkeypatch.setattr(ari, "_tmux_target", lambda pid: ("/tmp/sock", "%0"))
+        called: dict = {}
+        monkeypatch.setattr(
+            ar, "_resume_in_tmux_pane",
+            lambda **kw: (called.update(kw) or {"ok": True, "pane": "%0", "flags": [], "truncate": {"removed": 0}}),
+        )
+        spawned = {"n": 0}
+        monkeypatch.setattr(
+            ar, "_spawn_resume",
+            lambda e: (spawned.__setitem__("n", spawned["n"] + 1) or (0, "", "")),
+        )
+        self._write_cap_jsonl(ar, sid, "you've hit your session limit, try again later")
+        store = ar._load_all()
+        store[sid]["pid"] = 7777
+        store[sid]["spawnFallback"] = True
+        ar._dump_all(store)
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        assert called.get("session_id") == sid, "in-pane relaunch must be used for a tmux session"
+        assert called.get("socket") == "/tmp/sock" and called.get("pane") == "%0"
+        assert spawned["n"] == 0, "must NOT headless-spawn when in-pane relaunch succeeds"
+        assert e["state"] == "watching"
+        assert e["attempts"] == 1
+
+    def test_headless_spawn_when_not_tmux(self, tmp_path, monkeypatch):
+        # No tmux pane -> falls back to headless `claude --resume`.
+        ar, sid = self._setup(tmp_path, monkeypatch, claude_exit=0)
+        monkeypatch.setattr(ar, "_live_cli_sessions", lambda: {sid: {"pid": 7777}})
+        import server.auto_resume_inject as ari
+        monkeypatch.setattr(ari, "_tmux_target", lambda pid: None)  # not in tmux
+        inpane = {"n": 0}
+        monkeypatch.setattr(ar, "_resume_in_tmux_pane", lambda **kw: (inpane.__setitem__("n", inpane["n"] + 1) or {"ok": True}))
+        self._write_cap_jsonl(ar, sid, "you've hit your session limit, try again later")
+        store = ar._load_all()
+        store[sid]["pid"] = 7777
+        store[sid]["spawnFallback"] = True
+        ar._dump_all(store)
+
+        ar._process_one(sid)
+        e = ar._load_all()[sid]
+        assert inpane["n"] == 0, "no tmux -> must not use in-pane relaunch"
+        assert e["state"] == "done", e  # headless fake claude exited 0
+        assert e["lastExitReason"] == "clean"
+
 
 class TestTruncateSyntheticTail:
     """Claude Code #58427/#59520 workaround — revert jsonl to last real msg_."""
@@ -733,6 +784,74 @@ class TestTruncateSyntheticTail:
         import server.auto_resume as ar
         res = ar._truncate_synthetic_tail(str(tmp_path / "nope.jsonl"))
         assert res["ok"] is False
+
+
+class TestResumePaneFlags:
+    def test_preserves_dangerous_model_and_extraargs(self, monkeypatch):
+        import subprocess
+        import server.auto_resume as ar
+        monkeypatch.setattr(
+            subprocess, "check_output",
+            lambda *a, **k: "claude --continue --dangerously-skip-permissions --model opus",
+        )
+        flags = ar._resume_pane_flags(123, ["--foo"])
+        assert "--dangerously-skip-permissions" in flags
+        assert flags[flags.index("--model") + 1] == "opus"
+        assert "--foo" in flags
+
+    def test_no_pid_returns_extraargs_only(self):
+        import server.auto_resume as ar
+        assert ar._resume_pane_flags(None, ["--x"]) == ["--x"]
+
+
+class TestResumeInTmuxPane:
+    def _patch(self, monkeypatch, captures, pane_cmd="zsh"):
+        import server.auto_resume as ar
+        import server.auto_resume_inject as ari
+        monkeypatch.setattr(ar.os, "kill", lambda pid, sig: captures.setdefault("killed", []).append((pid, sig)))
+        monkeypatch.setattr(ar, "_pid_alive", lambda pid: False)
+        monkeypatch.setattr(ar.time, "sleep", lambda s: None)
+        monkeypatch.setattr(ar, "_truncate_synthetic_tail", lambda p: {"ok": True, "removed": 2})
+        monkeypatch.setattr(ari, "tmux_pane_command", lambda s, p: pane_cmd)
+        monkeypatch.setattr(ari, "tmux_send_line", lambda s, p, line: (captures.setdefault("sent", []).append(line) or (True, "ok")))
+
+    def test_kills_truncates_relaunches_with_prompt(self, monkeypatch):
+        import server.auto_resume as ar
+        import server.auto_resume_inject as ari
+        cap: dict = {}
+        self._patch(monkeypatch, cap)
+        monkeypatch.setattr(ar, "_resume_pane_flags", lambda pid, ea: ["--dangerously-skip-permissions"])
+        monkeypatch.setattr(ari, "tmux_capture", lambda s, p: "bypass permissions on")
+        res = ar._resume_in_tmux_pane(
+            session_id="sid-1", cwd="/Users/o/prj/x", jsonl_path="/tmp/x.jsonl",
+            pid=999, prompt="continue the task", extra_args=[],
+            socket="/tmp/sock", pane="%0",
+        )
+        assert res["ok"] is True
+        assert cap["killed"][0][0] == 999
+        launch = cap["sent"][0]
+        assert "claude --resume sid-1" in launch
+        assert "continue the task" in launch
+        assert "--dangerously-skip-permissions" in launch
+        assert "cd /Users/o/prj/x" in launch
+
+    def test_answers_trust_prompt(self, monkeypatch):
+        import server.auto_resume as ar
+        import server.auto_resume_inject as ari
+        cap: dict = {}
+        self._patch(monkeypatch, cap)
+        monkeypatch.setattr(ar, "_resume_pane_flags", lambda pid, ea: [])
+        caps = iter([
+            "Quick safety check ... Yes, I trust this folder",
+            "bypass permissions on",
+        ])
+        monkeypatch.setattr(ari, "tmux_capture", lambda s, p: next(caps, "bypass permissions on"))
+        res = ar._resume_in_tmux_pane(
+            session_id="s", cwd="/x", jsonl_path="/x.jsonl", pid=1,
+            prompt="go", extra_args=[], socket="", pane="%0",
+        )
+        assert res["ok"] is True and res["trustPrompt"] is True
+        assert "1" in cap["sent"]  # answered the trust prompt with "1"
 
 
 # Needed for the integration tests above

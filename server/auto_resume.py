@@ -1197,6 +1197,129 @@ def _truncate_synthetic_tail(jsonl_path: str) -> dict:
     }
 
 
+# ───────── In-pane relaunch (resume INSIDE the live tmux pane) ─────────
+
+
+def _resume_pane_flags(pid: Optional[int], extra_args: list) -> list[str]:
+    """Flags to carry into the relaunched `claude --resume`.
+
+    Preserve the safety-relevant flags the original process used so an
+    unattended resume can make progress without blocking on prompts (chiefly
+    --dangerously-skip-permissions; also --model / --permission-mode), then
+    append the binding's extraArgs. Must be called BEFORE the pid is killed.
+    """
+    flags: list[str] = []
+    cmd = ""
+    if pid:
+        try:
+            cmd = subprocess.check_output(
+                ["ps", "-o", "command=", "-p", str(pid)],
+                text=True, errors="replace", timeout=5,
+            )
+        except Exception:
+            cmd = ""
+    toks = cmd.split()
+    if "--dangerously-skip-permissions" in toks:
+        flags.append("--dangerously-skip-permissions")
+    for opt in ("--model", "--permission-mode"):
+        if opt in toks:
+            i = toks.index(opt)
+            if i + 1 < len(toks):
+                flags += [opt, toks[i + 1]]
+    for a in extra_args or []:
+        s = str(a)
+        if s and s not in flags:
+            flags.append(s)
+    return flags
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _resume_in_tmux_pane(
+    *,
+    session_id: str,
+    cwd: str,
+    jsonl_path: str,
+    pid: Optional[int],
+    prompt: str,
+    extra_args: list,
+    socket: str,
+    pane: str,
+) -> dict:
+    """Resume a usage-limited session IN its live tmux pane (visible in the
+    user's terminal), instead of a detached headless process.
+
+    A usage-limited Claude Code process is unrecoverable in place
+    (#58427/#59520), so we must restart it: (1) preserve its flags, (2) kill
+    the poisoned process, (3) wait for the pane to fall back to a shell,
+    (4) truncate the synthetic tail, (5) relaunch `claude --resume <id>` in the
+    SAME pane with the continue prompt as a positional arg (it auto-submits on
+    load), (6) answer a one-time "trust this folder?" prompt if it appears.
+    """
+    import shlex
+    import signal
+    from .auto_resume_inject import tmux_pane_command, tmux_capture, tmux_send_line
+
+    flags = _resume_pane_flags(pid, extra_args)  # capture BEFORE kill
+
+    if pid:
+        try:
+            os.kill(int(pid), signal.SIGTERM)
+        except Exception:
+            pass
+        for _ in range(10):
+            time.sleep(0.5)
+            if not _pid_alive(int(pid)):
+                break
+        else:
+            try:
+                os.kill(int(pid), signal.SIGKILL)
+            except Exception:
+                pass
+            time.sleep(1.0)
+
+    # Wait for the pane to return to a shell (claude exited).
+    for _ in range(12):
+        c = (tmux_pane_command(socket, pane) or "").lower()
+        if c and "claude" not in c:
+            break
+        time.sleep(0.5)
+
+    trunc = _truncate_synthetic_tail(jsonl_path)
+
+    launch = "cd {} && claude --resume {} {}".format(
+        shlex.quote(cwd), shlex.quote(session_id), shlex.quote(prompt)
+    )
+    if flags:
+        launch += " " + " ".join(shlex.quote(f) for f in flags)
+    ok, msg = tmux_send_line(socket, pane, launch)
+    if not ok:
+        return {"ok": False, "error": f"tmux send launch failed: {msg}", "truncate": trunc}
+
+    # Handle a one-time folder-trust prompt; otherwise just let the positional
+    # prompt auto-submit once the TUI is up.
+    answered_trust = False
+    for _ in range(15):
+        time.sleep(1.0)
+        cap = tmux_capture(socket, pane).lower()
+        if not answered_trust and ("trust this folder" in cap or "yes, i trust" in cap):
+            tmux_send_line(socket, pane, "1")
+            answered_trust = True
+            continue
+        if "bypass permissions" in cap or "esc to interrupt" in cap or "/1.0m" in cap:
+            break  # TUI rendered / loading / processing
+    return {
+        "ok": True, "pane": pane, "flags": flags,
+        "trustPrompt": answered_trust, "truncate": trunc,
+    }
+
+
 # ───────── Mechanism #5: external wrapper restart loop ─────────
 
 
@@ -1490,8 +1613,61 @@ def _process_one(session_id: str) -> None:
         )
         return
 
-    # Clean the synthetic tail so `claude --resume` gets a valid
-    # previous_message_id (the #58427/#59520 workaround). Backs up first.
+    # Preferred recovery: relaunch IN the live tmux pane so the work continues
+    # where the user can see it (Warp etc.). Only possible when the session runs
+    # inside tmux; otherwise fall through to a headless `claude --resume`.
+    try:
+        from .auto_resume_inject import _tmux_target
+    except Exception:
+        _tmux_target = None
+    pid_now: Optional[int] = None
+    live_rec = (live_map or {}).get(session_id) or {}
+    for src in (live_rec.get("pid"), attempt_entry.get("pid")):
+        try:
+            if src is not None:
+                pid_now = int(src)
+                break
+        except Exception:
+            pass
+    tmux_t = _tmux_target(pid_now) if (_tmux_target and pid_now) else None
+    if tmux_t:
+        socket, pane = tmux_t
+        try:
+            res = _resume_in_tmux_pane(
+                session_id=session_id,
+                cwd=attempt_entry.get("cwd") or os.path.expanduser("~"),
+                jsonl_path=attempt_entry.get("jsonlPath") or "",
+                pid=pid_now,
+                prompt=attempt_entry.get("prompt") or DEFAULT_PROMPT,
+                extra_args=list(attempt_entry.get("extraArgs") or []),
+                socket=socket,
+                pane=pane,
+            )
+        except Exception as e:
+            res = {"ok": False, "error": f"in-pane relaunch crashed: {e}"}
+        if res.get("ok"):
+            cooldown = max(idle_required, 60)
+            with _LOCK:
+                store = _load_all()
+                if session_id in store:
+                    store[session_id]["state"] = STATE_WATCHING
+                    store[session_id]["lastError"] = ""
+                    store[session_id]["nextAttemptAt"] = now_ms + cooldown * 1000
+                    _dump_all(store)
+            log.info(
+                "auto_resume: %s resumed IN tmux pane %s (flags=%s, truncated=%s)",
+                session_id, res.get("pane"), res.get("flags"),
+                (res.get("truncate") or {}).get("removed"),
+            )
+            return
+        log.info(
+            "auto_resume: %s in-pane relaunch failed (%s); falling back to headless",
+            session_id, res.get("error"),
+        )
+
+    # Headless fallback (no tmux, or in-pane relaunch failed): clean the
+    # synthetic tail so `claude --resume` gets a valid previous_message_id
+    # (the #58427/#59520 workaround). Backs up first.
     trunc = _truncate_synthetic_tail(attempt_entry.get("jsonlPath") or "")
     log.info(
         "auto_resume: %s synthetic-tail truncate: %s (removed=%s)",

@@ -206,6 +206,39 @@ def _tmux_target(pid: int) -> Optional[tuple[str, str]]:
     return None
 
 
+def _tmux_base(socket: str) -> list[str]:
+    tmux = shutil.which("tmux") or "tmux"
+    return [tmux, "-S", socket] if socket else [tmux]
+
+
+def tmux_pane_command(socket: str, pane: str) -> Optional[str]:
+    """Current foreground command of a tmux pane (e.g. 'claude', 'zsh')."""
+    try:
+        out = subprocess.check_output(
+            _tmux_base(socket) + ["display-message", "-p", "-t", pane, "#{pane_current_command}"],
+            text=True, errors="replace", timeout=5, stderr=subprocess.DEVNULL,
+        )
+        return out.strip() or None
+    except Exception:
+        return None
+
+
+def tmux_capture(socket: str, pane: str) -> str:
+    """Visible text of a tmux pane (for readiness / prompt detection)."""
+    try:
+        return subprocess.check_output(
+            _tmux_base(socket) + ["capture-pane", "-p", "-t", pane],
+            text=True, errors="replace", timeout=5, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return ""
+
+
+def tmux_send_line(socket: str, pane: str, line: str) -> tuple[bool, str]:
+    """Send one literal line followed by Enter into a tmux pane."""
+    return _tmux_inject(socket, pane, [line])
+
+
 def _tmux_inject(socket: str, pane: str, keystrokes: list[str]) -> tuple[bool, str]:
     """Send each keystroke into a tmux pane: literal text, then Enter."""
     tmux = shutil.which("tmux")
