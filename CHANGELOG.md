@@ -10,6 +10,39 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.44] — 2026-06-01  📤 reports/export · 🚨 anomaly detection · 🧠 memory audit · 🎨 output-style audit
+
+Four more roadmap picks, backends built in parallel (workflow), shared-file integration by the main thread. All read-only.
+
+- **📤 리포트 · 내보내기** (`server/reports.py`, tab `reports`): period (7/30d) usage
+  report — totals, daily trend, top projects, by-model, top sessions — exported as
+  Markdown + a self-contained printable HTML (browser print-to-PDF; pure stdlib makes
+  no binary PDF, stated honestly). HTML is opened client-side via a Blob (the GET
+  dispatcher is JSON-only).
+- **🚨 이상 탐지** (`server/anomaly.py`, tab `anomalies`): compute-on-request statistical
+  anomalies over the sessions series — daily spend spikes (>mean+σ / %jump), per-project
+  surges, oversized single sessions — ranked with plain-language explanations + the
+  series chart marking flagged points. No ML, no background job.
+- **🧠 메모리 감사** (`server/memory_audit.py`, tab `memoryAudit`): read-only audit of the
+  global + per-project CLAUDE.md and `~/.claude/projects/*/memory/*.md` — per-file
+  bytes/lines/est-tokens, load-boundary flags (files that inflate every conversation in
+  a project), per-project total load + biggest offenders. (Audit only; does not duplicate
+  the existing memory CRUD.)
+- **🎨 출력 스타일 점검** (`server/output_style_migrate.py`, tab `outputStyleAudit`):
+  verified that the output-styles *feature* is NOT deprecated — only the standalone
+  `/output-style` command (removed v2.1.91, use `/config`). Lists styles + a per-item
+  migration advisory.
+
+Integration: routes.py (6 GET), NAV + MODE_TABS (claude) + nav_catalog for all 4.
+Verified in-app (Playwright): all 4 tabs render with live data (memory audit total load
+88.5K tok; output-style audit correctly reports "feature not deprecated"); endpoints
+return ok; 0 console errors; i18n green.
+
+Roadmap status: of the 21-item feature-gap research, the high-leverage core is now
+implemented; remaining = team leaderboard (#14, needs Analytics API), plugin/skill
+marketplace discover (#15), bash sandbox manager (#19).
+
+---
 ## [3.99.43] — 2026-06-01  🧮 context inspector · 🧪 prompt eval/regression · 🔍 cache diagnostics · ⏮️ checkpoints
 
 Four more roadmap picks, backends built in parallel (workflow), shared-file integration by the main thread.

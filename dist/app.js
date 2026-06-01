@@ -121,6 +121,22 @@ const NAV = [
     desc: '두 연속 요청 비교 — 어느 캐시 브레이크포인트가 히트를 깨뜨렸는지 진단', docUrl: null
   },
   {
+    id: 'reports', icon: '📤', label: '리포트 · 내보내기', group: 'observe',
+    desc: '기간별 사용량 리포트 — Markdown + 인쇄용 HTML(브라우저 인쇄→PDF)', docUrl: null
+  },
+  {
+    id: 'anomalies', icon: '🚨', label: '이상 탐지', group: 'observe',
+    desc: '사용량·비용의 통계적 이상치(스파이크·프로젝트 급증·대형 세션) 로컬 탐지', docUrl: null
+  },
+  {
+    id: 'memoryAudit', icon: '🧠', label: '메모리 감사', group: 'config',
+    desc: 'CLAUDE.md·프로젝트 메모리의 컨텍스트 주입 부하·로드 경계 점검 (읽기 전용)', docUrl: null
+  },
+  {
+    id: 'outputStyleAudit', icon: '🎨', label: '출력 스타일 점검', group: 'config',
+    desc: '/output-style 명령 폐기 진단 + 마이그레이션 어드바이저 (읽기 전용)', docUrl: null
+  },
+  {
     id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE + 'sub-agents'
   },
@@ -700,6 +716,7 @@ const MODE_TABS = {
     'eventForwarder', 'autoResumeManager', 'backupRestore', 'backups',
     'system', 'telemetry', 'metrics', 'costsTimeline', 'otel', 'adminUsage',
     'budgets', 'rateLimit', 'today', 'contextInspector', 'checkpoints',
+    'reports', 'anomalies', 'memoryAudit', 'outputStyleAudit',
     'securityScan', 'claudeDocs', 'zclaude', 'homunculus', 'routines',
     'usage', 'ideStatus', 'scheduled', 'bashHistory', 'cliSessions', 'openPorts',
   ]),
@@ -24135,6 +24152,742 @@ AFTER.cacheDiag = () => {
     }
   });
 };
+
+
+// ═══ batch4: reports · anomalies · memory audit · output-style audit ═══
+// ============================================================================
+// Reports & shareable snapshot (feature #17)
+// Read-only usage report generator. Backend: GET /api/report/generate (Markdown)
+// and GET /api/report/html (self-contained printable HTML). No real PDF — the
+// server is pure stdlib (no binary-PDF writer); the honest path to a PDF is the
+// browser's print-to-PDF on the HTML page. Both endpoints return JSON (the
+// shared GET dispatcher always JSON-serializes), so the HTML is opened in a new
+// tab via a Blob URL built from the returned `html` string.
+// ============================================================================
+function _reportPeriodLabel(p) {
+  return p === 'month' ? t('최근 30일') : t('최근 7일');
+}
+
+function _reportOpenHtml() {
+  const period = (state.data._reportPeriod || 'week');
+  // Fetch the self-contained HTML, then open it in a new tab via a Blob URL.
+  // Done client-side because the shared route dispatcher returns JSON, not raw
+  // text/html. The page is fully inline (no external assets) so it stands alone.
+  api('/api/report/html?period=' + encodeURIComponent(period)).then((res) => {
+    if (!res || !res.ok || !res.html) {
+      if (typeof toast === 'function') toast(t('인쇄용 HTML을 생성하지 못했습니다'), 'err');
+      return;
+    }
+    const blob = new Blob([res.html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (!win) {
+      if (typeof toast === 'function') toast(t('팝업이 차단되었습니다 — 팝업을 허용해 주세요'), 'warn');
+    }
+    // Revoke after a delay so the new tab has time to load the Blob.
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) { } }, 60000);
+  }).catch((e) => {
+    if (typeof toast === 'function') toast(t('인쇄용 HTML 오류') + ': ' + (e && e.message || e), 'err');
+  });
+}
+
+function _reportCopyMd() {
+  const md = state.data._reportMarkdown || '';
+  if (!md) { if (typeof toast === 'function') toast(t('먼저 리포트를 생성하세요'), 'warn'); return; }
+  const done = () => { if (typeof toast === 'function') toast(t('Markdown을 클립보드에 복사했습니다'), 'ok'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(md).then(done).catch(() => {
+      if (typeof toast === 'function') toast(t('복사 실패 — 미리보기에서 직접 선택하세요'), 'warn');
+    });
+  } else {
+    const ta = document.getElementById('reportMdSource');
+    if (ta) { ta.removeAttribute('hidden'); ta.select(); try { document.execCommand('copy'); done(); } catch (_) { } ta.setAttribute('hidden', ''); }
+  }
+}
+
+async function _reportGenerate() {
+  const sel = document.getElementById('reportPeriod');
+  const period = (sel && sel.value) || state.data._reportPeriod || 'week';
+  state.data._reportPeriod = period;
+  const preview = document.getElementById('reportPreview');
+  const btn = document.getElementById('reportGenBtn');
+  if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = t('생성 중...'); }
+  if (preview) preview.innerHTML = `<div class="text-sm text-muted" style="padding:1rem;">${t('생성 중...')}</div>`;
+  try {
+    const res = await api('/api/report/generate?period=' + encodeURIComponent(period));
+    if (!res || !res.ok) throw new Error((res && (res.error || errMsg(res))) || 'error');
+    state.data._reportMarkdown = res.markdown || '';
+    state.data._reportTotal = res.total || {};
+    _reportRenderResult(res);
+  } catch (e) {
+    if (preview) {
+      preview.innerHTML = `<div class="card p-6 text-center">
+        <p class="text-[var(--err)] font-bold mb-1">${t('리포트를 생성하지 못했습니다')}</p>
+        <p class="text-sm text-[var(--text-mute)]">${escapeHtml(String(e && e.message || e))}</p>
+      </div>`;
+    }
+  } finally {
+    if (btn) { btn.disabled = false; if (btn.dataset.label) btn.textContent = btn.dataset.label; }
+  }
+}
+
+function _reportStatCard(label, value, accent) {
+  return `<div class="card" style="padding:.85rem 1rem;">
+    <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(label)}</div>
+    <div style="font-size:1.25rem;font-weight:700;margin-top:.2rem;${accent ? 'color:var(--accent,#d97757);' : ''}">${escapeHtml(value)}</div>
+  </div>`;
+}
+
+function _reportRenderResult(res) {
+  const preview = document.getElementById('reportPreview');
+  if (!preview) return;
+  const total = res.total || {};
+  const usd = (typeof total.usd === 'number') ? ('$' + total.usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '$0.00';
+  const cards = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1rem;">
+      ${_reportStatCard(t('세션'), (total.sessions || 0).toLocaleString())}
+      ${_reportStatCard(t('총 토큰'), fmtTokens(total.tokens || 0))}
+      ${_reportStatCard(t('추정 비용'), usd, true)}
+      ${_reportStatCard(t('입력 / 출력'), fmtTokens(total.in || 0) + ' / ' + fmtTokens(total.out || 0))}
+    </div>`;
+  // Markdown preview shown as escaped monospace text (no external MD renderer
+  // to keep the page self-contained); copy-MD ships the raw source verbatim.
+  preview.innerHTML = `
+    ${cards}
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.6rem .85rem;border-bottom:1px solid var(--border,rgba(255,255,255,0.08));">
+        <span class="text-sm font-bold">${t('Markdown 미리보기')}</span>
+        <span class="text-xs text-muted">${escapeHtml(res.label || _reportPeriodLabel(res.period))}</span>
+      </div>
+      <pre style="margin:0;padding:1rem;max-height:46vh;overflow:auto;white-space:pre-wrap;word-break:break-word;font-size:.78rem;line-height:1.5;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${escapeHtml(res.markdown || '')}</pre>
+    </div>
+    <textarea id="reportMdSource" hidden aria-hidden="true" style="position:absolute;left:-9999px;">${escapeHtml(res.markdown || '')}</textarea>`;
+}
+
+VIEWS.reports = async () => {
+  const period = state.data._reportPeriod || 'week';
+  state.data._reportPeriod = period;
+  const opt = (v, ko) => `<option value="${v}" ${period === v ? 'selected' : ''}>${t(ko)}</option>`;
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">📤 ${t('리포트 · 내보내기')}</h1>
+      <p class="text-sm text-muted mt-1">${t('기간별 사용량을 Markdown과 인쇄용 HTML로 내보냅니다. 모든 수치는 세션 인덱스에서 읽기 전용으로 집계됩니다.')}</p>
+    </div>
+    <div class="card p-4 mb-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="text-sm text-muted" for="reportPeriod">${t('기간')}</label>
+        <select id="reportPeriod" class="rounded-lg px-3 py-2 text-sm"
+          style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:inherit;min-height:44px;">
+          ${opt('week', '최근 7일')}
+          ${opt('month', '최근 30일')}
+        </select>
+        <button id="reportGenBtn" class="rounded-lg px-4 py-2 text-sm font-bold"
+          style="background:#d97757;color:#fff;min-height:44px;" onclick="_reportGenerate()">${t('리포트 생성')}</button>
+        <button class="rounded-lg px-4 py-2 text-sm" style="background:rgba(255,255,255,0.06);color:inherit;border:1px solid rgba(255,255,255,0.12);min-height:44px;"
+          onclick="_reportCopyMd()">${t('Markdown 복사')}</button>
+        <button class="rounded-lg px-4 py-2 text-sm" style="background:rgba(255,255,255,0.06);color:inherit;border:1px solid rgba(255,255,255,0.12);min-height:44px;"
+          onclick="_reportOpenHtml()">${t('인쇄용 HTML 열기')}</button>
+      </div>
+      <p class="text-xs text-muted mt-3">${t('서버는 순수 stdlib이라 바이너리 PDF를 직접 생성하지 않습니다 — 인쇄용 HTML을 연 뒤 브라우저의 인쇄 → PDF로 저장을 사용하세요.')}</p>
+    </div>
+    <div id="reportPreview">
+      <div class="card p-6 text-center text-sm text-muted">${t('기간을 선택하고 리포트 생성을 누르세요.')}</div>
+    </div>`;
+};
+
+AFTER.reports = () => { _reportGenerate(); };
+// ════════════════════════════════════════════════════════════════
+// ANOMALY DETECTION (feature #18) — statistical usage/cost outliers
+// Local, compute-on-request. Reads /api/anomalies (READ-ONLY sessions).
+// ════════════════════════════════════════════════════════════════
+const __anom = {
+  days: 30,
+  window: 14,
+  z: 2.5,
+  jumpPct: 150,
+  loading: false,
+  data: null,
+};
+
+const _ANOM_KIND_META = {
+  spend_spike: { icon: '📈', label: '일일 지출 급증' },
+  project_surge: { icon: '📦', label: '프로젝트 비용 급증' },
+  large_session: { icon: '🧨', label: '비정상 대형 세션' },
+};
+
+const _ANOM_SEVERITY_META = {
+  critical: { label: '심각', color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+  high: { label: '높음', color: '#fb923c', bg: 'rgba(251,146,60,0.12)' },
+  medium: { label: '중간', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
+  low: { label: '낮음', color: '#94a3b8', bg: 'rgba(148,163,184,0.12)' },
+};
+
+function _anomSeverity(sev) {
+  return _ANOM_SEVERITY_META[sev] || _ANOM_SEVERITY_META.low;
+}
+
+function _anomKind(kind) {
+  return _ANOM_KIND_META[kind] || { icon: '⚠️', label: kind };
+}
+
+async function _anomFetch() {
+  const host = document.getElementById('anomHost');
+  if (!host) return;
+  __anom.loading = true;
+  host.innerHTML = `<div class="card p-8 empty">${t('이상 탐지 계산 중…')}</div>`;
+  const qs = `days=${__anom.days}&window=${__anom.window}&z=${__anom.z}&jumpPct=${__anom.jumpPct}`;
+  let r;
+  try {
+    r = await api(`/api/anomalies?${qs}`);
+  } catch (e) {
+    __anom.loading = false;
+    host.innerHTML = `<div class="card p-8 empty">${t('이상 탐지 로드 실패:')} ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+  __anom.loading = false;
+  __anom.data = r;
+  if (!r || r.ok === false) {
+    host.innerHTML = `<div class="card p-8 empty">${escapeHtml((r && r.note) || t('이상 탐지 계산 중 오류가 발생했습니다.'))}</div>`;
+    return;
+  }
+  _anomRender(host, r);
+}
+
+function _anomStat(value, label, color) {
+  return `<div class="card p-3 text-center">
+    <div class="text-lg font-bold" ${color ? `style="color:${color}"` : ''}>${value}</div>
+    <div class="text-[10px] text-[var(--text-dim)] mt-1">${escapeHtml(label)}</div>
+  </div>`;
+}
+
+function _anomRender(host, r) {
+  const series = r.series || [];
+  const anomalies = r.anomalies || [];
+  const sum = r.summary || {};
+  const byKind = sum.byKind || {};
+
+  const flaggedCount = sum.total || 0;
+  const worst = anomalies[0];
+  const worstSev = worst ? _anomSeverity(worst.severity) : null;
+
+  const statsBlock = `
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+      ${_anomStat(flaggedCount, t('탐지된 이상'), flaggedCount > 0 ? '#fb923c' : '#94a3b8')}
+      ${_anomStat(worstSev ? worstSev.label : '—', t('최고 심각도'), worstSev ? worstSev.color : null)}
+      ${_anomStat('$' + (sum.totalUsd || 0).toFixed(2), t('범위 내 총 지출'), null)}
+      ${_anomStat(fmtTokens(sum.sessionCount || 0), t('분석 세션 수'), null)}
+    </div>`;
+
+  const kindChips = Object.keys(byKind).length
+    ? `<div class="flex flex-wrap gap-2 mb-3 text-[10px]">
+        ${Object.entries(byKind).map(([k, n]) => {
+          const m = _anomKind(k);
+          return `<span class="px-2 py-1 rounded-full" style="background:var(--bg-soft)">${m.icon} ${escapeHtml(t(m.label))} · ${n}</span>`;
+        }).join('')}
+       </div>`
+    : '';
+
+  const listRows = anomalies.length
+    ? anomalies.map((a) => {
+        const sev = _anomSeverity(a.severity);
+        const kind = _anomKind(a.kind);
+        const where = a.session
+          ? `<span class="font-mono text-[10px] text-[var(--text-dim)]">${escapeHtml(String(a.session).slice(0, 8))}</span>`
+          : a.project
+            ? `<span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(a.project)}</span>`
+            : `<span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(a.date || '')}</span>`;
+        const deltaBadge = (typeof a.deltaPct === 'number')
+          ? `<span class="font-mono" style="color:${sev.color}">${a.deltaPct >= 0 ? '+' : ''}${a.deltaPct.toFixed(0)}%</span>`
+          : '';
+        return `
+        <div class="card p-3 mb-2" style="border-left:3px solid ${sev.color};background:${sev.bg}">
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span>${kind.icon}</span>
+              <span class="text-[11px] font-semibold">${escapeHtml(t(kind.label))}</span>
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-semibold" style="color:${sev.color};background:var(--bg-soft)">${escapeHtml(sev.label)}</span>
+              ${where}
+            </div>
+            <div class="text-right whitespace-nowrap">
+              <div class="font-mono text-[13px] font-bold">$${(a.value || 0).toFixed(2)}</div>
+              <div class="text-[9px] text-[var(--text-dim)]">${t('기준')} $${(a.baseline || 0).toFixed(2)} ${deltaBadge}</div>
+            </div>
+          </div>
+          <div class="text-[11px] text-[var(--text-mute)] leading-snug">${escapeHtml(a.message || '')}</div>
+          ${(typeof a.sigmas === 'number' && a.sigmas > 0)
+            ? `<div class="text-[9px] text-[var(--text-dim)] mt-1 font-mono">σ-deviation: ${a.sigmas.toFixed(1)}</div>`
+            : ''}
+        </div>`;
+      }).join('')
+    : `<div class="card p-6 empty text-center">
+        <div class="text-2xl mb-2">✅</div>
+        <div class="text-[12px]">${t('이상 징후가 발견되지 않았습니다.')}</div>
+        <div class="text-[10px] text-[var(--text-dim)] mt-1">${t('현재 임계값 기준으로 사용량과 비용이 평소 범위 안에 있습니다.')}</div>
+       </div>`;
+
+  host.innerHTML = `
+    ${statsBlock}
+    ${kindChips}
+    <div class="card p-3 mb-3">
+      <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('일일 지출 시계열 (이상 강조)')}</div>
+      <div style="position:relative;height:200px;">
+        <canvas id="anomChart"></canvas>
+      </div>
+      <div class="text-[9px] text-[var(--text-dim)] mt-2">${t('빨간 점은 이상으로 표시된 날입니다.')}</div>
+    </div>
+    <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('순위별 이상 목록')}</div>
+    ${listRows}`;
+
+  _anomRenderChart(series);
+}
+
+async function _anomRenderChart(series) {
+  if (!series.length || typeof _renderChart !== 'function') return;
+  const canvas = document.getElementById('anomChart');
+  if (!canvas) return;
+  const labels = series.map((p) => p.date);
+  const usd = series.map((p) => p.usd || 0);
+  // Highlight flagged days with a larger red point; normal days stay small/dim.
+  const pointColors = series.map((p) => (p.flagged ? '#f87171' : 'rgba(125,211,252,0.7)'));
+  const pointRadius = series.map((p) => (p.flagged ? 5 : 2));
+  await _renderChart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: t('일일 지출 ($)'),
+        data: usd,
+        borderColor: 'rgba(125,211,252,0.9)',
+        backgroundColor: 'rgba(125,211,252,0.12)',
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+        pointRadius,
+        pointHoverRadius: 6,
+        tension: 0.25,
+        fill: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: {
+          callbacks: {
+            afterLabel: (ctx) => {
+              const p = series[ctx.dataIndex];
+              const parts = [`${fmtTokens(p.tokens || 0)} ${t('토큰')}`, `${p.count || 0} ${t('세션')}`];
+              if (p.flagged) parts.push('⚠ ' + t('이상'));
+              return parts.join(' · ');
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { font: { size: 9 }, maxRotation: 0, autoSkip: true } },
+        y: { ticks: { font: { size: 9 } }, beginAtZero: true },
+      },
+    },
+  });
+}
+
+VIEWS.anomalies = async () => {
+  return `
+    <div class="max-w-4xl mx-auto">
+      <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <h2 class="text-lg font-bold flex items-center gap-2">🚨 ${t('이상 탐지')}</h2>
+          <p class="text-[11px] text-[var(--text-dim)] mt-1">${t('세션 사용량·비용에서 통계적으로 비정상적인 지점을 로컬에서 탐지합니다 (ML 없음, 요청 시 계산).')}</p>
+        </div>
+        <button id="anomRefresh" class="btn text-xs" aria-label="${t('다시 계산')}">↻ ${t('다시 계산')}</button>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('윈도우 · 임계값')}</div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <label class="text-[10px] text-[var(--text-dim)] flex flex-col gap-1">${t('분석 기간 (일)')}
+            <input id="anomDays" type="number" min="7" max="365" step="1" value="${__anom.days}"
+              class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-mono" aria-label="${t('분석 기간 (일)')}"></label>
+          <label class="text-[10px] text-[var(--text-dim)] flex flex-col gap-1">${t('베이스라인 윈도우 (일)')}
+            <input id="anomWindow" type="number" min="3" max="90" step="1" value="${__anom.window}"
+              class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-mono" aria-label="${t('베이스라인 윈도우 (일)')}"></label>
+          <label class="text-[10px] text-[var(--text-dim)] flex flex-col gap-1">${t('σ 배수 (민감도)')}
+            <input id="anomZ" type="number" min="1" max="6" step="0.1" value="${__anom.z}"
+              class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-mono" aria-label="${t('σ 배수 (민감도)')}"></label>
+          <label class="text-[10px] text-[var(--text-dim)] flex flex-col gap-1">${t('전일 대비 급등 (%)')}
+            <input id="anomJump" type="number" min="10" max="2000" step="10" value="${__anom.jumpPct}"
+              class="bg-[var(--bg-soft)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-mono" aria-label="${t('전일 대비 급등 (%)')}"></label>
+        </div>
+        <div class="text-[9px] text-[var(--text-dim)] mt-2">${t('σ 배수가 낮을수록 더 민감하게 탐지합니다. 변경 후 자동으로 다시 계산됩니다.')}</div>
+      </div>
+
+      <div id="anomHost"><div class="card p-8 empty">${t('이상 탐지 계산 중…')}</div></div>
+    </div>`;
+};
+
+AFTER.anomalies = async () => {
+  const bind = (id, key, cast) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', () => {
+      const v = cast(el.value);
+      if (!isFinite(v)) return;
+      __anom[key] = v;
+      _anomFetch();
+    });
+  };
+  bind('anomDays', 'days', (v) => parseInt(v, 10));
+  bind('anomWindow', 'window', (v) => parseInt(v, 10));
+  bind('anomZ', 'z', (v) => parseFloat(v));
+  bind('anomJump', 'jumpPct', (v) => parseFloat(v));
+  const refresh = document.getElementById('anomRefresh');
+  if (refresh) refresh.addEventListener('click', () => _anomFetch());
+  await _anomFetch();
+};
+VIEWS.memoryAudit = async () => {
+  let r;
+  try {
+    r = await api('/api/memory/audit');
+  } catch (e) {
+    return `<h1 class="text-2xl font-bold mb-1">🧠 ${t('메모리 감사')}</h1>
+      <div class="lc-error">⚠ ${escapeHtml(e.message || t('실패'))}</div>`;
+  }
+  if (!r || !r.ok) {
+    return `<h1 class="text-2xl font-bold mb-1">🧠 ${t('메모리 감사')}</h1>
+      <div class="lc-error">⚠ ${escapeHtml((r && r.error) || t('실패'))}</div>`;
+  }
+
+  const tot = r.totals || {};
+  const th = r.thresholds || {};
+  const warnKB = Math.round((th.warnBytes || 25600) / 1024);
+  const warnLines = th.warnLines || 200;
+
+  // ── summary cards ──
+  const cards = [
+    [t('총 메모리 로드'), fmtTokens(tot.estTokens || 0) + ' tok', '#d97757'],
+    [t('글로벌 상시 로드'), fmtTokens(tot.globalLoadEstTokens || 0) + ' tok', '#60a5fa'],
+    [t('스캔한 파일'), String(tot.fileCount || 0), '#a3a3a3'],
+    [t('경계 초과 파일'), String(tot.flaggedCount || 0), (tot.flaggedCount ? '#fca5a5' : '#4ade80')],
+  ];
+  const cardsHtml = cards.map(([label, val, color]) => `
+    <div class="card p-3 text-center">
+      <div class="text-[11px] uppercase text-[var(--text-dim)] mb-1">${escapeHtml(label)}</div>
+      <div class="text-xl font-bold mono" style="color:${color};">${escapeHtml(val)}</div>
+    </div>`).join('');
+
+  // ── flagged files (warnings) ──
+  const flagged = r.flagged || [];
+  const flaggedHtml = flagged.length ? `
+    <div class="card p-4 mb-3" style="border-color:rgba(252,165,165,0.4);">
+      <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">⚠️ ${t('로드 경계 초과 파일')} (${flagged.length})</div>
+      <p class="text-xs text-[var(--text-mute)] mb-3">${t('아래 파일은 해당 범위의 모든 대화에 주입되어 컨텍스트를 부풀립니다. 분할·요약을 권장합니다.')}</p>
+      ${flagged.map(f => `
+        <div class="card p-2 mb-2" style="background:rgba(0,0,0,0.2);">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="chip text-[10px]">${escapeHtml(_maScopeLabel(f.scope))}</span>
+            <span class="mono text-[12px] font-semibold">${escapeHtml(f.name)}</span>
+            <span class="text-[11px] text-[var(--text-dim)] truncate flex-1">${escapeHtml(f.project || t('(글로벌)'))}</span>
+          </div>
+          <div class="flex items-center gap-3 mt-1 text-[11px] mono text-[var(--text-mute)]">
+            <span>${_maBytes(f.bytes)}</span>
+            <span>${f.lines} ${t('줄')}</span>
+            <span style="color:#d97757;">~${fmtTokens(f.estTokens)} tok</span>
+          </div>
+          <div class="flex flex-wrap gap-1 mt-1">
+            ${(f.reasons || []).map(rs => `<span class="chip text-[10px]" style="color:#fca5a5;border-color:rgba(252,165,165,0.4);">${escapeHtml(rs)}</span>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>` : `
+    <div class="card p-4 mb-3" style="border-color:rgba(74,222,128,0.3);">
+      <div class="text-sm" style="color:#4ade80;">✓ ${t('경계를 초과하는 메모리 파일이 없습니다')} (>${warnKB}KB / >${warnLines}${t('줄')})</div>
+    </div>`;
+
+  // ── per-project breakdown table ──
+  const projects = r.projects || [];
+  const maxProjTok = projects.reduce((m, p) => Math.max(m, p.totalEstTokens || 0), 1);
+  const projRows = projects.map(p => {
+    const pct = Math.round(((p.totalEstTokens || 0) / maxProjTok) * 100);
+    return `
+      <tr class="border-b border-[var(--border)]">
+        <td class="py-1.5 pr-2">
+          <div class="font-medium text-[12px] truncate">${escapeHtml(p.projectName || '—')}</div>
+          <div class="text-[10px] text-[var(--text-dim)] truncate" title="${escapeHtml(p.cwd || '')}">${escapeHtml(p.cwd || '')}</div>
+        </td>
+        <td class="py-1.5 text-center text-[11px]">${p.hasClaudeMd ? '✓' : '—'}</td>
+        <td class="py-1.5 text-center text-[11px] mono">${p.memoryFileCount || 0}</td>
+        <td class="py-1.5 text-right text-[11px] mono">${fmtTokens(p.totalEstTokens || 0)}</td>
+        <td class="py-1.5 text-center">${p.flaggedCount ? `<span class="chip text-[10px]" style="color:#fca5a5;">${p.flaggedCount}</span>` : '<span class="text-[11px] text-[var(--text-dim)]">0</span>'}</td>
+        <td class="py-1.5 pl-2" style="width:120px;">
+          <div style="height:6px;border-radius:3px;background:var(--border);overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:${p.flaggedCount ? '#fca5a5' : '#d97757'};"></div>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  const projTableHtml = projects.length ? `
+    <div class="card p-4 mb-3">
+      <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">📊 ${t('프로젝트별 메모리 로드')}</div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead><tr class="text-[var(--text-dim)] text-left border-b border-[var(--border)]">
+            <th class="py-1.5 pr-2">${t('프로젝트')}</th>
+            <th class="py-1.5 text-center">CLAUDE.md</th>
+            <th class="py-1.5 text-center">${t('메모리 파일')}</th>
+            <th class="py-1.5 text-right">${t('추정 토큰')}</th>
+            <th class="py-1.5 text-center">${t('플래그')}</th>
+            <th class="py-1.5 pl-2">${t('상대 로드')}</th>
+          </tr></thead>
+          <tbody>${projRows}</tbody>
+        </table>
+      </div>
+    </div>` : `<div class="card p-4 mb-3">${_emptyState(t('스캔된 프로젝트 메모리가 없습니다'), '🗂️')}</div>`;
+
+  // ── biggest offenders ──
+  const offenders = (r.offenders || []).slice(0, 10);
+  const offHtml = offenders.length ? `
+    <div class="card p-4 mb-3">
+      <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">🏔️ ${t('최대 로드 파일 Top 10')}</div>
+      <table class="w-full text-xs">
+        <thead><tr class="text-[var(--text-dim)] text-left border-b border-[var(--border)]">
+          <th class="py-1">#</th><th class="py-1">${t('파일')}</th>
+          <th class="py-1 text-right">${t('크기')}</th><th class="py-1 text-right">${t('줄')}</th>
+          <th class="py-1 text-right">${t('추정 토큰')}</th>
+        </tr></thead>
+        <tbody>${offenders.map((o, i) => `
+          <tr class="border-b border-[var(--border)] ${o.flagged ? '' : ''}">
+            <td class="py-1 mono text-[var(--text-dim)]">${i + 1}</td>
+            <td class="py-1">
+              <span class="mono text-[11px] ${o.flagged ? '' : ''}" ${o.flagged ? 'style="color:#fca5a5;"' : ''}>${escapeHtml(o.name)}</span>
+              <span class="text-[10px] text-[var(--text-dim)] ml-1">${escapeHtml(o.project || t('(글로벌)'))}</span>
+            </td>
+            <td class="py-1 text-right mono">${_maBytes(o.bytes)}</td>
+            <td class="py-1 text-right mono">${o.lines}</td>
+            <td class="py-1 text-right mono" style="color:#d97757;">~${fmtTokens(o.estTokens)}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>` : '';
+
+  return `
+    <h1 class="text-2xl font-bold mb-1">🧠 ${t('메모리 감사')}</h1>
+    <p class="text-sm text-[var(--text-mute)] mb-4">${t('CLAUDE.md · 프로젝트 메모리가 컨텍스트에 주입하는 부하를 측정 (읽기 전용)')}</p>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">${cardsHtml}</div>
+    <div class="card p-4 mb-3">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-[11px] uppercase text-[var(--text-dim)]">${t('범위별 추정 토큰 로드')}</div>
+        <span class="text-[10px] text-[var(--text-dim)]">${t('경계')}: >${warnKB}KB / >${warnLines}${t('줄')}</span>
+      </div>
+      <div style="position:relative;height:220px;"><canvas id="maGauge"></canvas></div>
+    </div>
+    ${flaggedHtml}
+    ${projTableHtml}
+    ${offHtml}
+    <div class="text-xs text-muted mt-4" style="line-height:1.6;">
+      ${escapeHtml(r.note || '')}<br>
+      <span class="mono">~</span> = ${t('추정값')} · <span class="mono">${escapeHtml(r.globalClaudeMdPath || '')}</span>
+    </div>`;
+};
+
+function _maScopeLabel(scope) {
+  return ({
+    global: t('글로벌'),
+    projectClaudeMd: t('프로젝트 CLAUDE.md'),
+    projectMemory: t('프로젝트 메모리'),
+  })[scope] || scope;
+}
+
+function _maBytes(n) {
+  n = n || 0;
+  if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + 'MB';
+  if (n >= 1024) return (n / 1024).toFixed(1) + 'KB';
+  return n + 'B';
+}
+
+AFTER.memoryAudit = async () => {
+  let r;
+  try {
+    r = await api('/api/memory/audit');
+  } catch (_) {
+    return;
+  }
+  if (!r || !r.ok) return;
+  const canvas = document.getElementById('maGauge');
+  if (!canvas || typeof _renderChart !== 'function') return;
+
+  // Aggregate estimated-token load by scope for the gauge/bar.
+  const buckets = { global: 0, projectClaudeMd: 0, projectMemory: 0 };
+  if (r.global && r.global.entry) buckets.global = r.global.entry.estTokens || 0;
+  (r.projects || []).forEach(p => {
+    (p.files || []).forEach(f => {
+      if (f.scope === 'projectClaudeMd') buckets.projectClaudeMd += f.estTokens || 0;
+      else if (f.scope === 'projectMemory') buckets.projectMemory += f.estTokens || 0;
+    });
+  });
+  const labels = [t('글로벌 CLAUDE.md'), t('프로젝트 CLAUDE.md'), t('프로젝트 메모리')];
+  const values = [buckets.global, buckets.projectClaudeMd, buckets.projectMemory];
+
+  await _renderChart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: t('추정 토큰'),
+        data: values,
+        backgroundColor: ['#60a5fa', '#d97757', '#a78bfa'],
+        borderWidth: 0,
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#a3a3a3', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#e7e7ea', font: { size: 11 } }, grid: { display: false } },
+      },
+    },
+  });
+};
+VIEWS.outputStyleAudit = async () => {
+  const d = await api('/api/output-style/audit');
+  if (!d || !d.ok) {
+    return `<div class="card empty">${escapeHtml(t('출력 스타일 점검 데이터를 불러오지 못했습니다.'))}</div>`;
+  }
+  const cd = d.commandDeprecation || {};
+  const sp = d.settingPointer || {};
+  const styles = d.styles || [];
+  const sm = d.summary || {};
+  const builtins = d.builtins || [];
+
+  const badge = (status) => {
+    const map = {
+      ok: ['#86efac', 'rgba(134,239,172,0.12)', t('정상')],
+      deprecated: ['#fca5a5', 'rgba(252,165,165,0.12)', t('폐기됨')],
+      orphaned: ['#fcd34d', 'rgba(252,211,77,0.12)', t('연결 끊김')],
+    };
+    const [fg, bg, lbl] = map[status] || map.ok;
+    return `<span class="text-[10px] px-2 py-0.5 rounded-full" style="color:${fg};background:${bg};">${escapeHtml(lbl)}</span>`;
+  };
+
+  const featureBanner = d.featureDeprecated
+    ? `<div class="card p-4 mb-4" style="background:rgba(252,165,165,0.08);border-color:rgba(252,165,165,0.3);">
+         <div class="font-semibold text-sm" style="color:#fca5a5;">⚠️ ${escapeHtml(t('출력 스타일 기능이 폐기되었습니다'))}</div>
+       </div>`
+    : `<div class="card p-4 mb-4" style="background:linear-gradient(135deg,rgba(134,239,172,0.08),transparent);border-color:rgba(134,239,172,0.25);">
+         <div class="flex items-start gap-2">
+           <span class="text-lg" aria-hidden="true">✅</span>
+           <div>
+             <div class="font-semibold text-sm">${escapeHtml(t('출력 스타일 기능은 폐기되지 않았습니다'))}</div>
+             <p class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(t('output styles 기능 자체는 정상입니다. 폐기·제거된 것은 standalone 슬래시 커맨드뿐입니다.'))}</p>
+           </div>
+         </div>
+       </div>`;
+
+  const cmdCard = `
+    <div class="card p-4 mb-4" style="background:rgba(252,211,77,0.06);border-color:rgba(252,211,77,0.25);">
+      <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+        <div class="font-semibold text-sm">⛔ <code class="mono">${escapeHtml(cd.command || '/output-style')}</code> ${escapeHtml(t('커맨드 폐기'))}</div>
+        <div class="text-[10px] mono text-[var(--text-dim)]">${escapeHtml(t('폐기'))} ${escapeHtml(cd.deprecatedIn || '')} · ${escapeHtml(t('제거'))} ${escapeHtml(cd.removedIn || '')}</div>
+      </div>
+      <blockquote class="text-xs text-[var(--text-mute)] border-l-2 pl-3 mb-2" style="border-color:var(--border);">${escapeHtml(cd.quote || '')}</blockquote>
+      <div class="text-xs"><span class="font-semibold">${escapeHtml(t('권장 대체'))}:</span> ${escapeHtml(cd.replacement || '')}</div>
+    </div>`;
+
+  const ptrCard = `
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <div class="font-semibold text-sm">⚙️ settings.json · <code class="mono">outputStyle</code></div>
+        ${badge(sp.status)}
+      </div>
+      <div class="text-xs mono text-[var(--text-dim)] mb-2 truncate">${escapeHtml(sp.value || t('(설정 없음 — Default 사용)'))}</div>
+      <p class="text-xs text-[var(--text-mute)]">${escapeHtml(sp.advisory || '')}</p>
+      ${sp.recommendedReplacement ? `<p class="text-xs mt-2"><span class="font-semibold">${escapeHtml(t('권장'))}:</span> ${escapeHtml(sp.recommendedReplacement)}</p>` : ''}
+    </div>`;
+
+  const builtinChips = builtins.map(b =>
+    `<span class="text-[10px] px-2 py-1 rounded mono" style="background:var(--code-bg);" title="${escapeHtml(b.description || '')}">${escapeHtml(b.name)}</span>`
+  ).join(' ');
+
+  window.__osAudit = { styles };
+  const styleCards = styles.map((s, i) => `
+    <div class="card p-4">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <div class="font-semibold text-sm truncate">${escapeHtml(s.name)} ${s.active ? `<span class="text-[10px]" style="color:#86efac;">● ${escapeHtml(t('활성'))}</span>` : ''}</div>
+        ${badge(s.status)}
+      </div>
+      <div class="text-[10px] mono text-[var(--text-dim)] mb-2 truncate">${escapeHtml(s.file)}${s.keepCodingInstructions ? ' · keep-coding' : ''}</div>
+      <p class="text-xs text-[var(--text-mute)] mb-2 line-clamp-3">${escapeHtml(s.advisory || '')}</p>
+      ${(s.warnings || []).length ? `<ul class="text-[11px] mb-2" style="color:#fcd34d;">${s.warnings.map(w => `<li>⚠ ${escapeHtml(w)}</li>`).join('')}</ul>` : ''}
+      <div class="flex gap-2 flex-wrap">
+        <button class="btn text-[11px]" onclick="osAuditCopy(${i},'claudeMd',this)">📋 ${escapeHtml(t('CLAUDE.md 스니펫 복사'))}</button>
+        <button class="btn text-[11px]" onclick="osAuditCopy(${i},'skill',this)">📋 ${escapeHtml(t('스킬 스니펫 복사'))}</button>
+        <button class="btn text-[11px]" onclick="osAuditToggle(${i})">${escapeHtml(t('마이그레이션 보기'))}</button>
+      </div>
+      <div id="os-mig-${i}" class="hidden mt-3 space-y-2">
+        <div>
+          <div class="text-[10px] uppercase text-[var(--text-dim)] mb-1">CLAUDE.md</div>
+          <pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded max-h-[220px] overflow-y-auto">${escapeHtml((s.migration && s.migration.claudeMd) || '')}</pre>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase text-[var(--text-dim)] mb-1">SKILL.md</div>
+          <pre class="mono text-[10px] whitespace-pre-wrap bg-[var(--code-bg)] p-2 rounded max-h-[220px] overflow-y-auto">${escapeHtml((s.migration && s.migration.skill) || '')}</pre>
+        </div>
+      </div>
+    </div>`).join('');
+
+  const emptyStyles = `<div class="card empty" style="grid-column:1/-1;">
+      ${escapeHtml(t('사용자 레벨 출력 스타일 파일이 없습니다.'))}<br>
+      <span class="text-xs">${escapeHtml(d.dir || '')}</span>
+    </div>`;
+
+  return `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">🎨 ${escapeHtml(t('출력 스타일 점검'))}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${escapeHtml(t('폐기 진단 · 마이그레이션 어드바이저 (읽기 전용)'))} · ${sm.total || 0} ${escapeHtml(t('개'))}</p>
+      </div>
+      <a class="btn text-xs" href="${escapeHtml(d.docUrl || '#')}" target="_blank" rel="noopener noreferrer">📖</a>
+    </div>
+    ${featureBanner}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      <div class="card p-3 text-center"><div class="text-xl font-bold">${sm.total || 0}</div><div class="text-[10px] text-[var(--text-mute)]">${escapeHtml(t('스타일'))}</div></div>
+      <div class="card p-3 text-center"><div class="text-xl font-bold" style="color:#86efac;">${sm.active || 0}</div><div class="text-[10px] text-[var(--text-mute)]">${escapeHtml(t('활성'))}</div></div>
+      <div class="card p-3 text-center"><div class="text-xl font-bold" style="color:#fcd34d;">${sm.withWarnings || 0}</div><div class="text-[10px] text-[var(--text-mute)]">${escapeHtml(t('경고'))}</div></div>
+      <div class="card p-3 text-center"><div class="text-xl font-bold" style="color:${sm.orphanedSetting ? '#fcd34d' : 'var(--text)'};">${sm.orphanedSetting || 0}</div><div class="text-[10px] text-[var(--text-mute)]">${escapeHtml(t('연결 끊김'))}</div></div>
+    </div>
+    ${cmdCard}
+    ${ptrCard}
+    <div class="card p-3 mb-4">
+      <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${escapeHtml(t('빌트인 스타일'))}</div>
+      <div class="flex gap-1.5 flex-wrap">${builtinChips}</div>
+    </div>
+    <h2 class="text-sm font-semibold mb-2">${escapeHtml(t('사용자 스타일 어드바이저'))}</h2>
+    <div class="grid-list">${styleCards || emptyStyles}</div>`;
+};
+
+function osAuditToggle(i) {
+  const el = document.getElementById('os-mig-' + i);
+  if (el) el.classList.toggle('hidden');
+}
+
+async function osAuditCopy(i, kind, btn) {
+  const s = (window.__osAudit && window.__osAudit.styles && window.__osAudit.styles[i]) || null;
+  const text = (s && s.migration && s.migration[kind]) || '';
+  if (!text) { toast(t('복사할 내용이 없습니다.'), 'warn'); return; }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(t('클립보드에 복사됨'), 'ok');
+  } catch (e) {
+    // Fallback for non-secure contexts / older browsers.
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast(t('클립보드에 복사됨'), 'ok'); }
+    catch (e2) { toast(t('복사 실패'), 'err'); }
+    document.body.removeChild(ta);
+  }
+}
 
 // ── Caveman 전용 탭 ─────────────────────────────────────────────────────
 // caveman 스위트(스킬 7종) 상태·설치/재설치·압축 레벨 가이드.

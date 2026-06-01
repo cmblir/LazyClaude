@@ -96,6 +96,10 @@ from .context_inspector import api_context_inspect, api_context_sessions
 from .prompt_eval import api_eval_sets, api_eval_set_save, api_eval_set_delete, api_eval_run
 from .cache_diag import api_cache_diag_examples, api_cache_diag_history, api_cache_diag_run
 from .checkpoints import api_checkpoints_list
+from .reports import api_report_generate, api_report_html
+from .anomaly import api_anomalies
+from .memory_audit import api_memory_audit
+from .output_style_migrate import api_output_style_audit
 from .toolkits import (
     api_toolkit_status,
     api_toolkit_ecc_install, api_toolkit_ecc_uninstall,
@@ -481,6 +485,11 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/cache-diag/examples": api_cache_diag_examples,
     "/api/cache-diag/history": api_cache_diag_history,
     "/api/checkpoints/list": api_checkpoints_list,
+    "/api/report/generate": api_report_generate,
+    "/api/report/html": api_report_html,
+    "/api/anomalies": api_anomalies,
+    "/api/memory/audit": api_memory_audit,
+    "/api/output-style/audit": api_output_style_audit,
     "/api/toolkit/status": api_toolkit_status,
     "/api/session-replay/list": api_session_replay_list,
     "/api/session-replay/load": api_session_replay_load,

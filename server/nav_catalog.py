@@ -215,6 +215,24 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "키 없으면 오프라인 구조 diff 로 폴백.",
         ["cache", "diagnostics", "prompt-cache", "breakpoint", "cache_miss_reason",
          "캐시", "진단", "cache diagnosis"]),
+    ("reports",       "observe",
+        "리포트 · 내보내기 — 기간별(7/30일) 사용량 리포트(토큰·추정 비용·일별 추이·상위 "
+        "프로젝트·모델별·상위 세션)를 Markdown + 자체완결형 인쇄용 HTML 로 내보낸다. 읽기 전용.",
+        ["리포트", "report", "내보내기", "export", "markdown", "PDF", "인쇄",
+         "공유", "share", "스냅샷", "주간", "월간"]),
+    ("anomalies",     "observe",
+        "이상 탐지 — 세션 사용량·비용의 통계적 이상치(일별 스파이크·프로젝트 급증·대형 세션)를 "
+        "로컬에서 탐지 (ML 없음, 요청 시 계산).",
+        ["anomaly", "이상", "탐지", "outlier", "spike", "급증", "비용", "통계"]),
+    ("memoryAudit",   "config",
+        "메모리 감사 — CLAUDE.md·프로젝트 메모리가 모든 대화에 주입하는 컨텍스트 부하를 "
+        "측정·플래그하고 로드 경계 초과 파일을 표시 (읽기 전용).",
+        ["메모리 감사", "memory audit", "CLAUDE.md", "컨텍스트 부하", "context load"]),
+    ("outputStyleAudit", "config",
+        "출력 스타일 점검 — /output-style 명령 폐기(v2.1.91 제거, /config 로 대체) 진단 + "
+        "마이그레이션 어드바이저 (읽기 전용).",
+        ["출력 스타일", "output style", "output-style", "deprecation", "폐기",
+         "migration", "마이그레이션", "점검"]),
     ("sessionReplay", "work",
         "Session Replay — Claude Code JSONL 세션 로그를 타임라인으로 재생 · "
         "툴 호출 하이라이트 · 누적 토큰 차트.",
