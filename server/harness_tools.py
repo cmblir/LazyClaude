@@ -28,6 +28,7 @@ HARNESS_TOOLS: list[dict] = [
         "install": "curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash",
         "use": "에이전트에서 /caveman (lite·full·ultra·wenyan), Node ≥18 필요",
         "check": {"type": "path", "value": str(CLAUDE_HOME / "skills" / "caveman")},
+        "openTab": "caveman",
     },
     {
         "id": "ccusage", "name": "ccusage", "category": "analytics",
@@ -115,6 +116,55 @@ def api_harness_tools_list(_q: dict | None = None) -> dict:
         "categories": [{"id": k, "label": v} for k, v in CATEGORY_LABELS.items()],
         "npxAvailable": bool(_which("npx") or _which("bunx")),
     }
+
+
+# ── Caveman dedicated tab ───────────────────────────────────────────────────
+# caveman installs as a *suite* of Claude Code skills (symlinked into
+# ~/.claude/skills/ → ~/.agents/skills/) plus a plugin marketplace entry.
+CAVEMAN_REPO = "https://github.com/JuliusBrussee/caveman"
+CAVEMAN_INSTALL = ("curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/"
+                   "caveman/main/install.sh | bash")
+CAVEMAN_LEVELS = ["lite", "full", "ultra", "wenyan-lite", "wenyan-full", "wenyan-ultra"]
+CAVEMAN_COMPONENTS = {
+    "caveman": "압축 모드 — 출력 토큰 ~75% 절감 (군더더기 제거, 코드·에러·기술내용 보존). /caveman [레벨]",
+    "cavecrew": "caveman 스타일 서브에이전트 위임 가이드 (investigator·builder·reviewer) — 결과를 압축해 메인 컨텍스트 절약",
+    "caveman-commit": "압축 커밋 메시지 생성 (Conventional Commits). /caveman-commit",
+    "caveman-compress": "CLAUDE.md·메모리 파일을 caveman 포맷으로 압축해 입력 토큰 절감. /caveman-compress <파일>",
+    "caveman-help": "caveman 모드·스킬·명령 레퍼런스 카드. /caveman-help",
+    "caveman-review": "압축 코드리뷰 코멘트 (위치·문제·수정 한 줄). /caveman-review",
+    "caveman-stats": "이번 세션 실제 토큰 사용·절감 통계 (세션 로그 기반). /caveman-stats",
+}
+
+
+def api_caveman_status(_q: dict | None = None) -> dict:
+    """caveman 스위트 설치 상태 + 컴포넌트별 감지 + 사용 가이드."""
+    skills = CLAUDE_HOME / "skills"
+    comps = []
+    for name, desc in CAVEMAN_COMPONENTS.items():
+        comps.append({"name": name, "command": "/" + name, "desc": desc,
+                      "installed": (skills / name).exists()})
+    installed_count = sum(1 for c in comps if c["installed"])
+    return {
+        "ok": True,
+        "installed": (skills / "caveman").exists(),
+        "installedCount": installed_count,
+        "totalComponents": len(comps),
+        "components": comps,
+        "skillsDir": str(skills),
+        "repo": CAVEMAN_REPO,
+        "installCmd": CAVEMAN_INSTALL,
+        "levels": CAVEMAN_LEVELS,
+        "nodeAvailable": bool(_which("node")),
+    }
+
+
+def api_caveman_action(body: dict | None = None) -> dict:
+    """install / reinstall the caveman suite in Terminal (curated command only)."""
+    action = ((body or {}).get("action") or "install").lower()
+    if action not in ("install", "reinstall"):
+        return {"ok": False, "error": "unsupported action", "error_key": "err_unsupported"}
+    result = _run_in_terminal(CAVEMAN_INSTALL)
+    return {**result, "action": action, "command": CAVEMAN_INSTALL}
 
 
 def api_harness_tool_run(body: dict | None = None) -> dict:

@@ -83,7 +83,10 @@ from .rtk_lab import (
     api_rtk_config, api_rtk_gain, api_rtk_session,
     api_rtk_uninstall_hook,
 )
-from .harness_tools import api_harness_tools_list, api_harness_tool_run
+from .harness_tools import (
+    api_harness_tools_list, api_harness_tool_run,
+    api_caveman_status, api_caveman_action,
+)
 from .toolkits import (
     api_toolkit_status,
     api_toolkit_ecc_install, api_toolkit_ecc_uninstall,
@@ -453,6 +456,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/gain": api_rtk_gain,
     "/api/rtk/session": api_rtk_session,
     "/api/harness-tools/list": lambda q: api_harness_tools_list(),
+    "/api/caveman/status": lambda q: api_caveman_status(),
     "/api/toolkit/status": api_toolkit_status,
     "/api/session-replay/list": api_session_replay_list,
     "/api/session-replay/load": api_session_replay_load,
@@ -572,6 +576,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/init": api_rtk_init,
     "/api/rtk/uninstall-hook": api_rtk_uninstall_hook,
     "/api/harness-tools/run": api_harness_tool_run,
+    "/api/caveman/action": api_caveman_action,
     "/api/toolkit/ecc/install": api_toolkit_ecc_install,
     "/api/toolkit/ecc/uninstall": api_toolkit_ecc_uninstall,
     "/api/toolkit/ecc/install-plugin": api_toolkit_ecc_install_plugin,

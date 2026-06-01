@@ -75,6 +75,11 @@ const NAV = [
     docUrl: null
   },
   {
+    id: 'caveman', icon: '🪨', label: 'Caveman', group: 'build',
+    desc: '출력 토큰 ~75% 절감 스킬 스위트 — 설치/상태/압축 레벨(lite·full·ultra·wenyan)',
+    docUrl: null
+  },
+  {
     id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE + 'sub-agents'
   },
@@ -647,7 +652,7 @@ const MODE_TABS = {
   claude: new Set([
     'features', 'onboarding', 'guideHub', 'overview', 'projects', 'analytics',
     'aiEval', 'sessions', 'agents', 'projectAgents', 'skills', 'commands',
-    'sessionReplay', 'rtk', 'harness',
+    'sessionReplay', 'rtk', 'harness', 'caveman',
     'hooks', 'permissions', 'mcp', 'plugins', 'marketplaces', 'settings',
     'claudemd', 'envConfig', 'modelConfig', 'statusline',
     'memory', 'memoryManager', 'tasks', 'plans', 'outputStyles', 'team',
@@ -658,7 +663,7 @@ const MODE_TABS = {
   ]),
   workflow: new Set([
     'workflows', 'runCenter', 'promptLibrary', 'agentSdkScaffold',
-    'learner', 'artifacts', 'crewWizard', 'rtk', 'harness',
+    'learner', 'artifacts', 'crewWizard', 'rtk', 'harness', 'caveman',
     'agents', 'projectAgents', 'skills', 'commands',
     'settings',
   ]),
@@ -22029,6 +22034,64 @@ async function _srLoad(path) {
 // ────────────────────────────────────────────────────────────────
 // RTK OPTIMIZER (v2.24.0) — rtk-ai/rtk 토큰 절감 프록시 통합
 // ────────────────────────────────────────────────────────────────
+// ── Caveman 전용 탭 ─────────────────────────────────────────────────────
+// caveman 스위트(스킬 7종) 상태·설치/재설치·압축 레벨 가이드.
+VIEWS.caveman = async () => {
+  const d = await api('/api/caveman/status');
+  state.data.caveman = d;
+  if (!d || !d.ok) return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml((d && d.error) || '')}</div>`;
+  const comps = d.components || [];
+  const compRows = comps.map(c => `
+    <div class="card p-3">
+      <div class="font-semibold text-sm mono">${escapeHtml(c.command)} ${c.installed
+        ? '<span class="text-[10px] px-1.5 py-0.5 rounded" style="background:rgba(134,239,172,0.15);color:#86efac">설치됨</span>'
+        : '<span class="text-[10px] text-[var(--text-dim)]">미설치</span>'}</div>
+      <p class="text-xs text-[var(--text-mute)] mt-1">${escapeHtml(c.desc)}</p>
+    </div>`).join('');
+  const levels = (d.levels || []).map(l => `<span class="mono text-[11px] px-2 py-0.5 rounded bg-white/5">${escapeHtml(l)}</span>`).join(' ');
+  const installed = d.installed;
+  return `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">🪨 Caveman</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">출력 토큰 ~75% 절감 — 에이전트가 "원시인 말투"(군더더기 제거)로 답하게 하는 Claude Code 스킬 스위트. 코드·에러·기술 내용은 그대로 보존.</p>
+      </div>
+      <a class="btn text-xs" href="${escapeHtml(d.repo)}" target="_blank" rel="noopener noreferrer">저장소 ↗</a>
+    </div>
+    <div class="card p-5 mb-4">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div class="text-sm font-semibold">${installed ? '✅ 설치됨' : '⬜ 미설치'} <span class="text-[11px] text-[var(--text-dim)] font-normal">· 컴포넌트 ${d.installedCount}/${d.totalComponents}${d.nodeAvailable ? '' : ' · <span style="color:var(--danger)">Node 미설치</span>'}</span></div>
+          <div class="mono text-[10px] text-[var(--text-dim)] mt-1">${escapeHtml(d.skillsDir)}</div>
+        </div>
+        <button class="btn btn-primary text-xs" onclick="cavemanAction('${installed ? 'reinstall' : 'install'}', this)">${installed ? '재설치' : '설치'}</button>
+      </div>
+      <div class="mono text-[10px] bg-black/30 rounded px-2 py-1 mt-3 overflow-x-auto whitespace-nowrap">${escapeHtml(d.installCmd)}</div>
+    </div>
+    <div class="card p-5 mb-4">
+      <h3 class="font-semibold text-sm mb-2">압축 레벨</h3>
+      <div class="flex gap-2 flex-wrap mb-2">${levels}</div>
+      <p class="text-xs text-[var(--text-mute)]">에이전트에서 <span class="mono">/caveman</span> 또는 "talk like caveman" → 레벨 선택. <span class="mono">full</span> 기본 · <span class="mono">ultra</span> 최대 압축 · <span class="mono">wenyan-*</span> 고전 중국어 스타일. Node ≥18 필요.</p>
+    </div>
+    <div class="mb-2"><h3 class="font-semibold text-sm">스위트 컴포넌트 <span class="text-[10px] text-[var(--text-dim)] font-normal">(${d.totalComponents})</span></h3></div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">${compRows}</div>`;
+};
+
+async function cavemanAction(action, btn) {
+  const cmd = (state.data.caveman || {}).installCmd || '';
+  const ok = await confirmModal(`Terminal 창을 열고 caveman 을 ${action === 'reinstall' ? '재설치' : '설치'}합니다:\n\n${cmd}\n\n계속할까요?`);
+  if (!ok) return;
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '여는 중…'; }
+  try {
+    const r = await api('/api/caveman/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+    if (r && r.ok) toast('Caveman — Terminal 창이 열렸어요', 'ok');
+    else toast((r && r.error) || t('실행 실패'), 'err');
+  } catch (e) { toast(t('실행 실패') + ': ' + e.message, 'err'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = orig; } }
+  setTimeout(() => { if ((state.route || location.hash).includes('caveman')) go('caveman'); }, 5000);
+}
+
 // ── Claude 하네스 도구 카탈로그 ──────────────────────────────────────────
 // 인기 토큰절감/관측/라우팅 도구를 모아 바로 설치·실행. 설치/실행 명령은
 // 백엔드 카탈로그(harness_tools.py)에 하드코딩된 것만 Terminal 에서 돌린다.

@@ -10,6 +10,28 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.39] — 2026-06-01  🪨 dedicated Caveman tab (suite status · install · levels)
+
+caveman had only a catalog card; gave it a dedicated tab like RTK / ccr.
+
+- Backend `server/harness_tools.py`: `GET /api/caveman/status` detects the
+  caveman *suite* on disk (it installs as symlinked skills: caveman, cavecrew,
+  caveman-commit/compress/help/review/stats) and reports per-component installed
+  state, the compression levels (lite/full/ultra/wenyan-lite/full/ultra), repo
+  and install command. `POST /api/caveman/action` runs install/reinstall in
+  Terminal (curated command only).
+- Frontend `VIEWS.caveman`: install status (N/total components), 재설치 button,
+  compression-level guide, and a grid of the 7 suite components with their slash
+  commands + descriptions. Registered in `NAV`, `nav_catalog.py`, **and
+  `MODE_TABS`** (claude + workflow). The harness-catalog caveman card now shows
+  "전용 탭 열기" (`openTab: caveman`) instead of an inline install, matching how
+  RTK / ccr cross-link to their tabs.
+
+Verified in-app: caveman tab visible in Build (claude mode), renders 7
+components all detected as installed (7/7), reinstall + repo actions wired,
+0 console errors.
+
+---
 ## [3.99.38] — 2026-06-01  🧰 fix: harness-tools tab was hidden in claude/workflow modes (MODE_TABS)
 
 The 하네스 도구 tab (with caveman etc.) was missing from the Build group for most
