@@ -161,7 +161,7 @@
       "in_existing_en_dict": false
     },
     {
-      "text": "Fast mode 기본 모델",
+      "text": "Fast mode 기본 모델 · legacy",
       "count": 0,
       "sample_lines": [],
       "in_existing_en_dict": false
@@ -206,14 +206,6 @@
       "text": "JSON 파싱 실패: {e}",
       "count": 0,
       "sample_lines": [],
-      "in_existing_en_dict": false
-    },
-    {
-      "text": "LazyClaude — 최적화 대시보드",
-      "count": 1,
-      "sample_lines": [
-        7
-      ],
       "in_existing_en_dict": false
     },
     {
@@ -1040,6 +1032,12 @@
       "in_existing_en_dict": false
     },
     {
+      "text": "전체",
+      "count": 0,
+      "sample_lines": [],
+      "in_existing_en_dict": false
+    },
+    {
       "text": "지정한 디렉토리 파일 읽기/쓰기. 보안상 allow-list 필수.",
       "count": 0,
       "sample_lines": [],
@@ -1054,7 +1052,7 @@
       "in_existing_en_dict": false
     },
     {
-      "text": "최강 성능, 느림/비쌈",
+      "text": "최신 · 최강 (현재 기본)",
       "count": 0,
       "sample_lines": [],
       "in_existing_en_dict": false

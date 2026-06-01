@@ -155,6 +155,26 @@ RATE_LIMIT_HINTS = (
     "available again",
 )
 
+# Strict "an actual limit/rate event happened" detector for _looks_rate_limited.
+# The loose RATE_LIMIT_HINTS substrings false-match benign prose (e.g. a skill
+# description "...usage limits and get recommendations"), which made the worker
+# resume a HEALTHY session. This requires the limit to be phrased as a real
+# hit / reached / reset / HTTP-429 event near a limit keyword.
+_PAT_LIMIT_EVENT = re.compile(
+    r"(?:you'?ve|you\s+have)\s+hit\s+(?:your|the)\s+\S*\s*limit"
+    r"|hit\s+your\s+\S*\s*limit"
+    r"|\blimit\s+reached\b"
+    r"|\blimit\s+will\s+reset\b"
+    r"|\b(?:usage|session|weekly|opus|rate|message|5[- ]?hour)\s+limit\b[^.\n]{0,40}?"
+    r"(?:reset|resets|reached|try\s+again|available\s+again|exceeded)"
+    r"|\bresets?\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)"
+    r"|reached\s*\|\s*\d{9,11}"
+    r"|\b429\b|\bquota\s+exceeded\b|too\s+many\s+requests"
+    r"|\brate[_ -]?limit(?:ed|_error)?\b"
+    r"|\boverloaded_error\b",
+    re.IGNORECASE,
+)
+
 # Patterns inspected on stderr/stdout/jsonl tail to classify the exit reason.
 _PAT_RATE_LIMIT = re.compile(
     r"(usage|rate|message|weekly|session|5[- ]?hour)\s*(limit|cap|quota)|"
@@ -462,9 +482,11 @@ def _looks_rate_limited(jsonl: Path) -> bool:
     tail = _read_jsonl_tail(jsonl)
     if not tail:
         return False
-    tail_lower = tail.lower()
-    # Fast path: text-based hint matching (legacy rate-limit messages)
-    if any(hint in tail_lower for hint in RATE_LIMIT_HINTS):
+    # Strict event match — requires a real "hit/reached/reset/429" phrasing, not
+    # just a benign mention of "usage limit" somewhere in the transcript. This
+    # is what prevents resuming a healthy session that merely *talked about*
+    # limits (e.g. a skill description).
+    if _PAT_LIMIT_EVENT.search(tail):
         return True
     # Structured check: parse jsonl tail lines for api_error system entries
     # with HTTP statuses that indicate rate limiting (429, 529, 503).

@@ -247,6 +247,36 @@ class TestJsonlHelpers:
         f = tmp_path / "missing.jsonl"
         assert _looks_rate_limited(f) is False
 
+    def test_looks_rate_limited_ignores_benign_usage_mention(self, tmp_path):
+        # Regression: benign prose that merely MENTIONS "usage limit" (e.g. a
+        # skill description) must NOT be read as a rate-limit event. This used
+        # to false-trigger the worker into resuming a healthy session.
+        f = tmp_path / "benign.jsonl"
+        f.write_text(
+            '{"role":"assistant","content":"Check all AI CLI (Claude, Codex, '
+            'Gemini, z.ai) usage limits and get recommendations"}\n'
+        )
+        assert _looks_rate_limited(f) is False
+
+    def test_looks_rate_limited_session_limit_with_reset(self, tmp_path):
+        f = tmp_path / "cap.jsonl"
+        f.write_text(
+            '{"role":"user","content":"You\'ve hit your session limit \\u00b7 resets 5:50pm (Asia/Seoul)"}\n'
+        )
+        assert _looks_rate_limited(f) is True
+
+    def test_looks_rate_limited_structured_429(self, tmp_path):
+        f = tmp_path / "api.jsonl"
+        f.write_text(
+            '{"type":"system","subtype":"api_error","error":{"status":429}}\n'
+        )
+        assert _looks_rate_limited(f) is True
+
+    def test_looks_rate_limited_machine_epoch(self, tmp_path):
+        f = tmp_path / "epoch.jsonl"
+        f.write_text('{"role":"assistant","content":"Claude AI usage limit reached|1780390200"}\n')
+        assert _looks_rate_limited(f) is True
+
 
 # ───────── _process_one full lifecycle (integration) ─────────
 

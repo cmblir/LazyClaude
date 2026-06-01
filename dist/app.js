@@ -27608,7 +27608,8 @@ const _ARM_STATE_COLOR = {
 function _armEtaText(nextAttemptAt) {
   if (!nextAttemptAt) return '—';
   const now = Math.floor(Date.now() / 1000);
-  const dt = nextAttemptAt - now;
+  // nextAttemptAt is epoch MILLISECONDS; convert before diffing.
+  const dt = Math.floor(nextAttemptAt / 1000) - now;
   if (dt <= 0) return t('방금');
   if (dt < 60) return dt + 's';
   if (dt < 3600) return Math.floor(dt / 60) + 'm ' + (dt % 60) + 's';
@@ -27929,12 +27930,16 @@ window._armOpenAddDialog = async () => {
       </div>
       <div>
         <label class="text-[10px] block">${t('최대 시도')}</label>
-        <input id="armMax" type="number" min="1" max="60" class="input w-full" value="12">
+        <input id="armMax" type="number" min="0" max="100000" class="input w-full" value="12">
       </div>
     </div>
     <label class="text-[11px] flex items-center gap-2 mb-2">
       <input type="checkbox" id="armUseContinue" checked>
       ${t('--continue 사용 (--resume 대신)')}
+    </label>
+    <label class="text-[11px] flex items-center gap-2 mb-2">
+      <input type="checkbox" id="armSpawnFallback" checked>
+      ${t('정밀 재개 불가 시 백그라운드 claude --resume 허용 (해제 시 일시정지)')}
     </label>
     <label class="text-[11px] flex items-center gap-2 mb-3">
       <input type="checkbox" id="armAllowUnbound">
@@ -27993,6 +27998,7 @@ window._armSubmitAddDialog = async () => {
   const idle = parseInt((document.getElementById('armIdle') || {}).value || '90', 10);
   const max = parseInt((document.getElementById('armMax') || {}).value || '12', 10);
   const useContinue = !!(document.getElementById('armUseContinue') || {}).checked;
+  const spawnFallback = !!(document.getElementById('armSpawnFallback') || {}).checked;
   const allowUnbound = !!(document.getElementById('armAllowUnbound') || {}).checked;
   if (!sid.trim()) { toast(t('Session UUID 가 비어있음'), 'err'); return; }
   try {
@@ -28002,7 +28008,7 @@ window._armSubmitAddDialog = async () => {
       body: JSON.stringify({
         sessionId: sid.trim(), cwd: cwd.trim(), prompt: prompt.trim(),
         pollInterval: poll, idleSeconds: idle, maxAttempts: max,
-        useContinue, allowUnboundSession: allowUnbound,
+        useContinue, spawnFallback, allowUnboundSession: allowUnbound,
       }),
     });
     if (r && r.ok) {
