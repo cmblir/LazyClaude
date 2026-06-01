@@ -193,6 +193,28 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
     ("today",         "main",
         "오늘 — 오늘 하루 토큰·비용·세션·상위 프로젝트·최근 활동을 한 화면에 요약한 코크핏.",
         ["오늘", "today", "코크핏", "cockpit", "일일 요약", "데일리", "daily"]),
+    ("contextInspector", "observe",
+        "컨텍스트 인스펙터 — 대시보드 자체 /context. 최신 턴의 컨텍스트 윈도우 점유율을 "
+        "카테고리별(시스템 프롬프트·도구 정의·MCP 도구·CLAUDE.md/메모리·대화 기록·남은 공간)로 "
+        "추정. 총 사용량은 message.usage 실측, 정적 항목은 추정. 읽기 전용.",
+        ["컨텍스트", "context", "윈도우", "window", "토큰", "usage", "사용량",
+         "시스템 프롬프트", "MCP", "CLAUDE.md", "메모리"]),
+    ("checkpoints",   "main",
+        "체크포인트 — 세션별 프롬프트 단위 파일 스냅샷 타임라인. /rewind·Esc Esc 되감기가 "
+        "~/.claude/file-history 에 남긴 백업을 읽어 프롬프트마다 변경 파일·복원 가능 여부를 표시. 읽기 전용.",
+        ["checkpoint", "rewind", "되감기", "체크포인트", "snapshot", "스냅샷",
+         "file-history", "restore", "복원", "undo"]),
+    ("promptEval",    "playground",
+        "프롬프트 Eval — 어서션 기반 회귀 테스트. 테스트 셋(케이스+어서션)을 여러 프로바이더에 "
+        "교차 실행하고 저장된 베이스라인과 비교해 회귀(이전 통과→현재 실패)를 강조.",
+        ["프롬프트 eval", "regression", "회귀", "어서션", "assertion", "테스트 셋",
+         "eval", "베이스라인", "baseline", "regex"]),
+    ("cacheDiag",     "playground",
+        "캐시 진단 — 두 연속 요청을 비교해 어느 캐시 브레이크포인트가 prompt-cache 히트를 "
+        "깨뜨렸는지 진단. Anthropic cache-diagnosis 베타(헤더 cache-diagnosis-2026-04-07) 사용, "
+        "키 없으면 오프라인 구조 diff 로 폴백.",
+        ["cache", "diagnostics", "prompt-cache", "breakpoint", "cache_miss_reason",
+         "캐시", "진단", "cache diagnosis"]),
     ("sessionReplay", "work",
         "Session Replay — Claude Code JSONL 세션 로그를 타임라인으로 재생 · "
         "툴 호출 하이라이트 · 누적 토큰 차트.",

@@ -10,6 +10,35 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.43] — 2026-06-01  🧮 context inspector · 🧪 prompt eval/regression · 🔍 cache diagnostics · ⏮️ checkpoints
+
+Four more roadmap picks, backends built in parallel (workflow), shared-file integration by the main thread.
+
+- **🧮 컨텍스트 인스펙터** (`server/context_inspector.py`, tab `contextInspector`):
+  the dashboard's own `/context` — estimates how the latest turn fills the model's
+  context window by category (system prompt / tool defs / MCP tools / CLAUDE.md /
+  conversation / free), real total from `message.usage`, static parts labelled
+  estimates. (Verified live: this session reads 93.3% of 1M, 91.6% conversation.)
+- **🧪 프롬프트 Eval** (`server/prompt_eval.py`, tab `promptEval`): assertion-based
+  regression suite — test sets (cases + assertions: contains/regex/json_path/
+  max_tokens/…) run across providers, compared to a stored baseline to flag
+  regressions. (Live runs need a key; set CRUD + assertion evaluator verified offline.)
+- **🔍 캐시 진단** (`server/cache_diag.py`, tab `cacheDiag`): pinpoints which cache
+  breakpoint broke a hit between two consecutive requests. Uses the verified
+  Anthropic beta `anthropic-beta: cache-diagnosis-2026-04-07` + body
+  `diagnostics:{previous_message_id}`; offline structural diff fallback when no key.
+- **⏮️ 체크포인트** (`server/checkpoints.py`, tab `checkpoints`): per-prompt file-
+  snapshot timeline read from the real on-disk store `~/.claude/file-history/<session>/`
+  + the session transcript's `file-history-snapshot` entries (verified: ~6155 files
+  across ~180 session dirs locally) — shows changed files + restorable state.
+
+Integration: routes.py (6 GET / 4 POST), NAV + MODE_TABS (claude for inspector/
+checkpoints, providers for eval/cacheDiag) + nav_catalog for all 4.
+Verified in-app (Playwright): all 4 tabs render with live data; endpoints return;
+0 console errors; i18n green. (Minor: the context donut canvas can paint a beat
+after the category table — table is authoritative.)
+
+---
 ## [3.99.42] — 2026-06-01  💰 spend budgets+alerts · ⏳ rate-limit widget · 🏠 Today cockpit · 🧬 structured-output node
 
 Four more roadmap picks, backends built in parallel (workflow), shared-file integration by the main thread.

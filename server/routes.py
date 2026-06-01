@@ -92,6 +92,10 @@ from .otel_ingest import api_otlp_ingest, api_otel_summary
 from .budget import api_budget_status, api_budget_set, api_alerts_list, api_alert_dismiss
 from .ratelimit import api_ratelimit_status
 from .cockpit import api_today_summary
+from .context_inspector import api_context_inspect, api_context_sessions
+from .prompt_eval import api_eval_sets, api_eval_set_save, api_eval_set_delete, api_eval_run
+from .cache_diag import api_cache_diag_examples, api_cache_diag_history, api_cache_diag_run
+from .checkpoints import api_checkpoints_list
 from .toolkits import (
     api_toolkit_status,
     api_toolkit_ecc_install, api_toolkit_ecc_uninstall,
@@ -471,6 +475,12 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/alerts/list": api_alerts_list,
     "/api/ratelimit/status": api_ratelimit_status,
     "/api/today/summary": lambda q: api_today_summary(),
+    "/api/context/inspect": api_context_inspect,
+    "/api/context/sessions": api_context_sessions,
+    "/api/eval/sets": api_eval_sets,
+    "/api/cache-diag/examples": api_cache_diag_examples,
+    "/api/cache-diag/history": api_cache_diag_history,
+    "/api/checkpoints/list": api_checkpoints_list,
     "/api/toolkit/status": api_toolkit_status,
     "/api/session-replay/list": api_session_replay_list,
     "/api/session-replay/load": api_session_replay_load,
@@ -595,6 +605,10 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/otlp": api_otlp_ingest,
     "/api/budget/set": api_budget_set,
     "/api/alert/dismiss": api_alert_dismiss,
+    "/api/eval/set/save": api_eval_set_save,
+    "/api/eval/set/delete": api_eval_set_delete,
+    "/api/eval/run": api_eval_run,
+    "/api/cache-diag/run": api_cache_diag_run,
     "/api/toolkit/ecc/install": api_toolkit_ecc_install,
     "/api/toolkit/ecc/uninstall": api_toolkit_ecc_uninstall,
     "/api/toolkit/ecc/install-plugin": api_toolkit_ecc_install_plugin,

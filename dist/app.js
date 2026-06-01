@@ -105,6 +105,22 @@ const NAV = [
     docUrl: null
   },
   {
+    id: 'contextInspector', icon: '🧮', label: '컨텍스트 인스펙터', group: 'observe',
+    desc: '대시보드 자체 /context — 최신 턴 컨텍스트 윈도우 점유율 카테고리별 추정', docUrl: null
+  },
+  {
+    id: 'checkpoints', icon: '⏮️', label: '체크포인트', group: 'main',
+    desc: '세션별 프롬프트 단위 파일 스냅샷 타임라인 (~/.claude/file-history)', docUrl: null
+  },
+  {
+    id: 'promptEval', icon: '🧪', label: '프롬프트 Eval', group: 'playground',
+    desc: '어서션 기반 회귀 테스트 — 테스트 셋을 모델에 교차 실행, 베이스라인 대비 회귀 강조', docUrl: null
+  },
+  {
+    id: 'cacheDiag', icon: '🔍', label: '캐시 진단', group: 'playground',
+    desc: '두 연속 요청 비교 — 어느 캐시 브레이크포인트가 히트를 깨뜨렸는지 진단', docUrl: null
+  },
+  {
     id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE + 'sub-agents'
   },
@@ -683,7 +699,7 @@ const MODE_TABS = {
     'memory', 'memoryManager', 'tasks', 'plans', 'outputStyles', 'team',
     'eventForwarder', 'autoResumeManager', 'backupRestore', 'backups',
     'system', 'telemetry', 'metrics', 'costsTimeline', 'otel', 'adminUsage',
-    'budgets', 'rateLimit', 'today',
+    'budgets', 'rateLimit', 'today', 'contextInspector', 'checkpoints',
     'securityScan', 'claudeDocs', 'zclaude', 'homunculus', 'routines',
     'usage', 'ideStatus', 'scheduled', 'bashHistory', 'cliSessions', 'openPorts',
   ]),
@@ -697,7 +713,7 @@ const MODE_TABS = {
     'aiProviders', 'modelConfig',
     'promptCache', 'thinkingLab', 'toolUseLab', 'batchJobs', 'apiFiles',
     'visionLab', 'modelBench', 'serverTools', 'citationsLab', 'embeddingLab',
-    'computerUseLab', 'memoryLab', 'advisorLab',
+    'computerUseLab', 'memoryLab', 'advisorLab', 'promptEval', 'cacheDiag',
     'costsTimeline', 'zclaude', 'envConfig', 'settings',
   ]),
 };
@@ -23273,6 +23289,850 @@ AFTER.today = () => {
         y: { beginAtZero: true, ticks: { color: axis, callback: v => fmtTokens(v), maxTicksLimit: 5 }, grid: { color: grid } },
       },
     },
+  });
+};
+
+
+// ═══ batch3: context inspector · checkpoints · prompt eval · cache diag ═══
+// ── Context Window Inspector (feature #7) ───────────────────────────────
+// The dashboard's own /context. Estimates how the latest turn of a Claude
+// Code session fills the model's context window, by category.
+const _ctxCategoryColor = (name) => ({
+  'system prompt': '#7c8cff',
+  'tool definitions': '#3fb6c9',
+  'MCP server tools': '#d97757',
+  'CLAUDE.md / memory': '#e0b341',
+  'conversation history': '#6fcf7f',
+  'free space': 'rgba(255,255,255,0.10)',
+}[name] || '#9aa0aa');
+
+const _ctxCategoryLabel = (name) => ({
+  'system prompt': t('시스템 프롬프트'),
+  'tool definitions': t('도구 정의'),
+  'MCP server tools': t('MCP 서버 도구'),
+  'CLAUDE.md / memory': t('CLAUDE.md / 메모리'),
+  'conversation history': t('대화 기록'),
+  'free space': t('남은 공간'),
+}[name] || name);
+
+function _ctxBarStack(cats, total) {
+  if (!total) return '';
+  const segs = cats.map(c => {
+    const w = Math.max(0, (c.tokens / total) * 100);
+    if (w <= 0) return '';
+    return `<div title="${escapeHtml(_ctxCategoryLabel(c.name))}: ${fmtTokens(c.tokens)} (${c.pct}%)"
+      style="width:${w}%;background:${_ctxCategoryColor(c.name)};height:100%;"></div>`;
+  }).join('');
+  return `<div role="img" aria-label="${t('컨텍스트 구성 막대')}"
+    style="display:flex;width:100%;height:1.5rem;border-radius:0.5rem;overflow:hidden;
+    border:1px solid rgba(255,255,255,0.08);">${segs}</div>`;
+}
+
+function _ctxRenderResult(r) {
+  const el = document.getElementById('ctxResult');
+  if (!el) return;
+  if (!r || !r.ok) {
+    el.innerHTML = `<div class="text-sm" style="color:#ff6b6b;padding:1rem;">
+      ${escapeHtml((r && r.note) || t('컨텍스트를 불러오지 못했습니다.'))}</div>`;
+    return;
+  }
+  const cats = r.byCategory || [];
+  if (!r.contextWindow) {
+    el.innerHTML = `<div class="text-sm text-muted" style="padding:1rem;">
+      ${escapeHtml(r.note || t('표시할 세션이 없습니다.'))}</div>`;
+    return;
+  }
+  const usedPct = Math.round((r.used / r.contextWindow) * 1000) / 10;
+  const ub = r.usageBreakdown || {};
+  el.innerHTML = `
+    <div class="grid gap-4" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
+      <div class="rounded-xl p-4" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+        <div class="text-xs text-muted mb-1">${t('모델')}</div>
+        <div class="font-bold mono" style="font-size:1.05rem;word-break:break-all;">${escapeHtml(r.model || t('알 수 없음'))}</div>
+        <div class="text-xs text-muted mt-3 mb-1">${t('컨텍스트 윈도우')}</div>
+        <div class="font-bold mono">${fmtTokens(r.contextWindow)} ${t('토큰')}</div>
+      </div>
+      <div class="rounded-xl p-4" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+        <div class="text-xs text-muted mb-1">${t('사용량')}</div>
+        <div class="font-bold mono" style="font-size:1.4rem;color:#d97757;">${usedPct}%</div>
+        <div class="text-xs text-muted mt-1">${fmtTokens(r.used)} / ${fmtTokens(r.contextWindow)} ${t('토큰')}</div>
+        <div class="mt-3">${_ctxBarStack(cats, r.contextWindow)}</div>
+      </div>
+      <div class="rounded-xl p-4" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+        <div class="text-xs text-muted mb-1">${t('최신 턴 usage')}</div>
+        <div class="text-xs mono" style="line-height:1.6;">
+          input: ${fmtTokens(ub.input || 0)}<br>
+          cache read: ${fmtTokens(ub.cacheRead || 0)}<br>
+          cache create: ${fmtTokens(ub.cacheCreate || 0)}<br>
+          output: ${fmtTokens(ub.output || 0)}
+        </div>
+      </div>
+    </div>
+    <div class="grid gap-4 mt-4" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
+      <div class="rounded-xl p-4" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);min-height:240px;">
+        <div class="text-xs text-muted mb-2">${t('컨텍스트 구성')}</div>
+        <div style="position:relative;height:240px;"><canvas id="ctxDonut"></canvas></div>
+      </div>
+      <div class="rounded-xl p-4 overflow-x-auto" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">
+        <table class="w-full text-sm" style="border-collapse:collapse;">
+          <thead><tr class="text-xs text-muted" style="text-align:left;">
+            <th class="py-1">${t('카테고리')}</th>
+            <th class="py-1 text-right">${t('토큰')}</th>
+            <th class="py-1 text-right">%</th>
+          </tr></thead>
+          <tbody>
+            ${cats.map(c => `<tr style="border-top:1px solid rgba(255,255,255,0.05);">
+              <td class="py-1.5">
+                <span style="display:inline-block;width:0.7rem;height:0.7rem;border-radius:2px;
+                  background:${_ctxCategoryColor(c.name)};margin-right:0.5rem;vertical-align:middle;"></span>
+                ${escapeHtml(_ctxCategoryLabel(c.name))}
+                ${c.estimated ? `<span class="text-xs text-muted" title="${t('추정값')}"> ~</span>` : ''}
+              </td>
+              <td class="py-1.5 text-right mono">${fmtTokens(c.tokens)}</td>
+              <td class="py-1.5 text-right mono text-muted">${c.pct}%</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="text-xs text-muted mt-4" style="line-height:1.5;">
+      <span class="mono">~</span> = ${t('추정값 (시스템 프롬프트 · 도구 정의 · MCP 도구는 트랜스크립트에 저장되지 않아 추정).')}<br>
+      ${escapeHtml(r.cwd ? (t('작업 디렉터리') + ': ' + r.cwd) : '')}
+    </div>`;
+
+  const donut = document.getElementById('ctxDonut');
+  if (donut && typeof _renderChart === 'function') {
+    _renderChart(donut, {
+      type: 'doughnut',
+      data: {
+        labels: cats.map(c => _ctxCategoryLabel(c.name)),
+        datasets: [{
+          data: cats.map(c => c.tokens),
+          backgroundColor: cats.map(c => _ctxCategoryColor(c.name)),
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#e7e7ea', boxWidth: 12, font: { size: 11 } } } },
+      },
+    });
+  }
+}
+
+async function _ctxLoad(sel) {
+  const result = document.getElementById('ctxResult');
+  if (result) result.innerHTML = `<div class="text-sm text-muted" style="padding:1rem;">${t('불러오는 중...')}</div>`;
+  let url = '/api/context/inspect';
+  if (sel) url += '?session_id=' + encodeURIComponent(sel);
+  try {
+    const r = await api(url);
+    _ctxRenderResult(r);
+  } catch (e) {
+    if (result) result.innerHTML = `<div class="text-sm" style="color:#ff6b6b;padding:1rem;">${escapeHtml(String(e.message || e))}</div>`;
+  }
+}
+
+VIEWS.contextInspector = async () => {
+  let sessions = [];
+  try {
+    const s = await api('/api/context/sessions?limit=50');
+    sessions = (s && s.sessions) || [];
+  } catch (_) { }
+  const opts = sessions.map(s =>
+    `<option value="${escapeHtml(s.sessionId)}">${escapeHtml(s.project || s.sessionId)} · ${escapeHtml(s.sessionId.slice(0, 8))}</option>`
+  ).join('');
+  return `
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+      <label class="text-sm text-muted" for="ctxSessionPick">${t('세션 선택')}</label>
+      <select id="ctxSessionPick" class="rounded-lg px-3 py-2 text-sm"
+        style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:inherit;max-width:100%;min-width:0;flex:1 1 260px;"
+        onchange="_ctxLoad(this.value)">
+        <option value="">${t('가장 최근 세션 (자동)')}</option>
+        ${opts}
+      </select>
+      <button class="rounded-lg px-3 py-2 text-sm" style="background:#d97757;color:#fff;min-height:44px;"
+        onclick="_ctxLoad(document.getElementById('ctxSessionPick').value)">${t('새로고침')}</button>
+    </div>
+    <div id="ctxResult"><div class="text-sm text-muted" style="padding:1rem;">${t('불러오는 중...')}</div></div>`;
+};
+
+AFTER.contextInspector = () => { _ctxLoad(''); };
+// ============================================================================
+// Checkpoints & Rewind Explorer (feature #16)
+// Read-only view of Claude Code's per-prompt file snapshots (the data behind
+// /rewind and double-Esc). Backed by GET /api/checkpoints/list.
+// ============================================================================
+VIEWS.checkpoints = async () => {
+  const st = state.data._ckpt || { sessionId: '', cwd: '' };
+  state.data._ckpt = st;
+  const params = new URLSearchParams({ sessions: '1' });
+  if (st.sessionId) params.set('session_id', st.sessionId);
+  else if (st.cwd) params.set('cwd', st.cwd);
+
+  let res;
+  try {
+    res = await api('/api/checkpoints/list?' + params);
+  } catch (e) {
+    return `
+      <div class="mb-4"><h1 class="text-2xl font-bold">⏮️ ${t('체크포인트')}</h1></div>
+      <div class="card p-6 text-center">
+        <p class="text-[var(--err)] font-bold mb-1">${t('체크포인트를 불러오지 못했습니다')}</p>
+        <p class="text-sm text-[var(--text-mute)]">${escapeHtml(String(e && e.message || e))}</p>
+      </div>`;
+  }
+  state.data._ckptRes = res;
+
+  const sessions = res.sessions || [];
+  // Keep the currently-resolved session selected in the picker.
+  const activeId = res.sessionId || st.sessionId || '';
+  const info = res.rewindInfo || {};
+
+  const sessionOptions = sessions.map(s => {
+    const label = (s.project || '—') + ' · ' + (s.firstPrompt || s.sessionId.slice(0, 8));
+    const fh = s.hasFileHistory ? '' : ' (no backups)';
+    return `<option value="${escapeHtml(s.sessionId)}" ${s.sessionId === activeId ? 'selected' : ''}>${escapeHtml(label.slice(0, 90))}${fh}</option>`;
+  }).join('');
+
+  // ── How-rewind-works info panel (always shown — it is the honest source) ──
+  const infoPanel = `
+    <details class="card p-3 mb-4" ${res.available ? '' : 'open'}>
+      <summary class="cursor-pointer text-sm font-bold select-none">ℹ️ ${t('되감기(rewind)는 어떻게 동작하나')}</summary>
+      <div class="mt-3 text-sm text-[var(--text-mute)] space-y-2">
+        <p><b class="text-[var(--text)]">${t('실행')}:</b> ${escapeHtml(info.trigger || '')}</p>
+        <p><b class="text-[var(--text)]">${t('캡처 대상')}:</b> ${escapeHtml(info.captures || '')}</p>
+        <p><b class="text-[var(--text)]">${t('캡처되지 않는 것')}:</b> ${escapeHtml(info.notCaptured || '')}</p>
+        <p><b class="text-[var(--text)]">${t('보존 기간')}:</b> ${escapeHtml(info.retention || '')}</p>
+        ${Array.isArray(info.actions) && info.actions.length ? `<p><b class="text-[var(--text)]">${t('되감기 옵션')}:</b> ${info.actions.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join(' ')}</p>` : ''}
+        <p class="text-xs text-[var(--text-dim)] mt-2">${escapeHtml(info.readOnlyNote || '')}</p>
+        <p class="text-xs text-[var(--text-dim)]">${t('저장 위치')}: <span class="mono">${escapeHtml(res.fileHistoryRoot || '')}</span></p>
+      </div>
+    </details>`;
+
+  const header = `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">⏮️ ${t('체크포인트')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${t('세션별 프롬프트 단위 파일 스냅샷 타임라인 (읽기 전용)')}.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <select id="ckptSession" class="input max-w-[340px]">${sessionOptions || `<option>${t('세션 없음')}</option>`}</select>
+        <button id="ckptRefresh" class="btn text-xs">↻ ${t('새로고침')}</button>
+      </div>
+    </div>`;
+
+  // ── Empty / unsupported state ─────────────────────────────────────────────
+  if (!res.available) {
+    const reason = res.error || res.emptyReason || t('이 세션에는 디스크에 저장된 체크포인트가 없습니다.');
+    return `
+      ${header}
+      ${infoPanel}
+      <div class="card p-6 text-center">
+        <div class="text-4xl mb-2">⏮️</div>
+        <p class="font-bold mb-1">${t('표시할 체크포인트가 없습니다')}</p>
+        <p class="text-sm text-[var(--text-mute)] max-w-xl mx-auto">${escapeHtml(reason)}</p>
+        ${res.fileHistoryRootExists === false ? `<p class="text-xs text-[var(--text-dim)] mt-3">${t('file-history 저장소가 존재하지 않습니다')} — <span class="mono">${escapeHtml(res.fileHistoryRoot || '')}</span></p>` : ''}
+      </div>`;
+  }
+
+  // ── Session summary chips ─────────────────────────────────────────────────
+  const summary = `
+    <div class="card p-3 mb-4 flex flex-wrap items-center gap-2 text-xs">
+      <span class="chip chip-accent">${res.checkpoints.length} ${t('체크포인트')}</span>
+      <span class="chip">${res.totalTrackedFiles || 0} ${t('추적 파일')}</span>
+      ${res.project ? `<span class="chip">📁 ${escapeHtml(res.project)}</span>` : ''}
+      ${res.gitBranch ? `<span class="chip">⎇ ${escapeHtml(res.gitBranch)}</span>` : ''}
+      <span class="text-[var(--text-dim)] mono ml-1">${escapeHtml((res.sessionId || '').slice(0, 8))}</span>
+      ${res.fileHistoryDirExists ? `<span class="chip chip-accent">${t('백업 사용 가능')}</span>` : `<span class="chip chip-err">${t('백업 없음 (GC됨)')}</span>`}
+    </div>`;
+
+  // ── Timeline list ─────────────────────────────────────────────────────────
+  const items = res.checkpoints.map((cp, i) => {
+    const files = cp.files || [];
+    const fileRows = files.length === 0
+      ? `<li class="text-xs text-[var(--text-dim)] py-1">${t('직접 편집된 파일 없음 (bash 변경은 추적되지 않음)')}</li>`
+      : files.map(f => `
+          <li class="flex items-center gap-2 py-1 text-xs border-b border-[var(--border)] last:border-0">
+            <span class="${f.restorable ? 'text-[var(--ok,#16a34a)]' : 'text-[var(--text-dim)]'}" title="${f.restorable ? t('백업 존재 — 되감기 가능') : t('백업 없음 — 되감기 불가')}">${f.restorable ? '●' : '○'}</span>
+            <span class="mono truncate flex-1" title="${escapeHtml(f.fullPath || f.path)}">${escapeHtml(f.path)}</span>
+            ${f.version != null ? `<span class="chip">v${f.version}</span>` : `<span class="chip">${t('신규')}</span>`}
+          </li>`).join('');
+    return `
+      <div class="card p-3 mb-3">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="chip chip-accent shrink-0">#${cp.index + 1}</span>
+            <span class="text-xs text-[var(--text-dim)] shrink-0">${fmtRel(cp.tsMs || 0)}</span>
+            ${cp.restorable ? `<span class="chip chip-accent shrink-0" title="${t('파일 백업이 디스크에 존재하여 /rewind 로 복원 가능')}">↩ ${t('되감기 가능')}</span>` : `<span class="chip shrink-0">${t('복원 불가')}</span>`}
+          </div>
+          <span class="text-xs text-[var(--text-dim)] shrink-0">${cp.restorableFileCount}/${cp.fileCount} ${t('파일 복원 가능')}</span>
+        </div>
+        <p class="text-sm mt-2 mb-2 break-words">${escapeHtml(cp.promptPreview || '')}</p>
+        <details ${i === 0 ? 'open' : ''}>
+          <summary class="cursor-pointer text-xs text-[var(--text-mute)] select-none">${cp.fileCount} ${t('파일 변경')} ▾</summary>
+          <ul class="mt-2">${fileRows}</ul>
+        </details>
+      </div>`;
+  }).join('');
+
+  return `
+    ${header}
+    ${summary}
+    ${infoPanel}
+    <div>${items}</div>`;
+};
+
+AFTER.checkpoints = () => {
+  const sel = document.getElementById('ckptSession');
+  if (sel) {
+    sel.addEventListener('change', () => {
+      state.data._ckpt = { sessionId: sel.value, cwd: '' };
+      go('checkpoints');
+    });
+  }
+  const refresh = document.getElementById('ckptRefresh');
+  if (refresh) {
+    refresh.addEventListener('click', () => {
+      go('checkpoints');
+    });
+  }
+};
+VIEWS.promptEval = async () => {
+  const data = await api('/api/eval/sets');
+  const sets = data.sets || [];
+  const baselines = data.baselines || {};
+  const assertionTypes = data.assertionTypes || ['contains','not_contains','regex','equals','json_valid','json_path_equals','max_tokens','max_latency_ms'];
+
+  state.data.pe = state.data.pe || {
+    setId: sets[0] ? sets[0].id : '',
+    assignees: ['claude:opus'],
+    saveBaseline: true,
+    running: false,
+    results: null,
+    editing: null, // a working-copy set object when the editor is open
+  };
+  const pe = state.data.pe;
+  // window helpers persisted on state so the closures below see them
+  window.__peAssertionTypes = assertionTypes;
+  if (sets.length && !sets.find(s => s.id === pe.setId)) pe.setId = sets[0].id;
+  const cur = sets.find(s => s.id === pe.setId) || null;
+
+  const setBtns = sets.length
+    ? sets.map(s =>
+        `<button class="chip ${pe.setId === s.id ? 'chip-accent' : ''}" onclick="peSelectSet('${escapeHtml(s.id)}')">${escapeHtml(s.name)} <span class="opacity-60">(${(s.cases||[]).length})</span></button>`
+      ).join('')
+    : `<span class="text-[11px] text-[var(--text-dim)]">${t('아직 테스트 셋이 없습니다')}</span>`;
+
+  // ── editor ──
+  const ed = pe.editing;
+  const editorHtml = ed ? `
+    <div class="card p-3 mb-4 border border-[var(--accent)]">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">${ed.__isNew ? t('새 테스트 셋') : t('테스트 셋 편집')}</div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary btn-sm" onclick="peSaveEditor()">💾 ${t('저장')}</button>
+          <button class="btn btn-sm" onclick="peCancelEditor()">${t('취소')}</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+        <label class="block">
+          <span class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('이름')}</span>
+          <input type="text" class="input w-full" value="${escapeHtml(ed.name || '')}" oninput="peEditField('name', this.value)">
+        </label>
+        <label class="block">
+          <span class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">ID</span>
+          <input type="text" class="input w-full font-mono" value="${escapeHtml(ed.id || '')}" ${ed.__isNew ? '' : 'disabled'} oninput="peEditField('id', this.value)" placeholder="auto">
+        </label>
+      </div>
+      <div class="space-y-3">
+        ${(ed.cases || []).map((c, ci) => `
+          <div class="card p-2 bg-[var(--bg-soft,transparent)]">
+            <div class="flex items-start gap-2 mb-2">
+              <span class="text-[10px] text-[var(--text-dim)] mt-2">#${ci + 1}</span>
+              <textarea class="input w-full text-[12px]" rows="2" placeholder="${t('프롬프트')}" oninput="peEditCasePrompt(${ci}, this.value)">${escapeHtml(c.prompt || '')}</textarea>
+              <button class="btn btn-sm" title="${t('케이스 삭제')}" onclick="peRemoveCase(${ci})">🗑</button>
+            </div>
+            <div class="space-y-1 pl-6">
+              ${(c.assertions || []).map((a, ai) => `
+                <div class="flex flex-wrap items-center gap-1">
+                  <select class="input text-[11px]" onchange="peEditAssertion(${ci},${ai},'type',this.value)">
+                    ${assertionTypes.map(at => `<option value="${at}" ${a.type === at ? 'selected' : ''}>${at}</option>`).join('')}
+                  </select>
+                  ${a.type === 'json_path_equals' ? `<input type="text" class="input text-[11px] w-28 font-mono" placeholder="path" value="${escapeHtml(String(a.path == null ? '' : a.path))}" oninput="peEditAssertion(${ci},${ai},'path',this.value)">` : ''}
+                  ${a.type === 'json_valid' ? `<span class="text-[10px] text-[var(--text-dim)]">${t('값 불필요')}</span>` : `<input type="text" class="input text-[11px] flex-1 min-w-[100px] font-mono" placeholder="${(a.type === 'max_tokens' || a.type === 'max_latency_ms') ? t('숫자') : t('기댓값')}" value="${escapeHtml(String(a.value == null ? '' : a.value))}" oninput="peEditAssertion(${ci},${ai},'value',this.value)">`}
+                  <button class="btn btn-sm" onclick="peRemoveAssertion(${ci},${ai})">✕</button>
+                </div>
+              `).join('')}
+              <button class="chip" onclick="peAddAssertion(${ci})">+ ${t('어서션')}</button>
+            </div>
+          </div>
+        `).join('')}
+        <button class="chip chip-accent" onclick="peAddCase()">+ ${t('케이스')}</button>
+      </div>
+    </div>
+  ` : '';
+
+  // ── assignee chips (built-in Claude models; user types custom too) ──
+  const builtinAssignees = ['claude:opus', 'claude:sonnet', 'claude:haiku'];
+  const allAssignees = Array.from(new Set([...builtinAssignees, ...pe.assignees]));
+  const assigneeChecks = allAssignees.map(a => {
+    const checked = pe.assignees.includes(a);
+    return `<label class="flex items-center gap-2 text-[11px] cursor-pointer select-none">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="peToggleAssignee('${escapeHtml(a)}')">
+      <span class="font-mono">${escapeHtml(a)}</span>
+    </label>`;
+  }).join('');
+
+  // ── results: pass/fail matrix ──
+  const res = pe.results;
+  let matrixHtml = '';
+  if (res && res.ok) {
+    const assignees = res.assignees || [];
+    const caseCount = cur ? (cur.cases || []).length : (assignees.length ? (res.matrix[assignees[0]] || []).length : 0);
+    const headerCells = assignees.map(a => {
+      const s = (res.summary || {})[a] || {};
+      const rate = Math.round((s.passRate || 0) * 100);
+      return `<th class="px-2 py-1 text-[11px] text-center"><div class="font-mono">${escapeHtml(a)}</div><div class="text-[10px] text-[var(--text-dim)]">${s.passed || 0}/${s.total || 0} · ${rate}%</div></th>`;
+    }).join('');
+    const rows = [];
+    for (let ci = 0; ci < caseCount; ci++) {
+      const promptText = cur ? escapeHtml((cur.cases[ci] || {}).prompt || '').slice(0, 70) : `#${ci + 1}`;
+      const cells = assignees.map(a => {
+        const cell = (res.matrix[a] || [])[ci] || {};
+        let mark = '·', cls = 'text-[var(--text-dim)]', title = '';
+        if (!cell.ok) { mark = '⚠️'; cls = 'text-amber-500'; title = cell.error || 'call failed'; }
+        else if (cell.passed) { mark = '✅'; cls = 'text-emerald-500'; }
+        else { mark = '❌'; cls = 'text-rose-500'; title = (cell.assertions || []).filter(x => !x.passed).map(x => x.detail).join(' · '); }
+        const reg = cell.regressed ? ' ring-2 ring-rose-500 rounded' : '';
+        return `<td class="px-2 py-1 text-center ${cls}${reg}" title="${escapeHtml(title)}" onclick="peShowCell('${escapeHtml(a)}',${ci})" style="cursor:pointer">${mark}${cell.regressed ? '<span class="text-[9px] text-rose-500"> REG</span>' : ''}</td>`;
+      }).join('');
+      rows.push(`<tr class="border-b border-[var(--border)]"><td class="px-2 py-1 text-[11px] max-w-[220px] truncate" title="${promptText}">${promptText || ('#' + (ci + 1))}</td>${cells}</tr>`);
+    }
+    const regBanner = (res.regressionCount || 0) > 0
+      ? `<div class="card p-2 mb-3 border border-rose-500 text-[11px]"><span class="font-semibold text-rose-500">⚠️ ${t('회귀 감지')}: ${res.regressionCount}</span><ul class="list-disc pl-5 mt-1 space-y-0.5">${(res.regressions || []).map(r => `<li><span class="font-mono">${escapeHtml(r.assignee)}</span> · ${t('케이스')} #${(r.caseIndex || 0) + 1}: ${escapeHtml(r.prompt || '')}${r.error ? ` <span class="text-[var(--text-dim)]">(${escapeHtml(r.error)})</span>` : ''}</li>`).join('')}</ul></div>`
+      : `<div class="text-[11px] text-emerald-500 mb-2">✓ ${t('베이스라인 대비 회귀 없음')}</div>`;
+    matrixHtml = `
+      ${regBanner}
+      <div class="card p-3 overflow-auto">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('Pass/Fail 매트릭스')} <span class="opacity-60">(✅ pass · ❌ fail · ⚠️ ${t('호출 실패')} · ${t('REG=회귀')})</span></div>
+        <table class="w-full text-[11px] border-collapse">
+          <thead><tr class="border-b border-[var(--border)]"><th class="px-2 py-1 text-left">${t('케이스')}</th>${headerCells}</tr></thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>
+        ${res.baselineSaved ? `<div class="text-[10px] text-[var(--text-dim)] mt-2">✓ ${t('이번 실행을 새 베이스라인으로 저장했습니다')}</div>` : ''}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="mb-4">
+      <h1 class="text-2xl font-bold">🧪 ${t('프롬프트 Eval')}</h1>
+      <p class="text-sm text-[var(--text-mute)] mt-1">
+        ${t('어서션 기반 회귀 테스트. 테스트 셋(케이스+어서션)을 여러 프로바이더에 교차 실행하고, 저장된 베이스라인과 비교해 회귀를 강조 표시합니다.')}
+      </p>
+      <p class="text-[11px] text-[var(--text-dim)] mt-1">${t('LIVE 실행에는 ANTHROPIC_API_KEY 또는 설치된 claude CLI 가 필요합니다. 없으면 각 셀이 ⚠️ 로 정직하게 실패 표시됩니다.')}</p>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap mb-3">
+      ${setBtns}
+      <button class="btn btn-sm" onclick="peNewSet()">+ ${t('새 셋')}</button>
+      ${cur ? `<button class="btn btn-sm" onclick="peEditSet()">✎ ${t('편집')}</button>` : ''}
+      ${cur ? `<button class="btn btn-sm" onclick="peDeleteSet('${escapeHtml(cur.id)}')">🗑 ${t('삭제')}</button>` : ''}
+    </div>
+
+    ${editorHtml}
+
+    ${cur && !ed ? `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div class="space-y-3">
+        <div class="card p-3 text-[11px]">
+          <div class="font-semibold mb-1">${escapeHtml(cur.name)}</div>
+          <ol class="list-decimal pl-4 space-y-1">${(cur.cases || []).map(c => `<li>${escapeHtml((c.prompt || '').slice(0, 90))} <span class="text-[var(--text-dim)]">(${(c.assertions || []).length} ${t('어서션')})</span></li>`).join('') || `<li class="list-none text-[var(--text-dim)]">${t('케이스 없음')}</li>`}</ol>
+        </div>
+        <div>
+          <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-1">${t('프로바이더 선택')} (assignee)</div>
+          <div class="flex gap-3 flex-wrap mb-2">${assigneeChecks}</div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="peCustomAssignee" class="input text-[11px] flex-1" placeholder="provider:model (예: openai:gpt-4.1)">
+            <button class="btn btn-sm" onclick="peAddCustomAssignee()">+ ${t('추가')}</button>
+          </div>
+        </div>
+        <label class="flex items-center gap-2 text-[11px] cursor-pointer select-none">
+          <input type="checkbox" ${pe.saveBaseline ? 'checked' : ''} onchange="peSet('saveBaseline', this.checked)">
+          <span>${t('이번 실행을 새 베이스라인으로 저장')}</span>
+        </label>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-primary" onclick="peRun()" ${pe.running ? 'disabled' : ''}>▶ ${pe.running ? t('실행 중…') : t('Eval 실행')}</button>
+          <span id="peStatus" class="text-[11px] text-[var(--text-dim)]"></span>
+        </div>
+      </div>
+      <div>
+        ${res ? '' : `<div class="card p-3 text-[11px] text-[var(--text-dim)]">${t('아직 결과가 없습니다')}</div>`}
+      </div>
+    </div>
+    ${matrixHtml}
+    ` : (!cur && !ed ? `<div class="card p-4 text-center text-[var(--text-dim)] text-sm">${t('테스트 셋을 만들어 시작하세요')} <button class="btn btn-primary btn-sm ml-2" onclick="peNewSet()">+ ${t('새 셋')}</button></div>` : '')}
+  `;
+};
+
+function peSet(key, val) { state.data.pe = state.data.pe || {}; state.data.pe[key] = val; }
+function peSelectSet(id) { peSet('setId', id); peSet('results', null); renderView(); }
+function peToggleAssignee(a) {
+  const pe = state.data.pe; const i = pe.assignees.indexOf(a);
+  if (i >= 0) pe.assignees.splice(i, 1); else pe.assignees.push(a);
+  renderView();
+}
+function peAddCustomAssignee() {
+  const el = document.getElementById('peCustomAssignee');
+  const v = (el && el.value || '').trim();
+  if (!v || !v.includes(':')) { toast(t('provider:model 형식으로 입력하세요'), 'err'); return; }
+  if (!state.data.pe.assignees.includes(v)) state.data.pe.assignees.push(v);
+  renderView();
+}
+
+// ── editor state mutations ──
+function peNewSet() {
+  peSet('editing', { id: '', name: '', cases: [{ prompt: '', assertions: [{ type: 'contains', value: '' }] }], __isNew: true });
+  renderView();
+}
+function peEditSet() {
+  const pe = state.data.pe;
+  const cur = (state.data.peSetsCache || []).find(s => s.id === pe.setId);
+  // fall back to a fresh fetch-derived copy if cache missing
+  if (cur) { peSet('editing', JSON.parse(JSON.stringify(Object.assign({ __isNew: false }, cur)))); renderView(); return; }
+  api('/api/eval/sets').then(d => {
+    const s = (d.sets || []).find(x => x.id === pe.setId);
+    if (s) { peSet('editing', JSON.parse(JSON.stringify(Object.assign({ __isNew: false }, s)))); renderView(); }
+  });
+}
+function peCancelEditor() { peSet('editing', null); renderView(); }
+function peEditField(k, v) { if (state.data.pe.editing) state.data.pe.editing[k] = v; }
+function peEditCasePrompt(ci, v) { const e = state.data.pe.editing; if (e && e.cases[ci]) e.cases[ci].prompt = v; }
+function peAddCase() { const e = state.data.pe.editing; if (e) { e.cases.push({ prompt: '', assertions: [] }); renderView(); } }
+function peRemoveCase(ci) { const e = state.data.pe.editing; if (e) { e.cases.splice(ci, 1); renderView(); } }
+function peAddAssertion(ci) { const e = state.data.pe.editing; if (e && e.cases[ci]) { e.cases[ci].assertions = e.cases[ci].assertions || []; e.cases[ci].assertions.push({ type: 'contains', value: '' }); renderView(); } }
+function peRemoveAssertion(ci, ai) { const e = state.data.pe.editing; if (e && e.cases[ci]) { e.cases[ci].assertions.splice(ai, 1); renderView(); } }
+function peEditAssertion(ci, ai, field, v) {
+  const e = state.data.pe.editing;
+  if (!e || !e.cases[ci] || !e.cases[ci].assertions[ai]) return;
+  const a = e.cases[ci].assertions[ai];
+  a[field] = v;
+  if (field === 'type') renderView(); // type change toggles path/value inputs
+}
+async function peSaveEditor() {
+  const e = state.data.pe.editing;
+  if (!e) return;
+  const body = { id: (e.id || '').trim(), name: (e.name || '').trim(), cases: (e.cases || []).map(c => ({ prompt: c.prompt || '', assertions: (c.assertions || []).map(a => { const o = { type: a.type, value: a.value }; if (a.type === 'json_path_equals') o.path = a.path || ''; return o; }) })) };
+  const r = await api('/api/eval/set/save', { method: 'POST', body: JSON.stringify(body) });
+  if (!r || !r.ok) { toast((r && r.error) || t('저장 실패'), 'err'); return; }
+  toast(t('저장됨'), 'success');
+  peSet('setId', r.set.id);
+  peSet('editing', null);
+  peSet('results', null);
+  renderView();
+}
+async function peDeleteSet(id) {
+  const ok = await confirmModal({ title: t('테스트 셋 삭제'), message: t('이 테스트 셋과 베이스라인을 삭제할까요?'), confirmLabel: t('삭제'), danger: true });
+  if (!ok) return;
+  const r = await api('/api/eval/set/delete', { method: 'POST', body: JSON.stringify({ id }) });
+  if (!r || !r.ok) { toast((r && r.error) || t('삭제 실패'), 'err'); return; }
+  toast(t('삭제됨'), 'success');
+  peSet('setId', ''); peSet('results', null);
+  renderView();
+}
+async function peRun() {
+  const pe = state.data.pe;
+  if (!pe.setId) { toast(t('테스트 셋을 선택하세요'), 'err'); return; }
+  if (!pe.assignees.length) { toast(t('프로바이더를 1개 이상 선택하세요'), 'err'); return; }
+  const d = await api('/api/eval/sets');
+  const s = (d.sets || []).find(x => x.id === pe.setId);
+  const nCases = s ? (s.cases || []).length : 0;
+  if (!nCases) { toast(t('케이스가 없습니다'), 'err'); return; }
+  const n = nCases * pe.assignees.length;
+  const ok = await confirmModal({
+    title: t('Eval 실행 확인'),
+    message: t('총 {n} 회 모델 호출을 수행합니다 ({c} 케이스 × {m} 프로바이더). 계속할까요?').replace('{n}', n).replace('{c}', nCases).replace('{m}', pe.assignees.length),
+    confirmLabel: t('실행'),
+  });
+  if (!ok) return;
+  peSet('running', true);
+  const st = document.getElementById('peStatus');
+  if (st) st.textContent = t('실행 중…');
+  try {
+    const r = await api('/api/eval/run', { method: 'POST', body: JSON.stringify({ setId: pe.setId, assignees: pe.assignees, saveBaseline: pe.saveBaseline }) });
+    peSet('running', false);
+    if (!r || !r.ok) { toast((r && r.error) || t('실행 실패'), 'err'); if (st) st.textContent = ''; renderView(); return; }
+    peSet('results', r);
+    if (r.regressionCount > 0) toast(t('회귀 {n} 건 감지').replace('{n}', r.regressionCount), 'err');
+    else toast(t('회귀 없음'), 'success');
+  } catch (err) {
+    peSet('running', false);
+    toast(String(err), 'err');
+  }
+  renderView();
+}
+function peShowCell(assignee, ci) {
+  const res = state.data.pe.results;
+  if (!res) return;
+  const cell = ((res.matrix || {})[assignee] || [])[ci];
+  if (!cell) return;
+  const assertLines = (cell.assertions || []).map(a => `${a.passed ? '✅' : '❌'} ${a.type}${a.detail ? ' — ' + a.detail : ''}`).join('\n') || t('어서션 없음');
+  const msg = `${t('프롬프트')}: ${cell.prompt || ''}\n${t('상태')}: ${cell.ok ? (cell.passed ? 'PASS' : 'FAIL') : 'ERROR — ' + (cell.error || '')}\n${t('토큰')}: ${cell.tokensTotal || 0} · ${t('지연')}: ${cell.latencyMs || 0}ms\n\n${assertLines}\n\n${t('출력')}:\n${(cell.output || '').slice(0, 800)}`;
+  confirmModal({ title: `${escapeHtml(assignee)} · #${ci + 1}`, message: msg, confirmLabel: t('닫기'), cancelLabel: '' });
+}
+VIEWS.cacheDiag = async () => {
+  let exData = { examples: [], betaHeader: 'cache-diagnosis-2026-04-07' };
+  try { exData = await api('/api/cache-diag/examples'); } catch (e) {}
+  const examples = exData.examples || [];
+  const beta = exData.betaHeader || 'cache-diagnosis-2026-04-07';
+  state.data = state.data || {};
+  state.data._cacheDiag = { examples };
+
+  const exOpts = examples.map((ex, i) =>
+    `<option value="${i}">${escapeHtml(ex.label || ex.id)}</option>`).join('');
+
+  return `
+  <div class="view-cacheDiag" style="max-width:980px;margin:0 auto;">
+    <header style="margin-bottom:1rem;">
+      <h1 style="display:flex;align-items:center;gap:.5rem;font-size:1.4rem;">
+        <span aria-hidden="true">🔍</span>${escapeHtml(t('캐시 진단'))}
+      </h1>
+      <p class="muted" style="margin:.25rem 0;line-height:1.5;">
+        ${escapeHtml(t('두 개의 연속 요청(base → modified)을 보내 어느 캐시 브레이크포인트가 prompt-cache 히트를 깨뜨렸는지 정확히 짚어냅니다.'))}
+      </p>
+      <p class="muted" style="font-size:.82rem;">
+        ${escapeHtml(t('Anthropic cache-diagnosis 베타 사용'))}
+        <code style="font-size:.78rem;">anthropic-beta: ${escapeHtml(beta)}</code>
+        · ${escapeHtml(t('Claude API 전용(Bedrock/Vertex 미지원). API 키가 없으면 오프라인 구조 diff로 폴백합니다.'))}
+      </p>
+    </header>
+
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:.75rem;">
+      <label style="display:flex;flex-direction:column;gap:.2rem;flex:1 1 200px;min-width:160px;">
+        <span style="font-size:.8rem;font-weight:600;">${escapeHtml(t('예시 불러오기'))}</span>
+        <select id="cd-example" style="padding:.45rem;border-radius:.4rem;">
+          <option value="">${escapeHtml(t('— 직접 입력 —'))}</option>
+          ${exOpts}
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:.2rem;flex:1 1 160px;min-width:140px;">
+        <span style="font-size:.8rem;font-weight:600;">${escapeHtml(t('모델'))}</span>
+        <select id="cd-model" style="padding:.45rem;border-radius:.4rem;">
+          <option value="claude-opus-4-8">Opus 4.8 (1M)</option>
+          <option value="claude-opus-4-7">Opus 4.7 (1M)</option>
+          <option value="claude-opus-4-6">Opus 4.6</option>
+          <option value="claude-sonnet-4-6">Sonnet 4.6 (1M)</option>
+          <option value="claude-haiku-4-5">Haiku 4.5</option>
+        </select>
+      </label>
+      <button id="cd-run" class="btn btn-primary" style="flex:0 0 auto;min-height:44px;padding:0 1rem;">
+        ${escapeHtml(t('진단 실행'))}
+      </button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.75rem;">
+      <fieldset style="border:1px solid var(--border,#3334);border-radius:.5rem;padding:.6rem;">
+        <legend style="font-weight:600;padding:0 .35rem;">${escapeHtml(t('기준 요청 (base · 턴1)'))}</legend>
+        <label style="display:block;font-size:.78rem;font-weight:600;margin:.3rem 0 .15rem;">system</label>
+        <textarea id="cd-base-system" rows="3" style="width:100%;font-family:monospace;font-size:.78rem;" placeholder="${escapeHtml(t('시스템 프롬프트 (문자열)'))}"></textarea>
+        <label style="display:block;font-size:.78rem;font-weight:600;margin:.4rem 0 .15rem;">tools (JSON array)</label>
+        <textarea id="cd-base-tools" rows="3" style="width:100%;font-family:monospace;font-size:.78rem;" placeholder="[]"></textarea>
+        <label style="display:block;font-size:.78rem;font-weight:600;margin:.4rem 0 .15rem;">messages (JSON array) *</label>
+        <textarea id="cd-base-messages" rows="4" style="width:100%;font-family:monospace;font-size:.78rem;" placeholder='[{"role":"user","content":"..."}]'></textarea>
+      </fieldset>
+
+      <fieldset style="border:1px solid var(--border,#3334);border-radius:.5rem;padding:.6rem;">
+        <legend style="font-weight:600;padding:0 .35rem;">${escapeHtml(t('수정 요청 (modified · 턴2)'))}</legend>
+        <label style="display:block;font-size:.78rem;font-weight:600;margin:.3rem 0 .15rem;">system</label>
+        <textarea id="cd-mod-system" rows="3" style="width:100%;font-family:monospace;font-size:.78rem;"></textarea>
+        <label style="display:block;font-size:.78rem;font-weight:600;margin:.4rem 0 .15rem;">tools (JSON array)</label>
+        <textarea id="cd-mod-tools" rows="3" style="width:100%;font-family:monospace;font-size:.78rem;" placeholder="[]"></textarea>
+        <label style="display:block;font-size:.78rem;font-weight:600;margin:.4rem 0 .15rem;">messages (JSON array) *</label>
+        <textarea id="cd-mod-messages" rows="4" style="width:100%;font-family:monospace;font-size:.78rem;"></textarea>
+      </fieldset>
+    </div>
+
+    <div id="cd-result" style="margin-top:1rem;" aria-live="polite"></div>
+  </div>`;
+};
+
+// ── helpers (module-scoped, prefixed to avoid collisions) ──
+function _cdStr(el) { return (el && el.value || '').trim(); }
+function _cdJsonArr(el, label) {
+  const raw = _cdStr(el);
+  if (!raw) return [];
+  let v;
+  try { v = JSON.parse(raw); } catch (e) {
+    throw new Error(label + ': ' + t('JSON 배열 파싱 실패') + ' — ' + e.message);
+  }
+  if (!Array.isArray(v)) throw new Error(label + ': ' + t('배열이어야 합니다'));
+  return v;
+}
+function _cdFillPart(prefix, part) {
+  const sys = (typeof part.system === 'string') ? part.system
+            : (part.system ? JSON.stringify(part.system, null, 2) : '');
+  document.getElementById(prefix + '-system').value = sys;
+  document.getElementById(prefix + '-tools').value =
+    (part.tools && part.tools.length) ? JSON.stringify(part.tools, null, 2) : '';
+  document.getElementById(prefix + '-messages').value =
+    JSON.stringify(part.messages || [], null, 2);
+}
+function _cdReasonClass(state, type) {
+  if (state === 'no_divergence') return 'ok';
+  if (state === 'reason' && /_changed$/.test(type || '')) return 'err';
+  return 'warn';
+}
+function _cdRenderResult(res) {
+  const box = document.getElementById('cd-result');
+  if (!box) return;
+  if (!res || res.ok === false) {
+    box.innerHTML = `<div class="card" style="border-left:3px solid #e55;padding:.7rem;">
+      <strong>${escapeHtml(t('오류'))}:</strong> ${escapeHtml((res && res.error) || t('알 수 없는 오류'))}</div>`;
+    return;
+  }
+  const ld = res.localDiff || {};
+  const diag = res.diagnostics;
+  const ud = res.usageDeltas;
+  let cls = 'warn', headline = res.summary || '';
+  if (res.mode === 'offline') {
+    cls = ld.diverged ? 'warn' : 'ok';
+  } else if (diag) {
+    cls = _cdReasonClass(diag.state, diag.type);
+    headline = diag.state === 'reason'
+      ? (t('캐시가 깨진 위치') + ': ' + escapeHtml(diag.summary))
+      : escapeHtml(res.summary || diag.summary);
+  }
+  const color = cls === 'ok' ? '#3a7' : (cls === 'err' ? '#e55' : '#e9a13b');
+
+  const localBlock = `
+    <div style="margin-top:.6rem;font-size:.82rem;">
+      <strong>${escapeHtml(t('오프라인 구조 diff'))}</strong>
+      ${res.mode === 'offline' ? `<span class="muted"> (${escapeHtml(t('API 키 없음 — 권위 진단 아님'))})</span>` : ''}
+      <div style="margin-top:.25rem;">
+        ${ld.diverged
+          ? `${escapeHtml(t('첫 분기'))}: <code>${escapeHtml(ld.section || '?')}</code>`
+            + (ld.index != null ? ` [${ld.index}]` : '')
+            + (ld.type ? ` → <code>${escapeHtml(ld.type)}</code>` : '')
+          : escapeHtml(t('두 요청의 prefix 가 일치합니다 (append-only 또는 동일).'))}
+        <div class="muted" style="margin-top:.2rem;">${escapeHtml(ld.summary || '')}</div>
+      </div>
+    </div>`;
+
+  let usageBlock = '';
+  if (ud) {
+    usageBlock = `
+    <div style="margin-top:.6rem;font-size:.82rem;">
+      <strong>${escapeHtml(t('캐시 토큰 델타 (turn1 → turn2)'))}</strong>
+      <div style="overflow-x:auto;margin-top:.3rem;">
+      <table style="border-collapse:collapse;font-size:.8rem;min-width:340px;">
+        <thead><tr>
+          <th style="text-align:left;padding:.2rem .5rem;"></th>
+          <th style="text-align:right;padding:.2rem .5rem;">cache_read</th>
+          <th style="text-align:right;padding:.2rem .5rem;">cache_creation</th>
+          <th style="text-align:right;padding:.2rem .5rem;">input</th>
+        </tr></thead>
+        <tbody>
+          <tr><td style="padding:.2rem .5rem;">turn1 (base)</td>
+            <td style="text-align:right;padding:.2rem .5rem;">${fmtTokens(ud.base.cacheReadInputTokens)}</td>
+            <td style="text-align:right;padding:.2rem .5rem;">${fmtTokens(ud.base.cacheCreationInputTokens)}</td>
+            <td style="text-align:right;padding:.2rem .5rem;">${fmtTokens(ud.base.inputTokens)}</td></tr>
+          <tr><td style="padding:.2rem .5rem;">turn2 (modified)</td>
+            <td style="text-align:right;padding:.2rem .5rem;">${fmtTokens(ud.modified.cacheReadInputTokens)}</td>
+            <td style="text-align:right;padding:.2rem .5rem;">${fmtTokens(ud.modified.cacheCreationInputTokens)}</td>
+            <td style="text-align:right;padding:.2rem .5rem;">${fmtTokens(ud.modified.inputTokens)}</td></tr>
+          <tr style="border-top:1px solid var(--border,#3334);font-weight:600;">
+            <td style="padding:.2rem .5rem;">Δ</td>
+            <td style="text-align:right;padding:.2rem .5rem;">${ud.deltaCacheRead >= 0 ? '+' : ''}${fmtTokens(ud.deltaCacheRead)}</td>
+            <td style="text-align:right;padding:.2rem .5rem;">${ud.deltaCacheCreation >= 0 ? '+' : ''}${fmtTokens(ud.deltaCacheCreation)}</td>
+            <td></td></tr>
+        </tbody>
+      </table></div>
+      <div class="muted" style="margin-top:.3rem;">
+        ${ud.cacheHitOnModified
+          ? escapeHtml(t('turn2 에서 캐시 READ 발생 — 히트 성공.'))
+          : escapeHtml(t('turn2 캐시 READ 0 — 캐시 미스(브레이크포인트가 깨짐).'))}
+      </div>
+    </div>`;
+  }
+
+  let fixBlock = '';
+  if (diag && diag.state === 'reason' && (diag.what || diag.fix)) {
+    fixBlock = `
+    <div style="margin-top:.6rem;font-size:.82rem;border-top:1px dashed var(--border,#3334);padding-top:.5rem;">
+      ${diag.what ? `<div><strong>${escapeHtml(t('원인'))}:</strong> ${escapeHtml(diag.what)}</div>` : ''}
+      ${diag.fix ? `<div style="margin-top:.25rem;"><strong>${escapeHtml(t('해결'))}:</strong> ${escapeHtml(diag.fix)}</div>` : ''}
+      ${diag.cacheMissedInputTokens != null ? `<div class="muted" style="margin-top:.2rem;">cache_missed_input_tokens ≈ ${fmtTokens(diag.cacheMissedInputTokens)} (${escapeHtml(t('크기 추정치 — 과금 수치 아님'))})</div>` : ''}
+    </div>`;
+  }
+
+  box.innerHTML = `
+    <div class="card" style="border-left:3px solid ${color};padding:.8rem;">
+      <div style="font-size:.95rem;font-weight:600;">${headline}</div>
+      ${diag && diag.type ? `<div style="margin-top:.2rem;"><code>cache_miss_reason.type = ${escapeHtml(diag.type)}</code></div>` : ''}
+      ${fixBlock}
+      ${usageBlock}
+      ${localBlock}
+      ${res.note ? `<div class="muted" style="margin-top:.6rem;font-size:.76rem;">${escapeHtml(res.note)}</div>` : ''}
+    </div>`;
+}
+
+AFTER.cacheDiag = () => {
+  const exSel = document.getElementById('cd-example');
+  const modelSel = document.getElementById('cd-model');
+  const runBtn = document.getElementById('cd-run');
+  const examples = (state.data && state.data._cacheDiag && state.data._cacheDiag.examples) || [];
+
+  if (exSel) exSel.addEventListener('change', () => {
+    const i = exSel.value;
+    if (i === '') return;
+    const ex = examples[+i];
+    if (!ex) return;
+    if (modelSel && ex.model) modelSel.value = ex.model;
+    _cdFillPart('cd-base', ex.base || {});
+    _cdFillPart('cd-mod', ex.modified || {});
+  });
+
+  if (runBtn) runBtn.addEventListener('click', async () => {
+    let base, modified;
+    try {
+      base = {
+        system: _cdStr(document.getElementById('cd-base-system')),
+        tools: _cdJsonArr(document.getElementById('cd-base-tools'), 'base.tools'),
+        messages: _cdJsonArr(document.getElementById('cd-base-messages'), 'base.messages'),
+      };
+      modified = {
+        system: _cdStr(document.getElementById('cd-mod-system')),
+        tools: _cdJsonArr(document.getElementById('cd-mod-tools'), 'modified.tools'),
+        messages: _cdJsonArr(document.getElementById('cd-mod-messages'), 'modified.messages'),
+      };
+    } catch (e) {
+      toast(e.message, 'error');
+      return;
+    }
+    if (!base.messages.length || !modified.messages.length) {
+      toast(t('base / modified 모두 messages 가 필요합니다'), 'error');
+      return;
+    }
+    const orig = runBtn.textContent;
+    runBtn.disabled = true;
+    runBtn.textContent = t('진단 중…');
+    const box = document.getElementById('cd-result');
+    if (box) box.innerHTML = `<div class="muted" style="padding:.6rem;">${escapeHtml(t('두 요청 전송 중…'))}</div>`;
+    try {
+      const res = await api('/api/cache-diag/run', {
+        method: 'POST',
+        body: JSON.stringify({
+          model: modelSel ? modelSel.value : 'claude-opus-4-8',
+          base, modified,
+        }),
+      });
+      _cdRenderResult(res);
+    } catch (e) {
+      _cdRenderResult({ ok: false, error: (e && e.message) || String(e) });
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = orig;
+    }
   });
 };
 
