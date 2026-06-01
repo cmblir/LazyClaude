@@ -1,15 +1,20 @@
-"""Anthropic 공식 hosted tools 플레이그라운드 — web_search / code_execution.
+"""Anthropic 공식 hosted tools 플레이그라운드 — web_search / code_execution / web_fetch.
 
 기존 tool_use_lab 은 사용자가 tool schema 를 정의하고 tool_result 를
 수동으로 공급하는 반면, 여기는 Anthropic 이 서버 측에서 **직접 실행**
 하는 hosted tool 을 실습한다.
 
-지원 도구:
-- web_search (tool type: `web_search_20250305`) — 웹 검색 + citation
-- code_execution (tool type: `code_execution_20250522`) — Python sandbox
+지원 도구 (verified 2026-06-01, platform.claude.com docs 기준):
+- web_search (tool type: `web_search_20260209`) — 웹 검색 + citation. GA, beta header 불필요.
+- code_execution (tool type: `code_execution_20250825`) — Bash + 파일 연산 sandbox.
+  beta header `code-execution-2025-08-25` 필요.
+- web_fetch (tool type: `web_fetch_20260209`) — URL 본문 fetch + citation. GA, beta header 불필요.
+  보안상 **대화 컨텍스트에 이미 등장한 URL** 만 fetch 가능 (사용자 메시지 / 이전 검색·fetch 결과).
+  Claude 가 임의 생성한 URL 이나 컨테이너 도구(Code Execution/Bash) 산출 URL 은 fetch 불가.
 
-beta header 는 현재 시점 기준 최선의 추측이며, Anthropic 스펙 변경 시
-`BETA_MAP` 조정 필요. 실패하면 에러 메시지를 그대로 사용자에게 노출.
+web_search / web_fetch 는 GA 로 `anthropic-beta` 헤더가 없다 (`beta` == "").
+code_execution 만 beta header 를 사용한다. Anthropic 스펙 변경 시 `TOOL_CATALOG` 만 갱신.
+실패하면 에러 메시지를 그대로 사용자에게 노출.
 
 히스토리: `~/.claude-dashboard-server-tools.json` (최근 20건)
 """
@@ -32,26 +37,48 @@ HISTORY_PATH = _env_path(
 )
 _MAX_HISTORY = 20
 
-# Anthropic hosted tool 카탈로그 — 최신 spec 기준 추정치.
+# Anthropic hosted tool 카탈로그 — verified 2026-06-01 (platform.claude.com docs).
 # 실제 API 스펙이 바뀌면 이 맵만 갱신하면 된다.
+# `beta` == "" 이면 GA 도구 (anthropic-beta 헤더 미부착).
 TOOL_CATALOG: list[dict] = [
     {
         "id": "web_search",
         "label": "🌐 Web Search",
-        "description": "Anthropic 서버 측 웹 검색 + citation.",
-        "apiType": "web_search_20250305",
-        "beta": "web-search-2025-03-05",
-        "block": {"type": "web_search_20250305", "name": "web_search", "max_uses": 3},
-        "supportedModels": ["claude-opus-4-7", "claude-sonnet-4-6"],
+        "description": "Anthropic 서버 측 웹 검색 + citation. GA — beta header 불필요. "
+                       "최신 `web_search_20260209` 은 dynamic filtering 지원 (code_execution 동시 활성화 필요). "
+                       "검색당 $10/1,000 + 표준 토큰 비용.",
+        "apiType": "web_search_20260209",
+        "beta": "",
+        "block": {"type": "web_search_20260209", "name": "web_search", "max_uses": 3},
+        "supportedModels": [
+            "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6",
+        ],
     },
     {
         "id": "code_execution",
         "label": "🧪 Code Execution",
-        "description": "Anthropic 호스팅 Python sandbox (stdout/stderr/return_code).",
-        "apiType": "code_execution_20250522",
-        "beta": "code-execution-2025-05-22",
-        "block": {"type": "code_execution_20250522", "name": "code_execution"},
-        "supportedModels": ["claude-opus-4-7", "claude-sonnet-4-6"],
+        "description": "Anthropic 호스팅 sandbox — Bash + 파일 연산 (stdout/stderr/return_code). "
+                       "`code_execution_20250825` 는 모든 지원 모델에서 사용 가능. "
+                       "web_search/web_fetch 와 함께 쓰면 무료, 아니면 월 1,550 시간 무료 후 컨테이너당 $0.05/시간.",
+        "apiType": "code_execution_20250825",
+        "beta": "code-execution-2025-08-25",
+        "block": {"type": "code_execution_20250825", "name": "code_execution"},
+        "supportedModels": [
+            "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6",
+        ],
+    },
+    {
+        "id": "web_fetch",
+        "label": "📄 Web Fetch",
+        "description": "Anthropic 서버 측 URL 본문 fetch + citation. GA — beta header 불필요. "
+                       "보안상 **대화 컨텍스트에 이미 등장한 URL** 만 fetch 가능 (Claude 가 임의 생성한 URL 불가). "
+                       "JS 렌더링 사이트 미지원. 추가 비용 없음 (표준 토큰 비용만).",
+        "apiType": "web_fetch_20260209",
+        "beta": "",
+        "block": {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 3},
+        "supportedModels": [
+            "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6",
+        ],
     },
 ]
 
@@ -76,9 +103,18 @@ EXAMPLES: list[dict] = [
         "id": "search-then-analyze",
         "label": "검색 + 분석 결합",
         "description": "웹 검색 + 코드 실행을 함께 사용.",
-        "model": "claude-sonnet-4-6",
+        "model": "claude-opus-4-8",
         "enabledTools": ["web_search", "code_execution"],
         "prompt": "최근 3년간 Anthropic, OpenAI, Google DeepMind 의 논문 편수를 웹에서 찾아보고, 그 수치로 막대 그래프의 값 배열 [A, O, G] 을 출력해.",
+    },
+    {
+        "id": "fetch-url",
+        "label": "URL 본문 요약",
+        "description": "web_fetch 로 URL 본문을 가져와 요약. "
+                       "프롬프트에 URL 을 직접 포함해야 fetch 가능 (컨텍스트에 없는 URL 은 fetch 불가).",
+        "model": "claude-opus-4-8",
+        "enabledTools": ["web_fetch"],
+        "prompt": "https://www.anthropic.com/news 의 내용을 가져와서 핵심 발표 3가지를 요약해줘. 출처 citation 포함.",
     },
 ]
 
@@ -163,7 +199,8 @@ def api_server_tools_run(body: dict) -> dict:
         }
 
     tools = [t["block"] for t in selected]
-    betas = ",".join(t["beta"] for t in selected)
+    # GA 도구는 beta == "" 이므로 빈 값은 제외. 비어 있으면 anthropic-beta 헤더 자체를 보내지 않는다.
+    betas = ",".join(dict.fromkeys(t["beta"] for t in selected if t["beta"]))
 
     body_obj: dict[str, Any] = {
         "model": model,
@@ -174,15 +211,18 @@ def api_server_tools_run(body: dict) -> dict:
     if system_prompt:
         body_obj["system"] = system_prompt
 
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+    }
+    if betas:
+        headers["anthropic-beta"] = betas
+
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=json.dumps(body_obj).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": betas,
-        },
+        headers=headers,
     )
 
     t0 = int(time.time() * 1000)

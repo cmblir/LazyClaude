@@ -13268,14 +13268,16 @@ VIEWS.thinkingLab = async () => {
     api('/api/thinking-lab/models'),
   ]);
   state.data.tl = state.data.tl || {
-    model: 'claude-sonnet-4-6',
+    model: 'claude-opus-4-8',
     budgetTokens: 4096,
-    maxTokens: 2048,
+    effort: 'medium',
+    maxTokens: 4096,
     prompt: '',
     lastResult: null,
     thinkingOpen: true,
   };
   const tl = state.data.tl;
+  const TL_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
   const last = tl.lastResult;
   const items = (hist && hist.items) || [];
 
@@ -13311,7 +13313,7 @@ VIEWS.thinkingLab = async () => {
     <div class="mb-4">
       <h1 class="text-2xl font-bold">🧠 ${t('Extended Thinking 실험실')}</h1>
       <p class="text-sm text-[var(--text-mute)] mt-1">
-        ${t('Opus 4.7 / Sonnet 4.6 의 thinking block 과 최종 응답을 분리 시각화. budget_tokens 로 추론 길이 조절.')}
+        ${t('thinking block 과 최종 응답을 분리 시각화. Opus 4.8/4.7·Sonnet 4.6 = adaptive thinking + effort(low~max) 로 추론/비용 조절. legacy 모델은 budget_tokens.')}
       </p>
     </div>
 
@@ -13327,8 +13329,15 @@ VIEWS.thinkingLab = async () => {
           <select class="input flex-1" onchange="tlSet('model', this.value)">${modelOpts}</select>
         </div>
         <div>
+          <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">effort <span class="normal-case text-[var(--text-dim)]">(adaptive 모델)</span></label>
+          <select class="input w-full" onchange="tlSet('effort', this.value)">
+            ${TL_EFFORTS.map(e => `<option value="${e}" ${tl.effort === e ? 'selected' : ''}>${e}</option>`).join('')}
+          </select>
+          <div class="text-[10px] text-[var(--text-dim)] mt-1">Opus 4.8/4.7·4.6·Sonnet 4.6 → adaptive thinking + effort. xhigh=Opus 4.8/4.7 · max=Opus·Sonnet 4.6 · 미설정 시 모델 기본(Opus 4.8=high).</div>
+        </div>
+        <div>
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider flex justify-between">
-            <span>budget_tokens</span>
+            <span>budget_tokens <span class="normal-case text-[var(--text-dim)]">(legacy 모델)</span></span>
             <span class="font-mono">${tl.budgetTokens}</span>
           </label>
           <input type="range" min="1024" max="32000" step="512" value="${tl.budgetTokens}"
@@ -13365,6 +13374,8 @@ VIEWS.thinkingLab = async () => {
               <div class="flex justify-between"><span class="text-[var(--text-dim)]">output_tokens</span><span class="font-mono">${usage.output_tokens || 0}</span></div>
               <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('소요 시간')}</span><span class="font-mono">${last.durationMs || 0}ms</span></div>
               <div class="flex justify-between"><span class="text-[var(--text-dim)]">stop_reason</span><span class="font-mono">${last.stopReason || '-'}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">thinking_tokens</span><span class="font-mono">${last.thinkingTokens || 0}</span></div>
+              <div class="flex justify-between"><span class="text-[var(--text-dim)]">mode</span><span class="font-mono">${escapeHtml(last.mode || '-')}${last.effort ? ' · ' + escapeHtml(last.effort) : ''}</span></div>
             </div>` : `<div class="text-[11px] text-[var(--text-dim)]">${t('아직 실행한 결과가 없습니다')}</div>`}
         </div>
         <div class="card p-3">
@@ -13391,6 +13402,7 @@ async function tlLoadExample(id) {
   state.data.tl = {
     model: e.model,
     budgetTokens: e.budgetTokens,
+    effort: e.effort || 'medium',
     maxTokens: e.maxTokens,
     prompt: e.prompt,
     lastResult: null,
@@ -13423,7 +13435,7 @@ async function tlRun() {
       return;
     }
     state.data.tl.lastResult = r.ok
-      ? { thinking: r.thinking, output: r.output, usage: r.usage, durationMs: r.durationMs, thinkingBlocks: r.thinkingBlocks, stopReason: r.stopReason }
+      ? { thinking: r.thinking, output: r.output, usage: r.usage, durationMs: r.durationMs, thinkingBlocks: r.thinkingBlocks, stopReason: r.stopReason, thinkingTokens: r.thinkingTokens, mode: r.mode, effort: r.effort }
       : { error: r.error || t('실행 실패') };
     if (st) st.textContent = r.ok ? `${r.durationMs}ms` : '';
     renderView();
@@ -15160,7 +15172,7 @@ VIEWS.serverTools = async () => {
     api('/api/server-tools/history'),
   ]);
   state.data.st = state.data.st || {
-    model: 'claude-sonnet-4-6',
+    model: 'claude-opus-4-8',
     maxTokens: 2048,
     prompt: '',
     enabled: ['web_search'],
@@ -15203,7 +15215,7 @@ VIEWS.serverTools = async () => {
     <div class="mb-4">
       <h1 class="text-2xl font-bold">🧰 ${t('Claude 공식 내장 Tools')}</h1>
       <p class="text-sm text-[var(--text-mute)] mt-1">
-        ${t('Anthropic 서버가 직접 실행하는 hosted tool (web_search / code_execution) 을 활성화하고 응답 블록을 분류 시각화합니다.')}
+        ${t('Anthropic 서버가 직접 실행하는 hosted tool (web_search · code_execution · web_fetch) 을 활성화하고 응답 블록을 분류 시각화합니다.')}
       </p>
     </div>
 
@@ -15217,6 +15229,7 @@ VIEWS.serverTools = async () => {
         <div class="flex items-center gap-2 flex-wrap">
           <label class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider w-20">${t('모델')}</label>
           <select class="input flex-1" onchange="stSet('model', this.value); renderView()">
+            <option value="claude-opus-4-8" ${st.model === 'claude-opus-4-8' ? 'selected' : ''}>Opus 4.8</option>
             <option value="claude-opus-4-7" ${st.model === 'claude-opus-4-7' ? 'selected' : ''}>Opus 4.7</option>
             <option value="claude-sonnet-4-6" ${st.model === 'claude-sonnet-4-6' ? 'selected' : ''}>Sonnet 4.6</option>
           </select>
@@ -25978,7 +25991,7 @@ const _QS_LABELS = {
   'ui.compactSidebar': ['컴팩트 사이드바', '카테고리 라벨 숨김'],
 
   'ai.defaultProvider': ['기본 프로바이더', '예: claude:sonnet, openai:gpt-4.1, ollama:llama3.1'],
-  'ai.effort': ['Effort', 'low / medium / high — 추론 깊이'],
+  'ai.effort': ['Effort', 'low / medium / high / xhigh / max — 추론 깊이·비용 (xhigh·max: Opus 4.8/4.7)'],
   'ai.temperature': ['Temperature', '0.0 결정적 ↔ 2.0 다양'],
   'ai.topP': ['Top-p', '핵 샘플링 누적 확률'],
   'ai.maxOutputTokens': ['Max output tokens', '응답 최대 토큰'],

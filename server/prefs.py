@@ -57,7 +57,12 @@ PREFS_SCHEMA: dict[str, dict[str, tuple]] = {
     },
     "ai": {
         "defaultProvider":  ("str", 120),
-        "effort":           ("enum", ["minimal", "low", "medium", "high"]),
+        # Complete effort enum per the official effort docs (verified 2026-06-01):
+        # exactly five values the API accepts — "The values documented on this
+        # page are the complete set the API accepts." Note: "minimal" is NOT a
+        # valid effort level and was removed; "high" is the default (equivalent
+        # to omitting the parameter). xhigh: Opus 4.8 / 4.7 only.
+        "effort":           ("enum", ["low", "medium", "high", "xhigh", "max"]),
         "temperature":      ("float", (0.0, 2.0)),
         "topP":             ("float", (0.0, 1.0)),
         "maxOutputTokens":  ("int", (1, 200000)),

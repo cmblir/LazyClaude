@@ -1898,13 +1898,38 @@ class AnthropicApiProvider(BaseProvider):
             messages_payload = [{"role": "user", "content": user_content}]
         else:
             messages_payload = [{"role": "user", "content": prompt}]
+        _extra = extra or {}
         body_obj: dict = {
             "model": resolved,
-            "max_tokens": int((extra or {}).get("max_tokens", 4096)),
+            "max_tokens": int(_extra.get("max_tokens", 4096)),
             "messages": messages_payload,
         }
         if system_prompt:
             body_obj["system"] = system_prompt
+
+        # Optional thinking / effort passthrough — only added when the caller
+        # supplies them, so default behaviour is unchanged.
+        #
+        # `thinking` may be either an adaptive block ({"type": "adaptive"},
+        # optionally with "display": "summarized" — required on Opus 4.8 / 4.7
+        # whose display defaults to "omitted") or a legacy manual block
+        # ({"type": "enabled", "budget_tokens": N}). The caller is responsible
+        # for choosing the shape valid for the target model; we pass it through
+        # verbatim. (Verified: manual enabled is rejected with HTTP 400 on Opus
+        # 4.8 / 4.7.)
+        thinking = _extra.get("thinking")
+        if isinstance(thinking, dict) and thinking:
+            body_obj["thinking"] = thinking
+
+        # `effort` lives under the top-level output_config field (NOT under
+        # thinking). Accept either a pre-built output_config dict or a bare
+        # effort string. `high` is the default and equals omitting the field.
+        output_config = _extra.get("output_config")
+        if not isinstance(output_config, dict):
+            effort = _extra.get("effort")
+            output_config = {"effort": effort} if isinstance(effort, str) and effort else None
+        if isinstance(output_config, dict) and output_config:
+            body_obj["output_config"] = output_config
 
         body = json.dumps(body_obj).encode("utf-8")
         req = urllib.request.Request(

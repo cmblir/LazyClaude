@@ -10,6 +10,41 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.40] — 2026-06-01  🧠 adaptive thinking + effort (CORRECTNESS FIX) · 🧰 serverTools tool-version upgrade
+
+Two roadmap items (#3 + #11), backend built in parallel (workflow) then frontend wired.
+
+### Extended Thinking lab — adaptive + effort (fixes a live 400 on Opus 4.8/4.7)
+
+- `thinking_lab.py` sent `thinking:{type:"enabled",budget_tokens}` for every
+  model — that **400s on Opus 4.8/4.7** (adaptive-only) and those models default
+  `thinking.display` to `omitted` (blank reasoning). New model-aware builder:
+  Opus 4.8/4.7 → `thinking:{type:"adaptive",display:"summarized"}`; Opus 4.6 /
+  Sonnet 4.6 → `{type:"adaptive"}`; legacy models keep `enabled+budget_tokens`.
+- `effort` is now sent as top-level `output_config.effort`; `prefs.py` enum
+  widened to `low/medium/high/xhigh/max` (dropped invalid `minimal`).
+- `AnthropicApiProvider.execute` gained opt-in `extra.thinking` / `output_config`
+  / `effort` passthrough (unchanged when not supplied).
+- Lab UI: effort selector (adaptive models) + budget slider (legacy), default
+  model → Opus 4.8, examples carry `effort`, and the result panel shows
+  `thinking_tokens` + `mode`. Quick-Settings effort dropdown auto-reflects the
+  new enum (schema-driven).
+
+### Server Tools lab — current tool versions + web_fetch
+
+- `server_tools.py` TOOL_CATALOG: `web_search_20250305 → web_search_20260209`
+  (GA, no beta header), `code_execution_20250522 → code_execution_20250825`,
+  and a **new `web_fetch` (web_fetch_20260209)** tool (GA; copy notes it only
+  fetches URLs already in context). supportedModels now include
+  `claude-opus-4-8`; beta-header builder dedups + drops empties.
+- Lab UI: model dropdown gains Opus 4.8 (default); the catalog-driven tool list
+  surfaces the 3rd (web_fetch) toggle automatically.
+
+Verified in-app: thinking lab default Opus 4.8 + effort low/medium/high/xhigh/max
++ budget(legacy) + thinking_tokens panel; serverTools shows 3 tools with the new
+version strings + web_fetch; both endpoints return valid data; 0 console errors.
+
+---
 ## [3.99.39] — 2026-06-01  🪨 dedicated Caveman tab (suite status · install · levels)
 
 caveman had only a catalog card; gave it a dedicated tab like RTK / ccr.
