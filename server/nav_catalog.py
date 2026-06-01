@@ -169,6 +169,17 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "레벨(lite·full·ultra·wenyan) 가이드.",
         ["caveman", "케이브맨", "토큰 압축", "output token", "출력 토큰 절감",
          "compression", "압축 레벨", "wenyan", "/caveman"]),
+    ("otel",          "system",
+        "실시간 텔레메트리 — Claude Code 의 OpenTelemetry(OTLP/HTTP JSON) 메트릭을 "
+        "수신해 비용·토큰·도구 수락/거절·코드 라인·커밋·세션을 실시간 집계. "
+        "CLAUDE_CODE_ENABLE_TELEMETRY=1 + OTEL_EXPORTER_OTLP_PROTOCOL=http/json 로 연결.",
+        ["텔레메트리", "telemetry", "otel", "opentelemetry", "otlp", "메트릭",
+         "metrics", "실시간", "monitoring", "관측"]),
+    ("adminUsage",    "system",
+        "Admin 사용량·비용 — Anthropic Admin Usage/Cost API 로 조직 단위 실제 청구된 "
+        "토큰/USD 를 가져와 로컬 추정치와 drift 비교 (admin 키 필요).",
+        ["admin", "usage", "cost", "billing", "anthropic", "조직", "청구",
+         "비용", "사용량", "drift", "reconcile"]),
     ("sessionReplay", "work",
         "Session Replay — Claude Code JSONL 세션 로그를 타임라인으로 재생 · "
         "툴 호출 하이라이트 · 누적 토큰 차트.",

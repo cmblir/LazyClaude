@@ -80,6 +80,16 @@ const NAV = [
     docUrl: null
   },
   {
+    id: 'otel', icon: '📡', label: '실시간 텔레메트리', group: 'observe',
+    desc: 'Claude Code OTLP/HTTP JSON 텔레메트리 실시간 집계 — 비용·토큰·도구 수락·코드 라인·커밋',
+    docUrl: null
+  },
+  {
+    id: 'adminUsage', icon: '🏢', label: 'Admin 사용량·비용', group: 'observe',
+    desc: 'Anthropic Admin API 조직 단위 실제 청구 토큰/USD vs 로컬 추정치 drift 비교',
+    docUrl: null
+  },
+  {
     id: 'projectAgents', icon: '👥', label: '프로젝트 서브 에이전트', group: 'build',
     desc: '프로젝트별 서브 에이전트 보기/추가/교체 + 16개 역할 프리셋', docUrl: DOCS_BASE + 'sub-agents'
   },
@@ -657,7 +667,7 @@ const MODE_TABS = {
     'claudemd', 'envConfig', 'modelConfig', 'statusline',
     'memory', 'memoryManager', 'tasks', 'plans', 'outputStyles', 'team',
     'eventForwarder', 'autoResumeManager', 'backupRestore', 'backups',
-    'system', 'telemetry', 'metrics', 'costsTimeline',
+    'system', 'telemetry', 'metrics', 'costsTimeline', 'otel', 'adminUsage',
     'securityScan', 'claudeDocs', 'zclaude', 'homunculus', 'routines',
     'usage', 'ideStatus', 'scheduled', 'bashHistory', 'cliSessions', 'openPorts',
   ]),
@@ -13200,8 +13210,11 @@ VIEWS.promptCache = async () => {
         </div>
       </div>
     </div>
+    <div id="pcAnalytics" class="mt-4"></div>
   `;
 };
+
+AFTER.promptCache = () => { try { loadPromptCacheAnalytics(); } catch (_) { } };
 
 function pcSet(key, val) {
   state.data.pc = state.data.pc || {};
@@ -22047,6 +22060,598 @@ async function _srLoad(path) {
 // ────────────────────────────────────────────────────────────────
 // RTK OPTIMIZER (v2.24.0) — rtk-ai/rtk 토큰 절감 프록시 통합
 // ────────────────────────────────────────────────────────────────
+
+// ═══ batch features: live telemetry (otel) · admin usage/cost · prompt-cache analytics ═══
+// ───────── otel — Claude Code 실시간 텔레메트리 (OTLP/HTTP JSON ingest) ─────────
+
+VIEWS.otel = async () => {
+  const hours = state.data._otelHours || 24;
+  const d = await api('/api/otel/summary?hours=' + hours).catch(() => ({ ok: false }));
+  if (!d || !d.ok) {
+    return `<div class="card p-6 text-[12px]">${t('데이터를 불러오지 못했습니다')}: ${escapeHtml((d && d.error) || '')}</div>`;
+  }
+
+  // 연결 설정 안내 — Claude Code 가 이 대시보드로 메트릭을 보내도록 env 설정.
+  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://127.0.0.1:19500';
+  const setup = `
+    <div class="card p-4 mb-4">
+      <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('연결 설정 — Claude Code 텔레메트리 내보내기')}</div>
+      <p class="text-[12px] text-[var(--text-mute)] mb-2">${t('이 대시보드는 Claude Code 의 OpenTelemetry 메트릭 수신처(OTLP 백엔드)입니다. 순수 stdlib 서버라 protobuf 는 파싱할 수 없으니 반드시 http/json 프로토콜로 설정하세요.')}</p>
+      <pre class="text-[11px] font-mono p-3 rounded" style="background:var(--bg-soft,rgba(127,127,127,0.08));overflow-x:auto;white-space:pre;">export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=${escapeHtml(origin)}/otlp
+# 디버깅: 내보내기 주기 단축 (기본 60초)
+export OTEL_METRIC_EXPORT_INTERVAL=10000
+claude</pre>
+      <div class="flex gap-2 mt-2 flex-wrap">
+        <button class="btn" onclick="_otelCopySetup(this)">${t('설정 복사')}</button>
+        <a class="btn" href="https://code.claude.com/docs/en/monitoring-usage" target="_blank" rel="noopener">${t('공식 문서')}</a>
+      </div>
+    </div>`;
+
+  // 빈 상태 — 아직 한 건도 수신하지 못함.
+  if (!d.hasData) {
+    return `
+      <div class="mb-4">
+        <h1 class="text-2xl font-bold">📡 ${t('실시간 텔레메트리')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${t('Claude Code 가 OTLP/HTTP JSON 으로 보낸 메트릭(비용·토큰·도구 결정·코드 라인·커밋)을 실시간 집계합니다.')}</p>
+      </div>
+      ${setup}
+      <div class="card p-8 text-center">
+        <div class="text-4xl mb-3">📭</div>
+        <div class="text-[14px] font-semibold mb-1">${t('아직 수신된 텔레메트리가 없습니다')}</div>
+        <div class="text-[12px] text-[var(--text-mute)] mb-3">${t('위 환경변수를 설정하고 Claude Code 를 실행하면, 다음 내보내기 주기(기본 60초)에 메트릭이 여기에 나타납니다.')}</div>
+        <button class="btn btn-primary" onclick="_otelRefresh()">${t('새로고침')}</button>
+      </div>`;
+  }
+
+  const fmtUsd = (v) => '$' + (Number(v) || 0).toFixed(4);
+  const tot = d.totals || {};
+  const tbt = tot.tokensByType || {};
+  const loc = tot.linesOfCode || {};
+  const dec = d.decisions || { accept: 0, reject: 0 };
+  const totalDec = (dec.accept || 0) + (dec.reject || 0);
+  const acceptPct = totalDec ? Math.round((dec.accept / totalDec) * 100) : 0;
+  const byModel = d.byModel || [];
+  const daily = d.daily || [];
+  const recent = d.recent || [];
+
+  const lastTxt = d.lastIngestAt
+    ? new Date(d.lastIngestAt * 1000).toLocaleTimeString()
+    : '-';
+
+  const tokenChip = (label, key, color) => `
+    <div class="flex items-center justify-between text-[11px] py-0.5">
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color};margin-right:6px;"></span>${label}</span>
+      <span class="font-mono">${fmtTokens(tbt[key] || 0)}</span>
+    </div>`;
+
+  const modelRows = byModel.map(m => `
+    <tr class="border-b border-[var(--border)]">
+      <td class="py-1 px-2 font-mono text-[10px]">${escapeHtml(m.model || '-')}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${fmtTokens(m.tokens || 0)}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono font-semibold">${fmtUsd(m.costUsd)}</td>
+    </tr>`).join('') || `<tr><td colspan="3" class="py-3 text-center text-[var(--text-dim)]">${t('아직 데이터가 없습니다')}</td></tr>`;
+
+  const metricLabel = (m) => ({
+    'claude_code.cost.usage': t('비용'),
+    'claude_code.token.usage': t('토큰'),
+    'claude_code.session.count': t('세션'),
+    'claude_code.lines_of_code.count': t('코드 라인'),
+    'claude_code.commit.count': t('커밋'),
+    'claude_code.pull_request.count': 'PR',
+    'claude_code.code_edit_tool.decision': t('편집 결정'),
+    'claude_code.active_time.total': t('활성 시간'),
+  }[m] || (m || '').replace('claude_code.', ''));
+
+  const recentRows = recent.map(e => {
+    const extra = [e.type, e.toolName, e.decision, e.language].filter(Boolean).join(' · ');
+    return `
+    <tr class="border-b border-[var(--border)]">
+      <td class="py-1 px-2 text-[10px] text-[var(--text-dim)] font-mono">${new Date((e.ts || 0) * 1000).toLocaleTimeString()}</td>
+      <td class="py-1 px-2 text-[11px]">${escapeHtml(metricLabel(e.metric))}</td>
+      <td class="py-1 px-2 font-mono text-[10px]">${escapeHtml(e.model || '-')}</td>
+      <td class="py-1 px-2 text-[10px] text-[var(--text-dim)]">${escapeHtml(extra || '-')}</td>
+      <td class="py-1 px-2 text-right text-[11px] font-mono">${fmtTokens(Math.round(e.value || 0))}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="5" class="py-3 text-center text-[var(--text-dim)]">—</td></tr>`;
+
+  const hoursBtn = (h, lbl) => `<button class="btn ${hours === h ? 'btn-primary' : ''}" onclick="_otelSetHours(${h})">${lbl}</button>`;
+
+  return `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">📡 ${t('실시간 텔레메트리')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${t('Claude Code 가 OTLP/HTTP JSON 으로 보낸 메트릭(비용·토큰·도구 결정·코드 라인·커밋)을 실시간 집계합니다.')}</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-[10px] text-[var(--text-dim)]">${t('최근 수신')}: <span class="font-mono">${lastTxt}</span></span>
+        <span class="inline-flex items-center gap-1 text-[10px]" style="color:#4ade80;">● ${t('수신 중')}</span>
+        <div class="flex gap-1">${hoursBtn(24, '24h')}${hoursBtn(168, '7d')}${hoursBtn(720, '30d')}</div>
+        <button class="btn" onclick="_otelRefresh()">${t('새로고침')}</button>
+      </div>
+    </div>
+
+    ${setup}
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('총 비용')}</div>
+        <div class="text-2xl font-bold mt-1 font-mono" style="color:var(--accent);">${fmtUsd(tot.costUsd)}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('총 토큰')}</div>
+        <div class="text-2xl font-bold mt-1 font-mono">${fmtTokens(tot.tokensTotal || 0)}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('세션')}</div>
+        <div class="text-2xl font-bold mt-1 font-mono">${(tot.sessions || 0).toLocaleString()}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">${t('커밋 / PR')}</div>
+        <div class="text-2xl font-bold mt-1 font-mono">${(tot.commits || 0)} / ${(tot.pullRequests || 0)}</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+      <div class="card p-4">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('토큰 종류별')}</div>
+        ${tokenChip(t('입력'), 'input', '#60a5fa')}
+        ${tokenChip(t('출력'), 'output', '#f472b6')}
+        ${tokenChip(t('캐시 읽기'), 'cacheRead', '#a78bfa')}
+        ${tokenChip(t('캐시 생성'), 'cacheCreation', '#fbbf24')}
+      </div>
+      <div class="card p-4">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('편집 도구 결정 (수락/거절)')}</div>
+        <div class="text-2xl font-bold font-mono mb-1">${acceptPct}% <span class="text-[11px] font-normal text-[var(--text-dim)]">${t('수락률')}</span></div>
+        <div class="w-full h-2 rounded overflow-hidden" style="background:rgba(127,127,127,0.18);">
+          <div style="width:${acceptPct}%;height:100%;background:#4ade80;"></div>
+        </div>
+        <div class="flex justify-between text-[11px] mt-1 font-mono">
+          <span style="color:#4ade80;">${t('수락')} ${dec.accept || 0}</span>
+          <span style="color:#f87171;">${t('거절')} ${dec.reject || 0}</span>
+        </div>
+      </div>
+      <div class="card p-4">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('코드 라인 / 활성 시간')}</div>
+        <div class="flex justify-between text-[12px] py-0.5"><span style="color:#4ade80;">+ ${t('추가')}</span><span class="font-mono">${(loc.added || 0).toLocaleString()}</span></div>
+        <div class="flex justify-between text-[12px] py-0.5"><span style="color:#f87171;">− ${t('삭제')}</span><span class="font-mono">${(loc.removed || 0).toLocaleString()}</span></div>
+        <div class="flex justify-between text-[12px] py-0.5 border-t border-[var(--border)] mt-1 pt-1"><span>${t('활성 시간')}</span><span class="font-mono">${Math.round((tot.activeTimeSeconds || 0) / 60)} ${t('분')}</span></div>
+      </div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('일별 토큰 추이')}</div>
+      <div style="position:relative;height:200px;"><canvas id="otelDailyChart"></canvas></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card p-3">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2 px-1">${t('모델별 비용')}</div>
+        <table class="w-full text-[12px]">
+          <thead><tr class="text-[10px] text-[var(--text-dim)] uppercase">
+            <th class="py-1 px-2 text-left">${t('모델')}</th>
+            <th class="py-1 px-2 text-right">${t('토큰')}</th>
+            <th class="py-1 px-2 text-right">${t('비용')}</th>
+          </tr></thead>
+          <tbody>${modelRows}</tbody>
+        </table>
+      </div>
+      <div class="card p-3">
+        <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2 px-1">${t('최근 활동')}</div>
+        <div style="max-height:260px;overflow-y:auto;">
+        <table class="w-full text-[12px]">
+          <thead><tr class="text-[10px] text-[var(--text-dim)] uppercase">
+            <th class="py-1 px-2 text-left">${t('시각')}</th>
+            <th class="py-1 px-2 text-left">${t('메트릭')}</th>
+            <th class="py-1 px-2 text-left">${t('모델')}</th>
+            <th class="py-1 px-2 text-left">${t('속성')}</th>
+            <th class="py-1 px-2 text-right">${t('값')}</th>
+          </tr></thead>
+          <tbody>${recentRows}</tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <script>window._otelDailyData = ${JSON.stringify(daily)};</script>`;
+};
+
+AFTER.otel = () => {
+  // 일별 토큰 차트 렌더 (데이터 있을 때만 canvas 존재).
+  const canvas = document.getElementById('otelDailyChart');
+  const daily = window._otelDailyData || [];
+  if (canvas && daily.length) {
+    _renderChart(canvas, {
+      type: 'bar',
+      data: {
+        labels: daily.map(x => x.day),
+        datasets: [{
+          label: 'tokens',
+          data: daily.map(x => x.tokens || 0),
+          backgroundColor: 'rgba(96,165,250,0.6)',
+          borderColor: '#60a5fa',
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+  }
+  // 자동 새로고침 — 30초마다 현재 탭이 otel 일 때만.
+  if (window._otelTimer) { clearInterval(window._otelTimer); }
+  window._otelTimer = setInterval(() => {
+    if ((state.data && state.data._activeView) === 'otel') {
+      _otelRefresh();
+    } else {
+      clearInterval(window._otelTimer);
+      window._otelTimer = null;
+    }
+  }, 30000);
+};
+
+function _otelRefresh() {
+  if (typeof go === 'function') { go('otel'); }
+}
+
+function _otelSetHours(h) {
+  state.data._otelHours = h;
+  _otelRefresh();
+}
+
+function _otelCopySetup(btn) {
+  const origin = (typeof location !== 'undefined' && location.origin) ? location.origin : 'http://127.0.0.1:19500';
+  const text = [
+    'export CLAUDE_CODE_ENABLE_TELEMETRY=1',
+    'export OTEL_METRICS_EXPORTER=otlp',
+    'export OTEL_EXPORTER_OTLP_PROTOCOL=http/json',
+    'export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=' + origin + '/otlp',
+    'export OTEL_METRIC_EXPORT_INTERVAL=10000',
+  ].join('\n');
+  try {
+    navigator.clipboard.writeText(text);
+    if (typeof toast === 'function') toast(t('설정을 클립보드에 복사했습니다'));
+  } catch (_) {
+    if (typeof toast === 'function') toast(t('복사 실패 — 수동으로 선택하세요'));
+  }
+}
+VIEWS.adminUsage = async () => {
+  return `
+  <div class="page" id="adminUsagePage">
+    <header class="page-head">
+      <h1>${escapeHtml(t('Admin 사용량·비용'))}</h1>
+      <p class="muted">${escapeHtml(t('Anthropic 조직 Admin API에서 실제 청구된 토큰/USD를 가져와 로컬 추정치와 비교합니다. Admin 키(sk-ant-admin...)가 필요합니다.'))}</p>
+    </header>
+    <div id="adminUsageBody"><div class="muted" style="padding:24px">${escapeHtml(t('불러오는 중…'))}</div></div>
+  </div>`;
+};
+
+AFTER.adminUsage = () => { _adminUsageInit(); };
+
+async function _adminUsageInit() {
+  const body = document.getElementById('adminUsageBody');
+  if (!body) return;
+  let status;
+  try {
+    status = await api('/api/admin/status');
+  } catch (e) {
+    body.innerHTML = `<div class="card err-card">${escapeHtml(t('상태 조회 실패'))}: ${escapeHtml(String(e))}</div>`;
+    return;
+  }
+  if (!status || !status.configured) {
+    _adminUsageRenderNoKey(body, status || {});
+    return;
+  }
+  _adminUsageRenderDashboard(body, status);
+}
+
+function _adminUsageRenderNoKey(body, status) {
+  const envLocked = status && status.fromEnv;
+  body.innerHTML = `
+    <div class="card" style="max-width:560px">
+      <h2 style="margin-top:0">${escapeHtml(t('Admin 키 설정'))}</h2>
+      <p class="muted">${escapeHtml(t('조직 Admin API 키는 표준 API 키와 다릅니다. sk-ant-admin... 으로 시작하며 콘솔의 admin-keys 페이지에서 발급합니다.'))}</p>
+      <label class="field">
+        <span>${escapeHtml(t('Admin API 키'))}</span>
+        <input type="password" id="adminKeyInput" placeholder="sk-ant-admin..." autocomplete="off" />
+      </label>
+      <div class="row" style="gap:8px;margin-top:12px">
+        <button class="btn btn-primary" id="adminKeySaveBtn">${escapeHtml(t('저장'))}</button>
+      </div>
+      <p class="muted" style="margin-top:12px;font-size:.85em">${escapeHtml(t('키는 ~/.claude-dashboard-admin.json 에 파일 권한 600으로 저장되며 화면에는 마스킹되어 표시됩니다.'))}</p>
+    </div>`;
+  if (envLocked) {
+    body.querySelector('.card').insertAdjacentHTML('beforeend',
+      `<p class="muted" style="color:var(--warn,#c80)">${escapeHtml(t('ANTHROPIC_ADMIN_KEY 환경변수가 설정되어 있어 여기서 관리할 수 없습니다.'))}</p>`);
+    const inp = body.querySelector('#adminKeyInput'); if (inp) inp.disabled = true;
+    const btn = body.querySelector('#adminKeySaveBtn'); if (btn) btn.disabled = true;
+    return;
+  }
+  body.querySelector('#adminKeySaveBtn').addEventListener('click', async () => {
+    const key = (body.querySelector('#adminKeyInput').value || '').trim();
+    if (!key) { toast(t('키를 입력하세요'), 'warn'); return; }
+    const btn = body.querySelector('#adminKeySaveBtn');
+    btn.disabled = true; btn.textContent = t('저장 중…');
+    try {
+      const r = await api('/api/admin/set-key', { method: 'POST', body: JSON.stringify({ adminKey: key }) });
+      if (r && r.ok) {
+        if (r.warning) toast(r.warning, 'warn');
+        toast(t('저장됨'), 'success');
+        _adminUsageInit();
+      } else {
+        toast((r && (r.hint || r.error)) || t('저장 실패'), 'err');
+        btn.disabled = false; btn.textContent = t('저장');
+      }
+    } catch (e) {
+      toast(String(e), 'err'); btn.disabled = false; btn.textContent = t('저장');
+    }
+  });
+}
+
+function _adminUsageRenderDashboard(body, status) {
+  body.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+        <label class="field inline"><span>${escapeHtml(t('기간(일)'))}</span>
+          <select id="adminDays">
+            <option value="7">7</option><option value="14">14</option>
+            <option value="30">30</option><option value="31">31</option>
+          </select></label>
+        <button class="btn" id="adminRefreshBtn">${escapeHtml(t('새로고침'))}</button>
+        <button class="btn btn-ghost" id="adminForceBtn" title="${escapeHtml(t('캐시 무시하고 강제 조회 (분당 1회 권장)'))}">${escapeHtml(t('강제 새로고침'))}</button>
+      </div>
+      <div class="row" style="gap:8px;align-items:center">
+        <span class="chip" title="${escapeHtml(t('저장된 Admin 키'))}">🔑 ${escapeHtml(status.maskedKey || '')}</span>
+        <button class="btn btn-ghost btn-sm" id="adminClearKeyBtn">${escapeHtml(t('키 삭제'))}</button>
+      </div>
+    </div>
+    <div id="adminMeta" class="muted" style="font-size:.85em;margin-bottom:8px"></div>
+    <div id="adminUsageGrid" class="cards-grid"></div>`;
+
+  const daysSel = body.querySelector('#adminDays');
+  const load = async (force) => {
+    const days = daysSel.value || '7';
+    const grid = body.querySelector('#adminUsageGrid');
+    const meta = body.querySelector('#adminMeta');
+    grid.innerHTML = `<div class="muted" style="padding:24px">${escapeHtml(t('불러오는 중…'))}</div>`;
+    const qf = force ? '&force=1' : '';
+    let usage, cost;
+    try {
+      [usage, cost] = await Promise.all([
+        api(`/api/admin/usage?days=${encodeURIComponent(days)}&bucket_width=1d${qf}`),
+        api(`/api/admin/cost?days=${encodeURIComponent(days)}${qf}`),
+      ]);
+    } catch (e) {
+      grid.innerHTML = `<div class="card err-card">${escapeHtml(t('조회 실패'))}: ${escapeHtml(String(e))}</div>`;
+      return;
+    }
+    _adminUsageRenderResults(grid, meta, usage, cost);
+  };
+
+  body.querySelector('#adminRefreshBtn').addEventListener('click', () => load(false));
+  body.querySelector('#adminForceBtn').addEventListener('click', () => load(true));
+  body.querySelector('#adminClearKeyBtn').addEventListener('click', async () => {
+    const ok = await confirmModal(t('Admin 키를 삭제할까요?'));
+    if (!ok) return;
+    try {
+      await api('/api/admin/set-key', { method: 'POST', body: JSON.stringify({ clear: true }) });
+      toast(t('삭제됨'), 'success');
+      _adminUsageInit();
+    } catch (e) { toast(String(e), 'err'); }
+  });
+  load(false);
+}
+
+function _adminUsageApiErr(r) {
+  if (!r) return t('응답 없음');
+  if (r.error === 'no_admin_key') return r.hint || t('Admin 키가 설정되지 않았습니다');
+  if (r.error === 'api_error') return `${t('API 오류')} (HTTP ${r.status}): ${escapeHtml((r.detail || '').slice(0, 200))}`;
+  return escapeHtml(r.detail || r.error || t('알 수 없는 오류'));
+}
+
+function _adminUsageRenderResults(grid, meta, usage, cost) {
+  if (!usage || !usage.ok) {
+    grid.innerHTML = `<div class="card err-card">${_adminUsageApiErr(usage)}</div>`;
+    meta.textContent = '';
+    return;
+  }
+  const u = usage.usage || {};
+  const ut = u.totals || {};
+  const recon = (cost && cost.ok) ? (cost.reconciliation || {}) : {};
+  const reconRows = recon.rows || [];
+  const c = (cost && cost.ok) ? (cost.cost || {}) : {};
+
+  const metaBits = [];
+  if (usage.fetchedAt) metaBits.push(`${t('갱신')}: ${new Date(usage.fetchedAt * 1000).toLocaleString()}`);
+  metaBits.push(usage.fromCache ? `${t('캐시')} (${usage.ageSec || 0}s)` : t('실시간'));
+  if (usage.stale) metaBits.push(`⚠ ${t('오래된 캐시')}`);
+  if (usage.warning) metaBits.push(escapeHtml(usage.warning));
+  meta.textContent = metaBits.join(' · ');
+
+  const fmtUsd = (n) => '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const driftBadge = (pct) => {
+    if (pct == null) return '';
+    const cls = Math.abs(pct) > 15 ? 'badge-warn' : 'badge-ok';
+    return `<span class="badge ${cls}">${pct > 0 ? '+' : ''}${pct}%</span>`;
+  };
+
+  const reconTotalRow = (recon && recon.actualUsdTotal != null)
+    ? `<div class="row" style="gap:24px;flex-wrap:wrap;margin-top:8px">
+         <div><div class="muted">${escapeHtml(t('추정 USD'))}</div><div class="big">${fmtUsd(recon.estimatedUsdTotal)}</div></div>
+         <div><div class="muted">${escapeHtml(t('실제 청구 USD'))}</div><div class="big">${fmtUsd(recon.actualUsdTotal)}</div></div>
+         <div><div class="muted">${escapeHtml(t('Drift'))}</div><div class="big">${fmtUsd(recon.driftUsd)} ${driftBadge(recon.driftPct)}</div></div>
+       </div>`
+    : `<div class="muted">${escapeHtml(t('비용 데이터 없음'))}${(cost && !cost.ok) ? ' — ' + _adminUsageApiErr(cost) : ''}</div>`;
+
+  const reconTableRows = reconRows.map(r => `
+    <tr>
+      <td>${escapeHtml(r.date)}</td>
+      <td style="text-align:right">${fmtUsd(r.estimatedUsd)}</td>
+      <td style="text-align:right">${fmtUsd(r.actualUsd)}</td>
+      <td style="text-align:right">${fmtUsd(r.driftUsd)} ${driftBadge(r.driftPct)}</td>
+    </tr>`).join('') || `<tr><td colspan="4" class="muted">${escapeHtml(t('데이터 없음'))}</td></tr>`;
+
+  const modelRows = (u.byModel || []).slice(0, 12).map(m => `
+    <tr>
+      <td>${escapeHtml(m.model)}</td>
+      <td style="text-align:right">${fmtTokens(m.totalTokens)}</td>
+      <td style="text-align:right">${fmtTokens(m.outputTokens)}</td>
+      <td style="text-align:right">${fmtUsd(m.estimatedUsd)}</td>
+    </tr>`).join('') || `<tr><td colspan="4" class="muted">${escapeHtml(t('데이터 없음'))}</td></tr>`;
+
+  const costTypeRows = (c.byCostType || []).map(ct => `
+    <tr><td>${escapeHtml(ct.costType)}</td><td style="text-align:right">${fmtUsd(ct.actualUsd)}</td></tr>`).join('')
+    || `<tr><td colspan="2" class="muted">${escapeHtml(t('데이터 없음'))}</td></tr>`;
+
+  grid.innerHTML = `
+    <div class="card" style="grid-column:1/-1">
+      <h3 style="margin-top:0">${escapeHtml(t('추정 vs 실제 청구'))}</h3>
+      ${reconTotalRow}
+      <div style="margin-top:12px;position:relative;height:240px"><canvas id="adminReconChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">${escapeHtml(t('토큰 합계 (실제)'))}</h3>
+      <table class="data-table"><tbody>
+        <tr><td>${escapeHtml(t('Uncached 입력'))}</td><td style="text-align:right">${fmtTokens(ut.uncachedInputTokens)}</td></tr>
+        <tr><td>${escapeHtml(t('캐시 읽기'))}</td><td style="text-align:right">${fmtTokens(ut.cacheReadInputTokens)}</td></tr>
+        <tr><td>${escapeHtml(t('캐시 생성'))}</td><td style="text-align:right">${fmtTokens(ut.cacheCreationTokens)}</td></tr>
+        <tr><td>${escapeHtml(t('출력'))}</td><td style="text-align:right">${fmtTokens(ut.outputTokens)}</td></tr>
+        <tr><td><strong>${escapeHtml(t('총 토큰'))}</strong></td><td style="text-align:right"><strong>${fmtTokens(ut.totalTokens)}</strong></td></tr>
+        <tr><td>${escapeHtml(t('웹 검색 요청'))}</td><td style="text-align:right">${fmtTokens(ut.webSearchRequests)}</td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">${escapeHtml(t('비용 유형별 (실제)'))}</h3>
+      <table class="data-table"><thead><tr><th>${escapeHtml(t('유형'))}</th><th style="text-align:right">USD</th></tr></thead>
+      <tbody>${costTypeRows}</tbody></table>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <h3 style="margin-top:0">${escapeHtml(t('모델별 (추정)'))}</h3>
+      <div style="overflow-x:auto"><table class="data-table">
+        <thead><tr><th>${escapeHtml(t('모델'))}</th><th style="text-align:right">${escapeHtml(t('총 토큰'))}</th><th style="text-align:right">${escapeHtml(t('출력'))}</th><th style="text-align:right">${escapeHtml(t('추정 USD'))}</th></tr></thead>
+        <tbody>${modelRows}</tbody>
+      </table></div>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <h3 style="margin-top:0">${escapeHtml(t('일별 Drift'))}</h3>
+      <div style="overflow-x:auto"><table class="data-table">
+        <thead><tr><th>${escapeHtml(t('날짜'))}</th><th style="text-align:right">${escapeHtml(t('추정'))}</th><th style="text-align:right">${escapeHtml(t('실제'))}</th><th style="text-align:right">${escapeHtml(t('Drift'))}</th></tr></thead>
+        <tbody>${reconTableRows}</tbody>
+      </table></div>
+    </div>`;
+
+  // Estimate-vs-actual chart per day.
+  const canvas = grid.querySelector('#adminReconChart');
+  if (canvas && reconRows.length && typeof _renderChart === 'function') {
+    _renderChart(canvas, {
+      type: 'bar',
+      data: {
+        labels: reconRows.map(r => r.date),
+        datasets: [
+          { label: t('추정 USD'), data: reconRows.map(r => r.estimatedUsd), backgroundColor: 'rgba(99,102,241,.7)' },
+          { label: t('실제 청구 USD'), data: reconRows.map(r => r.actualUsd), backgroundColor: 'rgba(16,185,129,.7)' },
+        ],
+      },
+      options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } },
+    });
+  }
+}
+// === Feature #5: prompt-cache analytics ===
+// Self-contained. Main thread anchors `<div id="pcAnalytics"></div>` inside
+// VIEWS.promptCache and calls loadPromptCacheAnalytics() from AFTER.promptCache.
+async function loadPromptCacheAnalytics() {
+  const host = document.getElementById('pcAnalytics');
+  if (!host) return;
+  host.innerHTML = `<div class="text-[11px] text-[var(--text-dim)]">${t('분석 불러오는 중...')}</div>`;
+  let r;
+  try {
+    r = await api('/api/prompt-cache/analytics');
+  } catch (e) {
+    host.innerHTML = `<div class="text-[11px] text-[var(--bad,--err)]">${t('분석 로드 실패')}: ${escapeHtml(String(e && e.message || e))}</div>`;
+    return;
+  }
+  if (!r || !r.ok) {
+    host.innerHTML = `<div class="text-[11px] text-[var(--text-dim)]">${t('분석 데이터 없음')}${r && r.error ? ' · ' + escapeHtml(r.error) : ''}</div>`;
+    return;
+  }
+  const tot = r.totals || {};
+  const daily = Array.isArray(r.daily) ? r.daily : [];
+  const bySrc = Array.isArray(r.bySource) ? r.bySource : [];
+  const ttl = r.ttlSplit || {};
+  const hitPct = ((tot.hitRate || 0) * 100).toFixed(1);
+
+  const srcRows = bySrc.map(b => `
+    <tr class="border-b border-[var(--border)]">
+      <td class="py-1">${escapeHtml(b.source || '')}</td>
+      <td class="py-1 text-right font-mono">${((b.hitRate || 0) * 100).toFixed(1)}%</td>
+      <td class="py-1 text-right font-mono text-[var(--ok)]">${fmtTokens(b.cacheRead || 0)}</td>
+      <td class="py-1 text-right font-mono">${fmtTokens(b.input || 0)}</td>
+      <td class="py-1 text-right font-mono text-[var(--ok)]">-$${(b.usdSaved || 0).toFixed(4)}</td>
+    </tr>`).join('') || `<tr><td colspan="5" class="py-1 text-[var(--text-dim)]">${t('데이터 없음')}</td></tr>`;
+
+  const ttlBlock = ttl.available
+    ? `<div class="grid grid-cols-2 gap-2 text-[11px] mt-2">
+         <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('5분 캐시 쓰기')}</span><span class="font-mono">${fmtTokens(ttl.ephemeral5m || 0)}</span></div>
+         <div class="flex justify-between"><span class="text-[var(--text-dim)]">${t('1시간 캐시 쓰기')}</span><span class="font-mono">${fmtTokens(ttl.ephemeral1h || 0)}</span></div>
+       </div>`
+    : `<div class="text-[10px] text-[var(--text-dim)] mt-2">${escapeHtml(ttl.note || t('TTL 분할 데이터 없음'))}</div>`;
+
+  host.innerHTML = `
+    <div class="card p-3">
+      <div class="text-[11px] text-[var(--text-dim)] uppercase tracking-wider mb-2">${t('캐시 분석 (랩 + 세션)')}</div>
+      <div class="grid grid-cols-3 gap-2 text-center mb-3">
+        <div><div class="text-lg font-bold text-[var(--ok)]">${hitPct}%</div><div class="text-[10px] text-[var(--text-dim)]">${t('캐시 히트율')}</div></div>
+        <div><div class="text-lg font-bold text-[var(--ok)]">-$${(tot.usdSaved || 0).toFixed(2)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('추정 절감액')}</div></div>
+        <div><div class="text-lg font-bold">${fmtTokens(tot.cacheRead || 0)}</div><div class="text-[10px] text-[var(--text-dim)]">${t('캐시 읽기 토큰')}</div></div>
+      </div>
+      <div class="mb-3" style="position:relative;height:160px;">
+        <canvas id="pcAnalyticsChart"></canvas>
+      </div>
+      <table class="w-full text-[11px] border-collapse">
+        <thead><tr class="text-[var(--text-dim)] text-left">
+          <th class="py-1 font-normal">${t('소스')}</th>
+          <th class="py-1 font-normal text-right">${t('히트율')}</th>
+          <th class="py-1 font-normal text-right">${t('캐시 읽기')}</th>
+          <th class="py-1 font-normal text-right">${t('입력')}</th>
+          <th class="py-1 font-normal text-right">${t('절감')}</th>
+        </tr></thead>
+        <tbody>${srcRows}</tbody>
+      </table>
+      ${ttlBlock}
+    </div>`;
+
+  if (daily.length && typeof _renderChart === 'function') {
+    const canvas = document.getElementById('pcAnalyticsChart');
+    const recent = daily.slice(-30);
+    await _renderChart(canvas, {
+      type: 'bar',
+      data: {
+        labels: recent.map(d => d.day),
+        datasets: [
+          { label: t('캐시 읽기'), data: recent.map(d => d.cacheRead || 0), backgroundColor: 'rgba(34,197,94,0.6)' },
+          { label: t('입력'), data: recent.map(d => d.input || 0), backgroundColor: 'rgba(148,163,184,0.55)' },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } },
+        scales: {
+          x: { stacked: true, ticks: { font: { size: 9 }, maxRotation: 0, autoSkip: true } },
+          y: { stacked: true, ticks: { font: { size: 9 } } },
+        },
+      },
+    });
+  }
+}
+
 // ── Caveman 전용 탭 ─────────────────────────────────────────────────────
 // caveman 스위트(스킬 7종) 상태·설치/재설치·압축 레벨 가이드.
 VIEWS.caveman = async () => {

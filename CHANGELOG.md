@@ -10,6 +10,44 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.41] — 2026-06-01  📡 OTLP telemetry backend · 🏢 Admin Usage/Cost connector · 📈 prompt-cache analytics
+
+Three roadmap picks built in parallel (workflow), shared-file integration done by the main thread.
+(The 4th pick — Cmd+K palette — was already implemented in app.js; skipped to avoid a double-bind.)
+
+### Live Telemetry (OTLP ingest) — new `otel` tab
+
+- `server/otel_ingest.py`: `POST /otlp` accepts Claude Code's **OTLP/HTTP JSON**
+  metric stream (set `CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+  `OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+  `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://127.0.0.1:<port>/otlp`), parses
+  cost / token / tool-decision / LoC / commit / session metrics into a new
+  `otel_metrics` SQLite table; `GET /api/otel/summary` aggregates them.
+- `VIEWS.otel`: connection-setup card (copyable env vars), live totals, token
+  split, tool accept-rate, daily chart, recent feed; empty-state before data.
+  This is the only real-time, per-tool-decision/LoC-grade source (Admin/Analytics
+  APIs lag), and the server is already a long-lived process so the sink is free.
+
+### Admin Usage & Cost connector — new `adminUsage` tab
+
+- `server/admin_api.py` (stdlib urllib): stores an `sk-ant-admin…` key in
+  `~/.claude-dashboard-admin.json` (chmod 600), polls the org Usage/Cost report
+  endpoints (verified params/limits), shows **real billed tokens/USD vs the
+  local `_estimate()`** so users see drift. Clean no-key state; `ANTHROPIC_ADMIN_KEY`
+  env locks set/clear. (Live fetch needs a real admin key — structurally verified.)
+
+### Prompt-cache analytics
+
+- `server/prompt_cache.py`: `GET /api/prompt-cache/analytics` computes cache
+  hit-rate, estimated USD saved (cache-read at 0.1× input, per-model), daily
+  trend, and the 5m/1h TTL split where the API exposes it. Surfaced as a
+  full-width section in the existing promptCache lab (`AFTER.promptCache`).
+
+Verified in-app (Playwright): otel ingest+summary round-trip (cost/tokens/decisions
+aggregate), admin no-key state + key form, prompt-cache analytics section renders,
+all tabs visible in claude mode, Cmd+K spotlight intact, 0 console errors, i18n green.
+
+---
 ## [3.99.40] — 2026-06-01  🧠 adaptive thinking + effort (CORRECTNESS FIX) · 🧰 serverTools tool-version upgrade
 
 Two roadmap items (#3 + #11), backend built in parallel (workflow) then frontend wired.

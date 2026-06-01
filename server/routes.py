@@ -42,7 +42,7 @@ from .guide import api_guide_onboarding, api_guide_toolkit
 from .hooks import api_plugin_hook_update, api_recent_blocked_hooks, get_hooks
 from .prompt_cache import (
     api_prompt_cache_examples, api_prompt_cache_history,
-    api_prompt_cache_test,
+    api_prompt_cache_test, api_prompt_cache_analytics,
 )
 from .thinking_lab import (
     api_thinking_lab_examples, api_thinking_lab_history,
@@ -87,6 +87,8 @@ from .harness_tools import (
     api_harness_tools_list, api_harness_tool_run,
     api_caveman_status, api_caveman_action,
 )
+from .admin_api import api_admin_status, api_admin_set_key, api_admin_usage, api_admin_cost
+from .otel_ingest import api_otlp_ingest, api_otel_summary
 from .toolkits import (
     api_toolkit_status,
     api_toolkit_ecc_install, api_toolkit_ecc_uninstall,
@@ -457,6 +459,11 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/session": api_rtk_session,
     "/api/harness-tools/list": lambda q: api_harness_tools_list(),
     "/api/caveman/status": lambda q: api_caveman_status(),
+    "/api/prompt-cache/analytics": api_prompt_cache_analytics,
+    "/api/admin/status": lambda q: api_admin_status(),
+    "/api/admin/usage": api_admin_usage,
+    "/api/admin/cost": api_admin_cost,
+    "/api/otel/summary": api_otel_summary,
     "/api/toolkit/status": api_toolkit_status,
     "/api/session-replay/list": api_session_replay_list,
     "/api/session-replay/load": api_session_replay_load,
@@ -577,6 +584,8 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/rtk/uninstall-hook": api_rtk_uninstall_hook,
     "/api/harness-tools/run": api_harness_tool_run,
     "/api/caveman/action": api_caveman_action,
+    "/api/admin/set-key": api_admin_set_key,
+    "/otlp": api_otlp_ingest,
     "/api/toolkit/ecc/install": api_toolkit_ecc_install,
     "/api/toolkit/ecc/uninstall": api_toolkit_ecc_uninstall,
     "/api/toolkit/ecc/install-plugin": api_toolkit_ecc_install_plugin,

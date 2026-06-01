@@ -229,6 +229,253 @@ def api_prompt_cache_history(_query: dict | None = None) -> dict:
     return {"items": _load_history()}
 
 
+# ───────── 분석 (Analytics) ─────────
+#
+# 두 개의 소스를 합산한다:
+#   1. 이 랩의 자체 히스토리 파일 (~/.claude-dashboard-prompt-cache.json) —
+#      각 entry.usage 에 input_tokens / cache_read_input_tokens /
+#      cache_creation_input_tokens 가 들어 있고, 1시간 캐시 사용 시
+#      entry.usage.cache_creation.{ephemeral_5m_input_tokens,
+#      ephemeral_1h_input_tokens} 로 TTL 분할이 노출된다 (Anthropic 공식 docs
+#      verified 2026-06: prompt-caching usage fields).
+#   2. SQLite sessions 테이블 (Claude Code 세션 인덱스) — input_tokens /
+#      output_tokens / cache_read_tokens / cache_creation_tokens 의 flat 컬럼.
+#      이 소스는 TTL(5m vs 1h) 분할 정보를 보존하지 않으므로 hit-rate / 절감액
+#      집계에만 쓰고, TTL split 은 랩 히스토리에서만 surface 한다.
+#
+# 캐시 절감액 추정: cache_read 토큰은 input 단가의 ~0.1x 로 청구되므로,
+# "캐시 미사용 가정"(cache_read 를 1x input 단가로 청구) 대비 절감액은
+#   saved = cache_read_tokens * (in_price - cr_price) / 1e6
+# in_price/cr_price 는 모델별 _PRICING 에서 가져온다.
+
+# Daily-trend / hit-rate 추정에 쓸 cache_read 단가가 _PRICING 에 없는 모델
+# (sessions 테이블의 model 문자열 등)을 위한 fallback prefix 매칭표.
+# cost_timeline 의 검증된 base 단가(2026-06)와 일관되게 cache_read=0.1x,
+# cache_write=1.25x 를 적용한다.
+_PRICING_PREFIX = {
+    "claude-opus":   {"in": 5.0, "cw": 6.25, "cr": 0.50, "out": 25.0},
+    "claude-sonnet": {"in": 3.0, "cw": 3.75, "cr": 0.30, "out": 15.0},
+    "claude-haiku":  {"in": 1.0, "cw": 1.25, "cr": 0.10, "out": 5.0},
+}
+
+
+def _price_for(model: str) -> dict:
+    """모델 문자열 → 단가 dict (cost_timeline 검증 단가 우선).
+
+    분석용 절감액 계산은 cost_timeline 의 검증된 base 단가(2026-06:
+    Opus $5/$25, Sonnet $3/$15, Haiku $1/$5, cache_read=0.1x)를 따른다.
+    prefix(_PRICING_PREFIX) → 정확 일치(_PRICING legacy) → Sonnet fallback 순.
+    legacy _PRICING 은 구버전 base 단가를 일부 포함하므로 prefix 를 우선한다."""
+    m = (model or "").lower()
+    for prefix, p in _PRICING_PREFIX.items():
+        if prefix in m:
+            return p
+    for mid, p in _PRICING.items():
+        if mid in m:
+            return p
+    return _PRICING_PREFIX["claude-sonnet"]
+
+
+def _saved_usd(model: str, cache_read: int) -> float:
+    """cache_read 토큰을 1x input 단가로 청구했을 때 대비 절감액(USD)."""
+    p = _price_for(model)
+    cr_price = p.get("cr")
+    if cr_price is None:
+        cr_price = p["in"] * 0.1
+    delta = max(0.0, p["in"] - cr_price)
+    return (cache_read / 1_000_000) * delta
+
+
+def _coerce_usage(usage: dict) -> dict:
+    """랩 히스토리 / API usage 객체 → 표준화된 토큰 dict + TTL split."""
+    ti = int(usage.get("input_tokens") or 0)
+    to_ = int(usage.get("output_tokens") or 0)
+    cw = int(usage.get("cache_creation_input_tokens") or 0)
+    cr = int(usage.get("cache_read_input_tokens") or 0)
+    cc = usage.get("cache_creation")
+    ttl5m = 0
+    ttl1h = 0
+    if isinstance(cc, dict):
+        ttl5m = int(cc.get("ephemeral_5m_input_tokens") or 0)
+        ttl1h = int(cc.get("ephemeral_1h_input_tokens") or 0)
+    return {
+        "input": ti, "output": to_,
+        "cacheWrite": cw, "cacheRead": cr,
+        "ttl5m": ttl5m, "ttl1h": ttl1h,
+    }
+
+
+def _analytics() -> dict:
+    """랩 히스토리 + SQLite sessions 를 합산한 prompt-cache 분석.
+
+    반환:
+      hitRate          : cache_read / (cache_read + input)  (전체 + 소스별)
+      usdSaved         : 캐시로 절감한 추정 비용 (모델별 단가 적용)
+      daily            : [{day, cacheRead, input, cacheWrite, hitRate, usdSaved}]
+      bySource         : lab / sessions 별 요약
+      ttlSplit         : {available, ephemeral5m, ephemeral1h, note}
+    """
+    import datetime as dt
+
+    # 누적 합산기
+    total = {"input": 0, "output": 0, "cacheWrite": 0, "cacheRead": 0, "usdSaved": 0.0}
+    by_source: dict[str, dict] = {}
+    daily: dict[str, dict] = {}
+    ttl5m_total = 0
+    ttl1h_total = 0
+    ttl_available = False
+
+    def _add_source(name: str) -> dict:
+        return by_source.setdefault(name, {
+            "source": name, "input": 0, "output": 0,
+            "cacheWrite": 0, "cacheRead": 0, "usdSaved": 0.0, "count": 0,
+        })
+
+    def _add_day(day: str) -> dict:
+        return daily.setdefault(day, {
+            "day": day, "input": 0, "output": 0,
+            "cacheWrite": 0, "cacheRead": 0, "usdSaved": 0.0, "count": 0,
+        })
+
+    def _accumulate(src: str, ts_sec: int, model: str, u: dict) -> None:
+        nonlocal ttl5m_total, ttl1h_total, ttl_available
+        saved = _saved_usd(model, u["cacheRead"])
+        total["input"] += u["input"]
+        total["output"] += u["output"]
+        total["cacheWrite"] += u["cacheWrite"]
+        total["cacheRead"] += u["cacheRead"]
+        total["usdSaved"] += saved
+        bs = _add_source(src)
+        bs["input"] += u["input"]
+        bs["output"] += u["output"]
+        bs["cacheWrite"] += u["cacheWrite"]
+        bs["cacheRead"] += u["cacheRead"]
+        bs["usdSaved"] = round(bs["usdSaved"] + saved, 6)
+        bs["count"] += 1
+        if ts_sec:
+            day = dt.date.fromtimestamp(ts_sec).isoformat()
+            bd = _add_day(day)
+            bd["input"] += u["input"]
+            bd["output"] += u["output"]
+            bd["cacheWrite"] += u["cacheWrite"]
+            bd["cacheRead"] += u["cacheRead"]
+            bd["usdSaved"] = round(bd["usdSaved"] + saved, 6)
+            bd["count"] += 1
+        if u["ttl5m"] or u["ttl1h"]:
+            ttl_available = True
+            ttl5m_total += u["ttl5m"]
+            ttl1h_total += u["ttl1h"]
+
+    # ── 소스 1: 랩 자체 히스토리 ──
+    for entry in _load_history():
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("status") != "ok":
+            continue
+        usage = entry.get("usage") or {}
+        if not isinstance(usage, dict):
+            continue
+        u = _coerce_usage(usage)
+        # 캐시 활동이 전혀 없으면 건너뛴다 (hit-rate 분모 오염 방지는 아래 분모로 처리)
+        ts = int(entry.get("ts") or 0)
+        _accumulate("lab", ts, entry.get("model") or "", u)
+
+    # ── 소스 2: SQLite sessions ──
+    try:
+        from .db import _db, _db_init
+        _db_init()
+        with _db() as c:
+            rows = c.execute(
+                "SELECT started_at, input_tokens, output_tokens, "
+                "       cache_read_tokens, cache_creation_tokens, model "
+                "FROM sessions "
+                "WHERE COALESCE(cache_read_tokens,0) > 0 "
+                "   OR COALESCE(cache_creation_tokens,0) > 0"
+            ).fetchall()
+        for r in rows:
+            # sessions.started_at 은 밀리초 (system.py 참조: ts/1000).
+            ts_ms = r["started_at"] or 0
+            ts_sec = int(ts_ms / 1000) if ts_ms else 0
+            u = {
+                "input": int(r["input_tokens"] or 0),
+                "output": int(r["output_tokens"] or 0),
+                "cacheWrite": int(r["cache_creation_tokens"] or 0),
+                "cacheRead": int(r["cache_read_tokens"] or 0),
+                "ttl5m": 0, "ttl1h": 0,  # sessions 는 TTL 분할 미보존
+            }
+            _accumulate("sessions", ts_sec, r["model"] or "", u)
+    except Exception as e:
+        log.warning("prompt_cache analytics: sessions read failed: %s", e)
+
+    # ── 파생값 계산 ──
+    def _hit_rate(cache_read: int, inp: int) -> float:
+        denom = cache_read + inp
+        return round(cache_read / denom, 4) if denom > 0 else 0.0
+
+    overall_hit = _hit_rate(total["cacheRead"], total["input"])
+
+    daily_list = []
+    for day in sorted(daily.keys()):
+        d = daily[day]
+        d["hitRate"] = _hit_rate(d["cacheRead"], d["input"])
+        d["usdSaved"] = round(d["usdSaved"], 6)
+        daily_list.append(d)
+
+    by_source_list = []
+    for src in sorted(by_source.keys()):
+        b = by_source[src]
+        b["hitRate"] = _hit_rate(b["cacheRead"], b["input"])
+        b["usdSaved"] = round(b["usdSaved"], 6)
+        by_source_list.append(b)
+
+    if ttl_available:
+        ttl_note = (
+            "TTL 분할은 1시간 캐시를 사용한 랩 호출의 usage.cache_creation "
+            "객체에서만 제공됩니다 (Anthropic 공식). SQLite 세션 인덱스는 "
+            "flat cache_creation_tokens 만 보존하므로 여기엔 포함되지 않습니다."
+        )
+    else:
+        ttl_note = (
+            "5분 vs 1시간 TTL 분할 데이터가 없습니다. Anthropic usage 객체는 "
+            "1시간 캐시(cache_control ttl='1h') 사용 시에만 cache_creation."
+            "{ephemeral_5m_input_tokens, ephemeral_1h_input_tokens} 를 반환합니다. "
+            "SQLite 세션 인덱스의 flat cache_creation_tokens 로는 분리 불가합니다."
+        )
+
+    return {
+        "ok": True,
+        "totals": {
+            "input": total["input"],
+            "output": total["output"],
+            "cacheWrite": total["cacheWrite"],
+            "cacheRead": total["cacheRead"],
+            "hitRate": overall_hit,
+            "usdSaved": round(total["usdSaved"], 6),
+        },
+        "daily": daily_list,
+        "bySource": by_source_list,
+        "ttlSplit": {
+            "available": ttl_available,
+            "ephemeral5m": ttl5m_total,
+            "ephemeral1h": ttl1h_total,
+            "note": ttl_note,
+        },
+    }
+
+
+def api_prompt_cache_analytics(_query: dict | None = None) -> dict:
+    """Prompt-cache 분석 엔드포인트.
+
+    랩 자체 히스토리 + SQLite 세션 토큰 컬럼을 합산해
+    cache hit-rate / 추정 절감액 / 일별 추이 / TTL split 을 반환한다.
+    """
+    try:
+        return _analytics()
+    except Exception as e:
+        log.warning("prompt_cache analytics failed: %s", e)
+        return {"ok": False, "error": str(e)}
+
+
 def api_prompt_cache_test(body: dict) -> dict:
     """프롬프트 + cache_control 로 Messages API 호출 → usage 반환."""
     if not isinstance(body, dict):
