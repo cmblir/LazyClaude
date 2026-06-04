@@ -474,33 +474,31 @@ def _system_events_inject(app_name: str, keystrokes: list[str]) -> tuple[bool, s
     integrated terminals).
 
     Sequence per keystroke:
-      1. Save current clipboard.
-      2. Set clipboard to the keystroke text (handles arbitrary
-         Unicode — the active keyboard layout doesn't matter).
-      3. Paste with Cmd+V.
-      4. Press Return (key code 36).
-      5. Wait 150ms before the next keystroke.
-      6. Restore the original clipboard.
+      1. `keystroke "<text>"` — System Events types the string directly.
+      2. Press Return (key code 36).
+      3. Wait 150ms before the next keystroke.
 
-    For pure-ASCII single chars (e.g. "1"), we still use the
-    clipboard path for uniformity — slight overhead, but
-    consistent semantics across the whole sequence.
+    Direct `keystroke` (NOT clipboard + Cmd+V): a programmatic Cmd+V
+    is silently swallowed by Warp's terminal input — the paste never
+    lands and osascript still returns success, so the dashboard
+    reported "injected" while nothing reached the prompt. `keystroke`
+    posts the characters straight to the focused field and works in
+    Warp. System Events `keystroke` also handles Unicode strings, so
+    we no longer need the clipboard layer (which had the side effect
+    of clobbering the user's clipboard).
     """
     if not keystrokes:
         return False, "no keystrokes to send"
-    # Build the sequence of `set the clipboard / keystroke "v" cmd / key code 36`
-    # blocks. We delay 0.2s before the FIRST paste so the activated
-    # app has time to take focus, and 0.15s between subsequent
-    # keystrokes so claude-cli can react.
+    # Build the `keystroke "<text>" / key code 36` blocks. Delay 0.25s
+    # before the FIRST keystroke so the activated app takes focus, and
+    # 0.15s between subsequent ones so claude-cli can react.
     blocks = []
     for i, k in enumerate(keystrokes):
         esc = _escape_applescript_string(k)
         prefix_delay = "0.25" if i == 0 else "0.15"
         blocks.append(f'''
         delay {prefix_delay}
-        set the clipboard to "{esc}"
-        delay 0.05
-        keystroke "v" using command down
+        keystroke "{esc}"
         delay 0.10
         key code 36
         ''')
@@ -508,14 +506,6 @@ def _system_events_inject(app_name: str, keystrokes: list[str]) -> tuple[bool, s
     app_esc = _escape_applescript_string(app_name)
     script = f'''
 on injectKeystrokesViaSE(appName)
-    -- Preserve the user's clipboard. On macOS, the clipboard is a
-    -- single global — repeatedly setting it would clobber
-    -- whatever the user had copied. Save → restore around the
-    -- whole sequence.
-    set savedClip to ""
-    try
-        set savedClip to the clipboard as text
-    end try
     try
         tell application appName to activate
         delay 0.30
@@ -524,16 +514,8 @@ on injectKeystrokesViaSE(appName)
         end tell
         return "system-events:ok"
     on error errMsg number errNum
-        try
-            set the clipboard to savedClip
-        end try
         return "system-events:error " & errNum & " " & errMsg
     end try
-    -- Restore the user's clipboard.
-    try
-        set the clipboard to savedClip
-    end try
-    return "system-events:ok"
 end injectKeystrokesViaSE
 
 return injectKeystrokesViaSE("{app_esc}")
