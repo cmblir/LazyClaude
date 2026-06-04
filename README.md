@@ -90,16 +90,20 @@ For local development you can instead use `make install-mac`, which installs a t
 When a Claude session hits a rate-limit or selection prompt, Auto-Resume can now inject keystrokes into the **live terminal** — not just spawn a separate subprocess. macOS only:
 
 - **Strategy A**: TTY-targeted AppleScript (iTerm, Terminal.app) — no focus shift
-- **Strategy B**: System Events keystroke fallback (Warp, kitty, WezTerm, Alacritty, Ghostty, Hyper, Tabby, VS Code, Cursor) — clipboard-paste, handles arbitrary Unicode
+- **Strategy B**: System Events keystroke fallback (Warp, kitty, WezTerm, Alacritty, Ghostty, Hyper, Tabby, VS Code, Cursor) — direct `keystroke` typing (a programmatic Cmd+V paste is silently swallowed by Warp, so the clipboard path was dropped in v3.99.46)
 
 Pass `pressChoice: "1"` (default) to dismiss `1) Continue / 2) Quit` selection prompts before injecting your prompt. Permission gate: System Events fallback requires Accessibility permission for python3 (granted once via System Settings → Privacy & Security → Accessibility).
 
 ```
 POST /api/auto_resume/inject_live
-{ "sessionId": "...", "prompt": "계속 시작.", "pressChoice": "1" }
+{ "sessionId": "...", "prompt": "keep going", "pressChoice": "1" }
 ```
 
+The default resume prompt is the short ASCII `keep going` (v3.99.46+) — the most reliable payload for live keystroke injection. Override it per binding in the UI prompt field or via `body.prompt`.
+
 Time-based deadlines (`durationSec` / `deadlineMs`) replace the legacy `maxAttempts` cap — pick how long, not how many tries.
+
+**Resume delay** (`resumeDelaySec`, v3.99.46+): by default the worker parses the reset moment from the cap message and resumes exactly then. Set a manual delay instead — resume N seconds after the limit hit (UI presets: 2h / 3h / custom hours).
 
 ---
 

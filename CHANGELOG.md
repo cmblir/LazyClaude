@@ -10,6 +10,29 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.46] — 2026-06-05  🔄 auto-resume: reliable Warp injection · "keep going" default · resume delay
+
+Root-caused live injection silently failing in Warp, plus two user-requested
+ergonomics: a short default prompt and a configurable resume delay.
+
+- **fix — Warp keystroke injection** (`server/auto_resume_inject.py`): the System
+  Events fallback now types via direct `keystroke` instead of clipboard + Cmd+V.
+  Warp silently swallows a programmatic paste, so injections reported `ok:true`
+  while nothing reached the prompt (verified live: paste → no JSONL change,
+  direct keystroke → session resumed). `keystroke` handles Unicode too, so the
+  clipboard layer — which clobbered the user's clipboard — is gone entirely.
+- **feat — `keep going` default prompt** (`DEFAULT_PROMPT`, UI prefill): short
+  ASCII is the most reliable keystroke payload. Still editable per binding —
+  the UI prompt field is prefilled and any `body.prompt` overrides it.
+- **feat — resume delay** (`resumeDelaySec` on `/api/auto_resume/set`): 0 = auto
+  (parse the reset moment from the cap message — existing behavior), >0 = park
+  and resume exactly N seconds after the limit message landed. UI presets in
+  the binding form: 자동 / 2시간 뒤 / 3시간 뒤 / 직접 입력 (hours). Capped at 7 days.
+
+Verified: synthetic rate-limited session parks at `limit_mtime + delay` (Δ0ms);
+auto-resume E2E 3/3 viewports; tab smoke 84/84; i18n 0 missing (EN/ZH).
+
+---
 ## [3.99.45] — 2026-06-01  🏆 team leaderboard · 🛍️ plugin marketplace discover · 🧰 bash sandbox manager (roadmap complete)
 
 Final three roadmap picks, backends built in parallel (workflow), shared-file integration by the main thread.

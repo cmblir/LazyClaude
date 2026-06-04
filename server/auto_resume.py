@@ -103,11 +103,10 @@ MAX_ATTEMPTS_CEILING = 100000
 SNAPSHOT_STALL_LIMIT = 3  # N identical hashes in a row -> stalled
 SNAPSHOT_HASH_HISTORY = 5  # how many tail hashes to keep
 
-DEFAULT_PROMPT = (
-    "Continue the previous task. The session was interrupted by a usage / rate "
-    "limit. Resume from exactly where you left off, do not start over, and keep "
-    "going until the original objective is complete."
-)
+# Short on purpose: the live-injection path types this into the terminal via
+# System Events `keystroke`, where a short ASCII string is the most reliable
+# payload. Users can override per binding (UI prompt field / body.prompt).
+DEFAULT_PROMPT = "keep going"
 
 WORKER_TICK_SECONDS = 5
 
@@ -549,6 +548,7 @@ def _public_state(entry: dict) -> dict:
         "idleSeconds": entry.get("idleSeconds") or DEFAULT_IDLE_SECONDS,
         "maxAttempts": entry.get("maxAttempts") if entry.get("maxAttempts") is not None else DEFAULT_MAX_ATTEMPTS,
         "deadlineMs": int(entry.get("deadlineMs") or 0),
+        "resumeDelaySec": int(entry.get("resumeDelaySec") or 0),
         "useContinue": bool(entry.get("useContinue")),
         "spawnFallback": bool(entry.get("spawnFallback", True)),
         "extraArgs": list(entry.get("extraArgs") or []),
@@ -735,6 +735,14 @@ def api_auto_resume_set(body: dict) -> dict:
         capped_sec = min(int(duration_sec_raw), 30 * 24 * 3600)
         deadline_ms = _now_ms() + capped_sec * 1000
     use_continue = bool(body.get("useContinue"))
+    # resumeDelaySec — manual resume delay. 0 (default) = auto: parse the
+    # reset moment from the cap message and resume exactly then. >0 = resume
+    # N seconds after the cap message landed ("2시간 뒤 / 3시간 뒤"), overriding
+    # the parsed reset time. Capped at 7 days so a typo can't park forever.
+    resume_delay_raw = body.get("resumeDelaySec")
+    resume_delay_sec = 0
+    if isinstance(resume_delay_raw, (int, float)) and resume_delay_raw > 0:
+        resume_delay_sec = min(int(resume_delay_raw), 7 * 24 * 3600)
     # spawnFallback (default True): when live TTY-targeted injection is not
     # possible (non-iTerm2/Terminal.app terminals), allow the supervised
     # `claude --resume` subprocess. Set False for strict inject-only bindings.
@@ -797,6 +805,7 @@ def api_auto_resume_set(body: dict) -> dict:
             "idleSeconds": idle,
             "maxAttempts": max_attempts,
             "deadlineMs": deadline_ms or int(existing.get("deadlineMs") or 0),
+            "resumeDelaySec": resume_delay_sec,
             "useContinue": use_continue,
             "spawnFallback": spawn_fallback,
             "extraArgs": extra_args,
@@ -1559,9 +1568,15 @@ def _process_one(session_id: str) -> None:
     # re-parse of "5:50pm" would roll the clock to *tomorrow* and re-park for
     # ~24h. The flag short-circuits that — once parked, the next eligible tick
     # falls straight through to the resume path instead of re-parking.
-    reset_ms = _parse_reset_time(
-        _read_jsonl_tail(jsonl), now_ts=now_ms / 1000.0, anchor_ts=msg_ts
-    )
+    # User-set manual delay overrides the parsed reset moment: resume exactly
+    # N seconds after the cap message landed ("2시간 뒤 / 3시간 뒤"). 0 = auto.
+    manual_delay_sec = int(entry.get("resumeDelaySec") or 0)
+    if manual_delay_sec > 0:
+        reset_ms = int(msg_ts * 1000) + manual_delay_sec * 1000
+    else:
+        reset_ms = _parse_reset_time(
+            _read_jsonl_tail(jsonl), now_ts=now_ms / 1000.0, anchor_ts=msg_ts
+        )
     if reset_ms and reset_ms > now_ms:
         # Decide AND mutate under one lock. Reading _resetParked from the
         # stale pre-lock snapshot would race a concurrent tick (the pool can

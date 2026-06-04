@@ -11401,7 +11401,9 @@ function _arRender(panel, entry) {
   const cwd = panel.dataset.cwd || '';
   const card = panel.querySelector('.card');
   if (!entry || !entry.enabled) {
-    const prevPrompt = entry && entry.prompt ? entry.prompt : '';
+    // Default visible & editable — short ASCII is the most reliable payload
+    // for the live keystroke injection path (server DEFAULT_PROMPT matches).
+    const prevPrompt = entry && entry.prompt ? entry.prompt : 'keep going';
     const prevPoll = entry && entry.pollInterval ? entry.pollInterval : 300;
     const prevIdle = entry && entry.idleSeconds ? entry.idleSeconds : 90;
     const prevMax = entry && entry.maxAttempts ? entry.maxAttempts : 12;
@@ -11415,6 +11417,13 @@ function _arRender(panel, entry) {
       : 24;
     const prevContinue = entry && entry.useContinue ? 'checked' : '';
     const prevHooks = entry && entry.installHooks ? 'checked' : '';
+    // Resume delay: 0 = auto (parse the reset moment from the cap message),
+    // otherwise resume N seconds after the limit hit (2h/3h presets + custom).
+    const prevDelay = (entry && entry.resumeDelaySec) || 0;
+    const delayPreset = (prevDelay === 7200 || prevDelay === 10800)
+      ? String(prevDelay)
+      : (prevDelay > 0 ? 'custom' : '0');
+    const delayCustomH = prevDelay > 0 ? Math.round(prevDelay / 360) / 10 : 2;
     const stoppedNote = entry && entry.stopReason
       ? `<div class="text-[10px] mb-2" style="color:#fca5a5">${t('이전 중단 사유')}: ${escapeHtml(entry.stopReason)}</div>`
       : '';
@@ -11447,6 +11456,17 @@ function _arRender(panel, entry) {
             <span>${t('+ 시도 횟수 캡')}</span>
             <input id="arMax" class="input w-16" type="number" min="1" max="60" value="${prevMax}" disabled style="opacity:0.5;" />
           </label>
+        </div>
+        <div class="flex gap-2 items-center text-xs flex-wrap mb-2">
+          <label class="text-[var(--text-dim)]" title="${t('한도 적중 후 언제 재개할지 — 자동은 한도 메시지의 리셋 시각을 파싱해 그 시점에 재개')}">${t('재개 지연')}</label>
+          <select id="arResumeDelay" class="input text-xs" onchange="_arResumeDelayToggle()">
+            <option value="0" ${delayPreset === '0' ? 'selected' : ''}>${t('자동 — 한도 리셋 시각에 재개')}</option>
+            <option value="7200" ${delayPreset === '7200' ? 'selected' : ''}>${t('2시간 뒤')}</option>
+            <option value="10800" ${delayPreset === '10800' ? 'selected' : ''}>${t('3시간 뒤')}</option>
+            <option value="custom" ${delayPreset === 'custom' ? 'selected' : ''}>${t('직접 입력')}</option>
+          </select>
+          <input id="arResumeDelayH" class="input w-20" type="number" min="0.5" max="168" step="0.5" value="${delayCustomH}" style="display:${delayPreset === 'custom' ? 'inline-block' : 'none'};" />
+          <span id="arResumeDelayHUnit" class="text-[var(--text-dim)]" style="display:${delayPreset === 'custom' ? 'inline' : 'none'};">${t('시간 후 재개')}</span>
         </div>
         <div class="flex gap-3 items-center text-xs flex-wrap mb-2">
           <label class="cursor-pointer flex items-center gap-1">
@@ -11602,6 +11622,17 @@ window._arDeadlineSync = function (source) {
 // default hours value. Has to wait for the DOM render — caller invokes
 // _arDeadlineSync('hours') after the form is in the DOM.
 
+// Resume-delay preset selector — show the custom hours input only when
+// "직접 입력" is selected.
+window._arResumeDelayToggle = function () {
+  const sel = document.getElementById('arResumeDelay');
+  const isCustom = !!(sel && sel.value === 'custom');
+  const h = document.getElementById('arResumeDelayH');
+  const u = document.getElementById('arResumeDelayHUnit');
+  if (h) h.style.display = isCustom ? 'inline-block' : 'none';
+  if (u) u.style.display = isCustom ? 'inline' : 'none';
+};
+
 // QQ222 — toggle the legacy max-attempts cap. Disabled by default; user
 // must opt in if they want the old behavior on top of the deadline.
 document.addEventListener('change', (e) => {
@@ -11638,6 +11669,18 @@ async function _arSubmit(sessionId, cwd) {
     const hrs = Math.max(0, Number(hoursEl.value) || 0);
     if (hrs > 0) deadlineMs = Date.now() + hrs * 3600000;
   }
+  // Resume delay: 0 = auto (parse the reset moment from the cap message),
+  // otherwise resume N seconds after the limit hit.
+  let resumeDelaySec = 0;
+  const rdSel = document.getElementById('arResumeDelay');
+  if (rdSel) {
+    if (rdSel.value === 'custom') {
+      const h = Number((document.getElementById('arResumeDelayH') || {}).value) || 0;
+      resumeDelaySec = Math.max(0, Math.round(h * 3600));
+    } else {
+      resumeDelaySec = Number(rdSel.value) || 0;
+    }
+  }
   const body = {
     sessionId,
     cwd: cwd || '',
@@ -11650,6 +11693,7 @@ async function _arSubmit(sessionId, cwd) {
       ? { maxAttempts: Number(maxEl.value) || 12 }
       : {}),
     ...(deadlineMs ? { deadlineMs } : {}),
+    resumeDelaySec,
     useContinue: !!(contEl && contEl.checked),
     installHooks: !!(hooksEl && hooksEl.checked),
     allowUnboundSession: !!(allowEl && allowEl.checked),
