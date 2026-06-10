@@ -54,6 +54,21 @@ yesterday. Both fixed with a live tail parser + per-turn usage events.
 - **test — `scripts/e2e-usage-today.mjs`**: Playwright check that the widget
   renders, fills with live data, keeps 24 hourly bars, and doesn't overflow
   at 320 px.
+- **fix — i18n: live-DOM Korean residue swept (2491 → ~130)**: new
+  `scripts/e2e-i18n-residue.mjs` walks every tab in en/zh and reports
+  Hangul left after translation. Closed three leak classes: (a) ~1,600
+  missing dict entries — all `t()` keys and static server literals diffed
+  against `en.json` and translated (`tools/translations_manual_49/50.py`);
+  (b) user-authored content (CLAUDE.md viewer, memory notes, checkpoint/
+  session prompts, tasks, marketplace descriptions) was being substring-
+  mangled into ko/en gibberish — `_translateDOM` now honors a
+  `data-no-i18n` attribute and those containers are marked; (c) safe noun
+  tokens for composed strings. Remaining residue is user data embedded in
+  server-composed analytics strings (intentionally untranslated).
+- **fix — usage_events retention + tailer hardening**: 90-day retention,
+  hourly orphan cleanup, quiet-file skip for permanently unterminated
+  lines, and per-message `turn_tokens` distribution (was multiplied by
+  the content-block count).
 
 ## [3.99.46] — 2026-06-05  🔄 auto-resume: reliable Warp injection · "keep going" default · resume delay
 

@@ -8895,7 +8895,7 @@ async function _wfPickRecentSession(winId) {
               onclick="_wfApplyRecentSession('${winId}','${sid}')">
       <div class="flex items-center gap-2">
         <code style="color:#c4b5fd;font-size:10px;">${escapeHtml(sidShort)}</code>
-        <span class="text-[10px] text-[var(--text-dim)] flex-1 truncate">${escapeHtml(proj)}</span>
+        <span class="text-[10px] text-[var(--text-dim)] flex-1 truncate" data-no-i18n>${escapeHtml(proj)}</span>
         <span class="text-[10px] text-[var(--text-dim)]">${escapeHtml(ago)}</span>
       </div>
       ${preview ? `<div class="text-[11px] mt-1 truncate" style="color:var(--text-mute);">${escapeHtml(preview)}</div>` : ''}
@@ -10404,7 +10404,7 @@ VIEWS.overview = async () => {
         <span class="chip" style="background:${scoreColor(s.score)}22; border-color:${scoreColor(s.score)}55; color:${scoreColor(s.score)}">★ ${s.score}</span>
         <span class="text-xs flex-1 truncate text-[var(--text-mute)]">${escapeHtml(s.project || '—')}</span>
       </div>
-      <div class="text-sm mt-1 truncate">${escapeHtml((s.first_user_prompt || '').slice(0, 90) || '(요청 없음)')}</div>
+      <div class="text-sm mt-1 truncate">${s.first_user_prompt ? `<span data-no-i18n>${escapeHtml(s.first_user_prompt.slice(0, 90))}</span>` : t('(요청 없음)')}</div>
     </div>`).join('') || `<div class="text-sm text-[var(--text-dim)]">기록 없음</div>`;
 
   return `
@@ -10951,7 +10951,7 @@ function _sessRowHtml(s, arActiveIds) {
           ${s.score}
         </div>
       </td>
-      <td class="max-w-[340px] truncate">${escapeHtml((s.first_user_prompt || '(요청 없음)').slice(0, 120))}</td>
+      <td class="max-w-[340px] truncate">${s.first_user_prompt ? `<span data-no-i18n>${escapeHtml(s.first_user_prompt.slice(0, 120))}</span>` : t('(요청 없음)')}</td>
       <td class="text-xs" title="${escapeHtml(s.projectPath || '')}">
         <div class="font-semibold">${escapeHtml(s.project || '—')}${arActiveIds && arActiveIds.has(s.session_id) ? ` <span class="chip chip-accent text-[9px]" title="${t('Auto-Resume 주입 중')}">🔄 AR</span>` : ''}</div>
         <div class="mono text-[10px] text-[var(--text-dim)] truncate" style="max-width:240px;">${escapeHtml(s.projectPath || '')}</div>
@@ -11249,7 +11249,7 @@ function renderSessionDetail(d, tok, tl) {
       </div>
       <div class="flex-1 min-w-0">
         <div class="text-xs text-[var(--text-dim)] mono">${escapeHtml(s.session_id)}</div>
-        <h2 class="text-lg font-bold mt-1 line-clamp-2">${escapeHtml(s.first_user_prompt || '(요청 없음)')}</h2>
+        <h2 class="text-lg font-bold mt-1 line-clamp-2">${s.first_user_prompt ? `<span data-no-i18n>${escapeHtml(s.first_user_prompt)}</span>` : t('(요청 없음)')}</h2>
         <div class="flex flex-wrap gap-2 mt-3">
           <span class="chip">📁 ${escapeHtml(s.project || '—')}</span>
           <span class="chip">💬 ${s.message_count}</span>
@@ -17156,11 +17156,11 @@ VIEWS.claudemd = async () => {
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="card p-4">
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('소스')}</div>
-        <textarea id="claudeMdEditor" class="input" style="min-height: 560px;">${escapeHtml(raw)}</textarea>
+        <textarea id="claudeMdEditor" data-no-i18n class="input" style="min-height: 560px;">${escapeHtml(raw)}</textarea>
       </div>
       <div class="card p-5 overflow-y-auto" style="max-height: 620px;">
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('미리보기')}</div>
-        <div id="claudeMdPreview" class="prose-claude">${isEmpty ? '<div class="empty">' + t('소스가 비어있습니다') + '</div>' : marked.parse(raw)}</div>
+        <div id="claudeMdPreview" class="prose-claude" data-no-i18n>${isEmpty ? '<div class="empty">' + t('소스가 비어있습니다') + '</div>' : marked.parse(raw)}</div>
       </div>
     </div>
   `;
@@ -17435,7 +17435,7 @@ function renderProjectDetail(d) {
           <tr class="link-row" onclick="closeModal();openSessionDetail('${s.session_id}')">
             <td><div class="inline-flex items-center justify-center w-9 h-7 rounded mono font-bold text-xs"
               style="background:${scoreColor(s.score)}22;color:${scoreColor(s.score)}">${s.score}</div></td>
-            <td class="text-xs max-w-[320px] truncate">${escapeHtml((s.first_user_prompt || '').slice(0, 120) || '—')}</td>
+            <td class="text-xs max-w-[320px] truncate" data-no-i18n>${escapeHtml((s.first_user_prompt || '').slice(0, 120) || '—')}</td>
             <td class="text-right text-xs">${s.tool_use_count}</td>
             <td class="text-right text-xs">${s.agent_call_count || 0}</td>
             <td class="text-right text-xs">${s.error_count || 0}</td>
@@ -18319,7 +18319,7 @@ function renderScoreDetail(d) {
   const bestSess = (d.best || []).map(s => `
     <tr class="link-row" onclick="closeModal();openSessionDetail('${s.session_id}')">
       <td><span class="chip" style="background:${scoreColor(s.score)}22;color:${scoreColor(s.score)}">★ ${s.score}</span></td>
-      <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt || '').slice(0, 100))}</td>
+      <td class="text-xs max-w-[340px] truncate" data-no-i18n>${escapeHtml((s.first_user_prompt || '').slice(0, 100))}</td>
       <td class="text-right text-xs">${s.tool_use_count}</td>
       <td class="text-right text-xs">${s.agent_call_count || 0}</td>
     </tr>`).join('');
@@ -18327,7 +18327,7 @@ function renderScoreDetail(d) {
   const worstSess = (d.worst || []).map(s => `
     <tr class="link-row" onclick="closeModal();openSessionDetail('${s.session_id}')">
       <td><span class="chip" style="background:${scoreColor(s.score)}22;color:${scoreColor(s.score)}">★ ${s.score}</span></td>
-      <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt || '').slice(0, 100))}</td>
+      <td class="text-xs max-w-[340px] truncate" data-no-i18n>${escapeHtml((s.first_user_prompt || '').slice(0, 100))}</td>
       <td class="text-right text-xs">${s.tool_use_count}</td>
       <td class="text-right text-xs">${s.agent_call_count || 0}</td>
     </tr>`).join('');
@@ -23294,7 +23294,7 @@ VIEWS.today = async () => {
   const recentHtml = (r.recent || []).map(s => `
     <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded">
       <div class="flex-1 min-w-0">
-        <div class="text-xs truncate">${escapeHtml(s.prompt || '(요청 없음)')}</div>
+        <div class="text-xs truncate">${s.prompt ? `<span data-no-i18n>${escapeHtml(s.prompt)}</span>` : t('(요청 없음)')}</div>
         <div class="text-[10px] text-[var(--text-dim)] mt-0.5 truncate">
           📁 ${escapeHtml(s.project || '—')} · ${escapeHtml(s.model || '—')} · 💬 ${s.messages} · 🛠 ${s.tools}
         </div>
@@ -23590,7 +23590,7 @@ VIEWS.checkpoints = async () => {
         <p class="text-sm text-[var(--text-mute)] mt-1">${t('세션별 프롬프트 단위 파일 스냅샷 타임라인 (읽기 전용)')}.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <select id="ckptSession" class="input max-w-[340px]">${sessionOptions || `<option>${t('세션 없음')}</option>`}</select>
+        <select id="ckptSession" class="input max-w-[340px]" ${sessionOptions ? 'data-no-i18n' : ''}>${sessionOptions || `<option>${t('세션 없음')}</option>`}</select>
         <button id="ckptRefresh" class="btn text-xs">↻ ${t('새로고침')}</button>
       </div>
     </div>`;
@@ -25284,7 +25284,7 @@ VIEWS.marketplaceDiscover = async () => {
               ? `<span class="chip text-[9px] flex-shrink-0" style="color:#34d399;border-color:rgba(52,211,153,0.4);">✓ ${escapeHtml(t('설치됨'))}</span>`
               : `<span class="chip text-[9px] flex-shrink-0" style="color:#fbbf24;border-color:rgba(251,191,36,0.4);">${escapeHtml(t('미설치'))}</span>`}
           </div>
-          <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" style="min-height:3.2em;">${escapeHtml(p.description || '—')}</div>
+          <div class="text-xs text-[var(--text-mute)] line-clamp-3 mb-2" data-no-i18n style="min-height:3.2em;">${escapeHtml(p.description || '—')}</div>
           <div class="flex gap-1 flex-wrap mb-2">
             ${p.category ? `<span class="chip text-[9px]">${escapeHtml(p.category)}</span>` : ''}
             ${(p.keywords || []).slice(0, 3).map(k => `<span class="chip text-[9px]">${escapeHtml(k)}</span>`).join('')}
@@ -26316,7 +26316,7 @@ VIEWS.usage = async () => {
         <tbody>
           ${(tk.topSessions || []).map(s => `
             <tr class="link-row" onclick="openSessionDetail('${s.session_id}')">
-              <td class="text-xs max-w-[340px] truncate">${escapeHtml((s.first_user_prompt || '(요청 없음)').slice(0, 120))}</td>
+              <td class="text-xs max-w-[340px] truncate">${s.first_user_prompt ? `<span data-no-i18n>${escapeHtml(s.first_user_prompt.slice(0, 120))}</span>` : t('(요청 없음)')}</td>
               <td class="text-xs">${escapeHtml(s.project || '—')}</td>
               <td class="text-right mono" style="color:#d97757">${fmtTokens(s.total_tokens || 0)}</td>
               <td class="text-right text-xs text-[var(--text-mute)]">${fmtRel(s.started_at)}</td>
@@ -26647,7 +26647,7 @@ async function openProjectUsage(cwd) {
     return `
       <tr class="link-row" onclick="closeModal();openSessionDetail('${escapeHtml(sid)}')">
         <td class="text-xs">
-          <div class="font-medium" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;">${escapeHtml(prompt) || '—'}</div>
+          <div class="font-medium" data-no-i18n style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;">${escapeHtml(prompt) || '—'}</div>
           <div class="mono text-[10px] text-[var(--text-dim)]">${escapeHtml(s.session_id || '')}</div>
         </td>
         <td class="text-xs mono text-[var(--text-dim)]">${escapeHtml(s.model || '')}</td>
@@ -26778,12 +26778,12 @@ VIEWS.memory = async () => {
             <div class="rounded bg-white/5 border border-[var(--border)] p-3">
               <div class="flex items-center gap-2 mb-1">
                 <span class="chip text-[10px]">${escapeHtml(it.type || 'memo')}</span>
-                <div class="font-semibold text-sm flex-1">${escapeHtml(it.name)}</div>
+                <div class="font-semibold text-sm flex-1" data-no-i18n>${escapeHtml(it.name)}</div>
                 <button class="btn text-[10px]" onclick='openMemoryEditor(${JSON.stringify(it.path)})'>편집</button>
                 <button class="btn text-[10px]" style="color:#fca5a5" onclick='deleteMemoryFile(${JSON.stringify(it.path)}, ${JSON.stringify(it.name)})'>삭제</button>
               </div>
-              ${it.description ? `<div class="text-xs text-[var(--text-mute)] mb-1">${escapeHtml(it.description)}</div>` : ''}
-              <pre class="mono text-[10px] whitespace-pre-wrap text-[var(--text-mute)] line-clamp-6">${escapeHtml((it.content || '').slice(0, 800))}${(it.content || '').length > 800 ? '\n…' : ''}</pre>
+              ${it.description ? `<div class="text-xs text-[var(--text-mute)] mb-1" data-no-i18n>${escapeHtml(it.description)}</div>` : ''}
+              <pre class="mono text-[10px] whitespace-pre-wrap text-[var(--text-mute)] line-clamp-6" data-no-i18n>${escapeHtml((it.content || '').slice(0, 800))}${(it.content || '').length > 800 ? '\n…' : ''}</pre>
             </div>`).join('') || '<div class="text-xs text-[var(--text-dim)]">MEMORY.md 인덱스만 존재 (개별 파일 없음)</div>'}
         </div>
       </div>`).join('') : `<div class="card empty">${(q || type) ? t('일치하는 메모리 없음') : '아직 저장된 메모리가 없습니다.<br><span class="text-xs">Claude 가 \"Saved to memory\" 라고 말하면 여기에 자동으로 나타납니다.</span>'}</div>`}
@@ -26800,7 +26800,7 @@ async function openMemoryEditor(filePath) {
       <div class="p-4" style="min-width:min(560px,80vw);">
         <h3 class="text-base font-semibold mb-2">📝 ${escapeHtml(fname)}</h3>
         <div class="text-[10px] mono text-[var(--text-dim)] mb-3">${escapeHtml(filePath)}</div>
-        <textarea id="_memEditArea" class="input mono w-full" style="min-height:320px;font-size:11px;white-space:pre;resize:vertical;">${escapeHtml(r.raw)}</textarea>
+        <textarea id="_memEditArea" data-no-i18n class="input mono w-full" style="min-height:320px;font-size:11px;white-space:pre;resize:vertical;">${escapeHtml(r.raw)}</textarea>
         <div class="flex justify-end gap-2 mt-3">
           <button class="btn" onclick="closeModal()">취소</button>
           <button class="btn-primary btn" onclick="saveMemoryEdit('${escapeHtml(filePath).replace(/'/g, "\\'")}')">저장</button>
@@ -26873,8 +26873,8 @@ VIEWS.tasks = async () => {
         ? `<button class="p-0 bg-transparent border-0 cursor-pointer text-lg" title="상태 토글" onclick='toggleTaskStatus(${JSON.stringify(sid)}, ${JSON.stringify(t)})'>${iconMap[t.status] || '•'}</button>`
         : `<span style="color:${col}">${iconMap[t.status] || '•'}</span>`}
         <div class="flex-1 min-w-0">
-          <div class="text-sm ${t.status === 'completed' ? 'line-through text-[var(--text-dim)]' : ''}">${escapeHtml(t.subject)}</div>
-          ${t.description ? `<div class="text-[10px] text-[var(--text-mute)] line-clamp-2">${escapeHtml(t.description)}</div>` : ''}
+          <div class="text-sm ${t.status === 'completed' ? 'line-through text-[var(--text-dim)]' : ''}" data-no-i18n>${escapeHtml(t.subject)}</div>
+          ${t.description ? `<div class="text-[10px] text-[var(--text-mute)] line-clamp-2" data-no-i18n>${escapeHtml(t.description)}</div>` : ''}
         </div>
         ${canEdit ? `
           <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100">
@@ -29154,9 +29154,16 @@ function _translateDOM(root) {
     }
   });
 
+  // User-authored content (CLAUDE.md, memory notes, checkpoint prompts,
+  // marketplace catalogs …) must not be substring-translated — partial dict
+  // hits turn Korean prose into ko/en gibberish. Renderers mark those
+  // containers with data-no-i18n.
+  const _excluded = (el) => !!(el && el.closest && el.closest('[data-no-i18n]'));
+
   // ── 2단계: 한글 텍스트 속성 치환 ──
   if (keys.length) {
     root.querySelectorAll('[placeholder],[title],[alt],[aria-label]').forEach(el => {
+      if (_excluded(el)) return;
       ['placeholder', 'title', 'alt', 'aria-label'].forEach(attr => {
         const v = el.getAttribute(attr);
         if (v && _KO_RE.test(v)) {
@@ -29172,6 +29179,7 @@ function _translateDOM(root) {
     while (node = walker.nextNode()) {
       const t = node.textContent;
       if (!t || !_KO_RE.test(t) || !t.trim()) continue;
+      if (_excluded(node.parentElement)) continue;
       const trimmed = t.trim();
       // 1) 전체 일치 우선
       if (dict[trimmed]) {
