@@ -165,6 +165,33 @@ def _db_init() -> None:
                 CREATE INDEX IF NOT EXISTS idx_sess_cwd_score ON sessions(cwd, score DESC);
                 """)
 
+                # v2.67 — real-time token tracking. One row per assistant
+                # message carrying usage; ts is the message timestamp so
+                # daily/hourly aggregation is accurate for multi-day
+                # sessions (sessions.started_at bucketing is not).
+                # jsonl_offsets stores the tail cursor per session file so
+                # the live tailer only parses appended bytes.
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS usage_events (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  session_id TEXT,
+                  ts INTEGER,
+                  model TEXT,
+                  input_tokens INTEGER DEFAULT 0,
+                  output_tokens INTEGER DEFAULT 0,
+                  cache_read_tokens INTEGER DEFAULT 0,
+                  cache_creation_tokens INTEGER DEFAULT 0
+                );
+                CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_events(ts);
+                CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_events(session_id);
+                CREATE TABLE IF NOT EXISTS jsonl_offsets (
+                  jsonl_path TEXT PRIMARY KEY,
+                  session_id TEXT,
+                  offset INTEGER DEFAULT 0,
+                  mtime INTEGER DEFAULT 0
+                );
+                """)
+
                 # Workflow cost tracking table
                 c.executescript("""
                 CREATE TABLE IF NOT EXISTS workflow_costs (

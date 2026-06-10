@@ -149,6 +149,11 @@ def main() -> None:
     # late-finishing migration doesn't change behaviour.
     threading.Thread(target=_migrate_runs_to_db, daemon=True, name="runs-migrate").start()
     threading.Thread(target=background_index, daemon=True, name="bg-index").start()
+    # v2.67 — live token tracking: tail-parse appended JSONL lines every 5s
+    # so today's usage stays current without restarts (boot index alone left
+    # the Usage tab frozen at boot-time numbers).
+    from server.usage_live import start_usage_tailer
+    start_usage_tailer()
     # QQ137 — pre-warm the slow `<tool> --version` and `claude auth status`
     # subprocess fan-outs so the first AI Providers / Team tab visit hits
     # the 30s memo (QQ135 / QQ136) instead of paying the cold cost.

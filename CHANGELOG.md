@@ -10,6 +10,37 @@
 기능 업데이트 시 (a) `VERSION` 파일 번호 bump, (b) 아래 표에 한 줄 추가, (c) `git tag v<버전>` 권장.
 
 ---
+## [3.99.47] — 2026-06-10  ⚡ real-time token usage tracking
+
+Today's token usage never showed up in the Usage tab: session indexing ran
+only once at boot, and the daily timeline attributed a session's whole token
+total to its start day, so multi-day sessions credited everything to
+yesterday. Both fixed with a live tail parser + per-turn usage events.
+
+- **feat — per-turn usage events** (`server/db.py`, `server/sessions.py`):
+  new `usage_events` table (one row per assistant message with `usage`,
+  keyed by the message timestamp) and `jsonl_offsets` (per-file byte cursor).
+  `_index_jsonl` now records both during full indexing and switched to
+  binary line iteration so the stored offset is an exact byte position.
+- **feat — live JSONL tail parser** (`server/usage_live.py`, new): daemon
+  thread every 5 s `seek()`s to the stored offset of each changed session
+  file and parses only appended lines — no multi-MB re-parse. Handles
+  truncation/rewrite (full re-parse), half-written trailing lines (left for
+  the next cycle), and pre-feature history (files older than 48 h start
+  tracking from their current end). An `INDEX_LOCK` serializes the tailer
+  against boot/manual full reindexes. Session token columns are updated
+  incrementally so existing Usage views stay fresh without restarts.
+- **feat — `GET /api/usage/today`** (`server/usage_live.py`): local-midnight
+  window over `usage_events` — totals, 24 hourly buckets, per-model rows,
+  top sessions, 5-minute burn rate, last-event timestamp.
+- **feat — Usage tab "Today (live)" widget** (`dist/app.js`): total/input/
+  output/cache cards, hourly bar chart, per-model breakdown, tokens/min burn
+  rate and a freshness dot, polling every 5 s while the tab is visible
+  (self-cleans on tab switch). i18n: `tools/translations_manual_48.py`.
+- **test — `scripts/e2e-usage-today.mjs`**: Playwright check that the widget
+  renders, fills with live data, keeps 24 hourly bars, and doesn't overflow
+  at 320 px.
+
 ## [3.99.46] — 2026-06-05  🔄 auto-resume: reliable Warp injection · "keep going" default · resume delay
 
 Root-caused live injection silently failing in Warp, plus two user-requested

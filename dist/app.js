@@ -26161,6 +26161,40 @@ VIEWS.usage = async () => {
       <a class="btn text-xs" href="${DOCS_BASE}costs" target="_blank" rel="noopener noreferrer">📖</a>
     </div>
 
+    <!-- 오늘 실시간 토큰 (v2.67) — usage_events 기반, 5초 폴링 -->
+    <div class="card p-5 mb-5">
+      <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <h3 class="font-semibold text-sm">⚡ ${t('오늘 실시간')} <span id="tdDate" class="text-[10px] text-[var(--text-dim)] font-normal mono"></span></h3>
+        <div class="flex items-center gap-2 text-[10px] mono">
+          <span id="tdBurn" class="text-[var(--text-dim)]"></span>
+          <span id="tdLive" style="color:var(--text-dim)">●</span>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        ${[
+      [t('오늘 총 토큰'), 'tdTotal', '#d97757'],
+      [t('입력'), 'tdIn', '#86efac'],
+      [t('출력'), 'tdOut', '#7dd3fc'],
+      [t('캐시 read'), 'tdCr', '#a78bfa'],
+      [t('캐시 create'), 'tdCc', '#fcd34d'],
+    ].map(([l, id, c]) => `
+        <div class="card p-3">
+          <div class="text-[10px] uppercase text-[var(--text-dim)]">${l}</div>
+          <div class="text-2xl font-bold mono mt-1" style="color:${c}" id="${id}">—</div>
+        </div>`).join('')}
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <div class="text-xs font-semibold mb-2">${t('시간대별 (오늘)')}</div>
+          <div id="tdHourly" class="flex items-end gap-[2px]" style="height:72px"></div>
+        </div>
+        <div>
+          <div class="text-xs font-semibold mb-2">${t('모델별 (오늘)')} · <span id="tdSess" class="mono">0</span> ${t('활성 세션')}</div>
+          <div id="tdModels"><div class="empty text-xs">${t('오늘 기록 없음')}</div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- 토큰 요약 -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
       ${[
@@ -26311,6 +26345,12 @@ VIEWS.usage = async () => {
   `;
 };
 AFTER.usage = () => {
+  // 오늘 실시간 — poll every 5s while the view is mounted; the poller
+  // self-cleans when its DOM anchor disappears (tab switch).
+  if (_usageTodayTimer) { clearInterval(_usageTodayTimer); _usageTodayTimer = null; }
+  _pollUsageToday();
+  _usageTodayTimer = setInterval(_pollUsageToday, 5000);
+
   const d = state.data.usage;
   const tl = (d && d.tokens && d.tokens.dailyTimeline) || [];
   const ctx = document.getElementById('usageTokenDaily');
@@ -26354,6 +26394,68 @@ AFTER.usage = () => {
     loadUsageBreakdown('', 30);
   }
 };
+
+// Live "today" widget for the Usage tab. Polls /api/usage/today (filled by
+// the server-side JSONL tail parser) and updates the cards/bars in place —
+// no full view re-render, so chart state and scroll position survive.
+let _usageTodayTimer = null;
+async function _pollUsageToday() {
+  const elTotal = document.getElementById('tdTotal');
+  if (!elTotal) {
+    if (_usageTodayTimer) { clearInterval(_usageTodayTimer); _usageTodayTimer = null; }
+    return;
+  }
+  let d;
+  try {
+    d = await api('/api/usage/today');
+  } catch (e) {
+    const live = document.getElementById('tdLive');
+    if (live) { live.style.color = '#f87171'; live.title = e.message; }
+    return;
+  }
+  if (!d || !d.ok) return;
+  const tt = d.totals || {};
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('tdTotal', fmtTokens(tt.total || 0));
+  set('tdIn', fmtTokens(tt.input || 0));
+  set('tdOut', fmtTokens(tt.output || 0));
+  set('tdCr', fmtTokens(tt.cacheRead || 0));
+  set('tdCc', fmtTokens(tt.cacheCreate || 0));
+  set('tdDate', d.date || '');
+  set('tdSess', String(tt.sessions || 0));
+  set('tdBurn', (d.burnPerMin || 0) > 0 ? `${fmtTokens(d.burnPerMin)} ${t('토큰/분')}` : '');
+  const live = document.getElementById('tdLive');
+  if (live) {
+    const fresh = d.lastEventTs && (d.serverNow - d.lastEventTs) < 10 * 60 * 1000;
+    live.style.color = fresh ? '#4ade80' : 'var(--text-dim)';
+    live.title = '';
+  }
+  const hours = d.hourly || [];
+  const maxTok = Math.max(1, ...hours.map(h => h.tokens || 0));
+  const hourlyEl = document.getElementById('tdHourly');
+  if (hourlyEl) {
+    hourlyEl.innerHTML = hours.map(h => {
+      const pct = Math.round((h.tokens || 0) / maxTok * 100);
+      return `<div class="flex-1 rounded-t" title="${String(h.hour).padStart(2, '0')}:00 — ${fmtTokens(h.tokens || 0)}"
+        style="height:${h.tokens ? Math.max(4, pct) : 2}%; background:${h.tokens ? '#d97757' : 'rgba(255,255,255,0.08)'};"></div>`;
+    }).join('');
+  }
+  const modelsEl = document.getElementById('tdModels');
+  if (modelsEl) {
+    const rows = d.byModel || [];
+    const maxM = Math.max(1, ...rows.map(r => r.tokens || 0));
+    modelsEl.innerHTML = rows.map(r => {
+      const pct = Math.max(2, Math.round((r.tokens || 0) / maxM * 100));
+      return `<div class="mb-2">
+        <div class="flex justify-between text-xs mb-1">
+          <span class="mono">${escapeHtml(r.model || '?')} <span class="text-[var(--text-dim)]">×${r.events}</span></span>
+          <span class="mono font-bold" style="color:#d97757">${fmtTokens(r.tokens || 0)}</span>
+        </div>
+        <div class="h-1.5 bg-white/5 rounded overflow-hidden"><div style="width:${pct}%; height:100%; background:#d97757;"></div></div>
+      </div>`;
+    }).join('') || `<div class="empty text-xs">${t('오늘 기록 없음')}</div>`;
+  }
+}
 
 // Hour-of-day × per-agent token breakdown for the Usage tab. Fetches
 // /api/usage/breakdown (project-scoped or all) and renders into #ubBody:

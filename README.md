@@ -107,6 +107,21 @@ Time-based deadlines (`durationSec` / `deadlineMs`) replace the legacy `maxAttem
 
 ---
 
+## ⚡ Real-time token usage (v3.99.47+)
+
+The Usage tab opens with a **Today (live)** widget: today's total/input/output/cache tokens, an hourly bar chart, a per-model breakdown, and a tokens-per-minute burn rate — refreshed every 5 seconds while the tab is open.
+
+Under the hood a background tail parser watches `~/.claude/projects/**/*.jsonl` and parses only newly appended lines (per-file byte cursors), so today's numbers stay current without restarting the server, and tokens are attributed to the day they were actually used — sessions spanning midnight no longer credit everything to their start day.
+
+```
+GET /api/usage/today
+→ { totals, hourly[24], byModel, topSessions, burnPerMin, lastEventTs }
+```
+
+History note: on first launch after upgrading, only session files modified in the last 48 hours are back-parsed into per-turn events; older history starts tracking from its current state.
+
+---
+
 ## 📐 Architecture
 
 ```

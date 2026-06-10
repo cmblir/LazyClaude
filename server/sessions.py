@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -17,6 +18,12 @@ from .config import PROJECTS_DIR, SCORE_MIN_TOOLS, _cwd_to_slug
 from .db import _db, _db_init
 from .logger import log
 from .utils import _iso_ms
+
+
+# Serializes full per-file indexing (_index_jsonl) against the live tail
+# parser (server/usage_live.py) so boot-time reindex and the 5s tail cycle
+# never consume the same bytes twice.
+INDEX_LOCK = threading.Lock()
 
 
 def background_index() -> None:
@@ -80,6 +87,17 @@ def _compute_score(stats: dict) -> tuple[int, dict]:
 def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
     """Parse a single session jsonl → upsert into DB.
 
+    Serialized with the live tail parser (server/usage_live.py) via
+    INDEX_LOCK so a full re-parse and an incremental tail never consume the
+    same bytes twice.
+    """
+    with INDEX_LOCK:
+        return _index_jsonl_unlocked(jsonl, project_dir)
+
+
+def _index_jsonl_unlocked(jsonl: Path, project_dir: str) -> Optional[dict]:
+    """Parse a single session jsonl → upsert into DB. Caller holds INDEX_LOCK.
+
     Memory-conscious: streams lines from disk and processes them in a single
     pass without retaining the full ``list[dict]`` of parsed messages. The
     previous implementation read the whole file as one string + ``splitlines()``
@@ -95,24 +113,37 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
     tool_counter: Counter = Counter()
     subagent_counter: Counter = Counter()
     tool_rows: list[tuple] = []
+    usage_rows: list[tuple] = []
     edges: list[tuple] = []
     first_prompt = ""
     model = ""
     cwd = ""
     saw_any = False
+    consumed = 0  # exact byte offset for the tail parser to resume from
 
     try:
-        # Iterate line-by-line; each loop body holds only the current parsed
-        # dict, then drops it. Peak memory ~= max(line size).
-        with jsonl.open("r", encoding="utf-8", errors="replace") as f:
-            for raw in f:
-                raw = raw.strip()
+        # Iterate line-by-line (binary, so `consumed` stays an exact byte
+        # count); each loop body holds only the current parsed dict, then
+        # drops it. Peak memory ~= max(line size).
+        with jsonl.open("rb") as f:
+            for braw in f:
+                terminated = braw.endswith(b"\n")
+                raw = braw.decode("utf-8", errors="replace").strip()
                 if not raw:
+                    if terminated:
+                        consumed += len(braw)
                     continue
                 try:
                     m = json.loads(raw)
                 except Exception:
-                    continue
+                    if terminated:
+                        # Corrupt line — skip permanently.
+                        consumed += len(braw)
+                        continue
+                    # Unterminated trailing line: a write in progress. Leave
+                    # it for the tail parser's next cycle.
+                    break
+                consumed += len(braw)
                 saw_any = True
 
                 if not cwd:
@@ -172,6 +203,11 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
                     tok_out += u_out
                     tok_cache_read += u_cr
                     tok_cache_create += u_cc
+                    if u_in or u_out or u_cr or u_cc:
+                        usage_rows.append((
+                            session_id, ts or 0, str(msg_obj.get("model") or ""),
+                            u_in, u_out, u_cr, u_cc,
+                        ))
                     # Distribute (input+output) tokens evenly across this turn's tools.
                     turn_total = u_in + u_out + u_cr + u_cc
                     per_tool = (turn_total // len(turn_tools)) if turn_tools else 0
@@ -215,6 +251,18 @@ def _index_jsonl(jsonl: Path, project_dir: str) -> Optional[dict]:
     with _db() as c:
         c.execute("DELETE FROM tool_uses WHERE session_id=?", (session_id,))
         c.execute("DELETE FROM agent_edges WHERE session_id=?", (session_id,))
+        c.execute("DELETE FROM usage_events WHERE session_id=?", (session_id,))
+        if usage_rows:
+            c.executemany(
+                "INSERT INTO usage_events (session_id,ts,model,input_tokens,output_tokens,"
+                "cache_read_tokens,cache_creation_tokens) VALUES (?,?,?,?,?,?,?)",
+                usage_rows,
+            )
+        c.execute(
+            "INSERT OR REPLACE INTO jsonl_offsets (jsonl_path,session_id,offset,mtime) VALUES (?,?,?,?)",
+            (str(jsonl), session_id, consumed,
+             int(jsonl.stat().st_mtime * 1000) if jsonl.exists() else 0),
+        )
         if tool_rows:
             c.executemany(
                 "INSERT INTO tool_uses (session_id,ts,tool,subagent_type,input_summary,had_error,turn_tokens) VALUES (?,?,?,?,?,?,?)",

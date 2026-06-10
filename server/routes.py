@@ -271,6 +271,7 @@ from .sessions import (
     api_sessions_search, api_sessions_stats, index_all_sessions,
 )
 from .skills import delete_skill, get_skill, list_skills, put_skill
+from .usage_live import api_usage_today
 from .system import (
     api_backup_diff, api_backups_list, api_bash_history, api_env_config, api_homunculus_projects,
     api_ide_status, api_memory_delete, api_memory_get, api_memory_list, api_memory_put,
@@ -376,6 +377,7 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/project-agents/list": api_project_agents_list,
     "/api/subagent/model-choices": lambda q: api_subagent_model_choices(),
     "/api/usage/summary": lambda q: api_usage_summary(),
+    "/api/usage/today": lambda q: api_usage_today(),
     "/api/usage/project": api_usage_project,
     "/api/usage/breakdown": api_usage_breakdown,
     "/api/memory/list": api_memory_list,
