@@ -26186,7 +26186,7 @@ VIEWS.usage = async () => {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div>
           <div class="text-xs font-semibold mb-2">${t('시간대별 (오늘)')}</div>
-          <div id="tdHourly" class="flex items-end gap-[2px]" style="height:72px"></div>
+          <div id="tdHourly" class="flex items-end" style="height:72px; gap:2px"></div>
         </div>
         <div>
           <div class="text-xs font-semibold mb-2">${t('모델별 (오늘)')} · <span id="tdSess" class="mono">0</span> ${t('활성 세션')}</div>
@@ -26436,8 +26436,8 @@ async function _pollUsageToday() {
   if (hourlyEl) {
     hourlyEl.innerHTML = hours.map(h => {
       const pct = Math.round((h.tokens || 0) / maxTok * 100);
-      return `<div class="flex-1 rounded-t" title="${String(h.hour).padStart(2, '0')}:00 — ${fmtTokens(h.tokens || 0)}"
-        style="height:${h.tokens ? Math.max(4, pct) : 2}%; background:${h.tokens ? '#d97757' : 'rgba(255,255,255,0.08)'};"></div>`;
+      return `<div class="flex-1" title="${String(h.hour).padStart(2, '0')}:00 — ${fmtTokens(h.tokens || 0)}"
+        style="height:${h.tokens ? Math.max(4, pct) : 2}%; border-radius:2px 2px 0 0; background:${h.tokens ? '#d97757' : 'var(--border)'};"></div>`;
     }).join('');
   }
   const modelsEl = document.getElementById('tdModels');

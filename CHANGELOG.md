@@ -22,6 +22,20 @@ yesterday. Both fixed with a live tail parser + per-turn usage events.
   keyed by the message timestamp) and `jsonl_offsets` (per-file byte cursor).
   `_index_jsonl` now records both during full indexing and switched to
   binary line iteration so the stored offset is an exact byte position.
+- **fix — message.id dedup (2.5x overcount)**: Claude Code writes one
+  assistant JSONL line per content block of a single API response, each
+  repeating the same `message.id` and an identical usage object — naive
+  per-line summing overcounted ~2.5x (measured on real transcripts). A
+  unique index on `message_id` + `INSERT OR IGNORE` collapses duplicate
+  blocks, cross-cycle re-reads, and resumed-session history copies to one
+  row per response. Newly indexed sessions' token columns are deduped too
+  (pre-existing inflation in old rows heals on the next per-file reindex;
+  sidebar "세션 재인덱스" with force does it in one shot).
+- **feat — subagent/workflow transcripts counted**: nested
+  `<project>/<session>/subagents/**.jsonl` files (Task tool, workflow
+  agents) were invisible to the flat glob — the tailer now scans
+  recursively and ingests them as usage events only (they never become
+  sessions rows).
 - **feat — live JSONL tail parser** (`server/usage_live.py`, new): daemon
   thread every 5 s `seek()`s to the stored offset of each changed session
   file and parses only appended lines — no multi-MB re-parse. Handles

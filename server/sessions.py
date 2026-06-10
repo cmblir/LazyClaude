@@ -114,6 +114,7 @@ def _index_jsonl_unlocked(jsonl: Path, project_dir: str) -> Optional[dict]:
     subagent_counter: Counter = Counter()
     tool_rows: list[tuple] = []
     usage_rows: list[tuple] = []
+    seen_msg_ids: set = set()
     edges: list[tuple] = []
     first_prompt = ""
     model = ""
@@ -199,14 +200,21 @@ def _index_jsonl_unlocked(jsonl: Path, project_dir: str) -> Optional[dict]:
                     u_out = int(usage.get("output_tokens") or 0)
                     u_cr = int(usage.get("cache_read_input_tokens") or 0)
                     u_cc = int(usage.get("cache_creation_input_tokens") or 0)
-                    tok_in += u_in
-                    tok_out += u_out
-                    tok_cache_read += u_cr
-                    tok_cache_create += u_cc
-                    if u_in or u_out or u_cr or u_cc:
+                    # Claude Code writes one line per content block of a
+                    # single API response, each repeating the same message.id
+                    # and an identical usage object — count each message once
+                    # (measured 2.5x overcount without dedup).
+                    mid = str(msg_obj.get("id") or "")
+                    if (u_in or u_out or u_cr or u_cc) and not (mid and mid in seen_msg_ids):
+                        if mid:
+                            seen_msg_ids.add(mid)
+                        tok_in += u_in
+                        tok_out += u_out
+                        tok_cache_read += u_cr
+                        tok_cache_create += u_cc
                         usage_rows.append((
                             session_id, ts or 0, str(msg_obj.get("model") or ""),
-                            u_in, u_out, u_cr, u_cc,
+                            mid, u_in, u_out, u_cr, u_cc,
                         ))
                     # Distribute (input+output) tokens evenly across this turn's tools.
                     turn_total = u_in + u_out + u_cr + u_cc
@@ -253,9 +261,12 @@ def _index_jsonl_unlocked(jsonl: Path, project_dir: str) -> Optional[dict]:
         c.execute("DELETE FROM agent_edges WHERE session_id=?", (session_id,))
         c.execute("DELETE FROM usage_events WHERE session_id=?", (session_id,))
         if usage_rows:
+            # OR IGNORE: resumed/forked sessions copy history lines (with the
+            # original message ids) into a new file — the global unique index
+            # on message_id keeps each API response counted once.
             c.executemany(
-                "INSERT INTO usage_events (session_id,ts,model,input_tokens,output_tokens,"
-                "cache_read_tokens,cache_creation_tokens) VALUES (?,?,?,?,?,?,?)",
+                "INSERT OR IGNORE INTO usage_events (session_id,ts,model,message_id,input_tokens,"
+                "output_tokens,cache_read_tokens,cache_creation_tokens) VALUES (?,?,?,?,?,?,?,?)",
                 usage_rows,
             )
         c.execute(
@@ -336,6 +347,16 @@ def index_all_sessions(force: bool = False) -> dict:
                     if not prev_mtime and prev_indexed >= mtime_ms:
                         skipped += 1
                         continue
+                # `existing` is a boot-time snapshot — the live tailer may
+                # have fully indexed this file since. Re-check fresh so the
+                # two don't both parse it (duplicate scores_history rows).
+                with _db() as c:
+                    fresh = c.execute(
+                        "SELECT mtime FROM sessions WHERE jsonl_path=?", (str(jsonl),)
+                    ).fetchone()
+                if fresh and (fresh["mtime"] or 0) >= mtime_ms:
+                    skipped += 1
+                    continue
             if _index_jsonl(jsonl, project_dir):
                 indexed += 1
             else:

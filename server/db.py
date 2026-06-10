@@ -177,6 +177,7 @@ def _db_init() -> None:
                   session_id TEXT,
                   ts INTEGER,
                   model TEXT,
+                  message_id TEXT DEFAULT '',
                   input_tokens INTEGER DEFAULT 0,
                   output_tokens INTEGER DEFAULT 0,
                   cache_read_tokens INTEGER DEFAULT 0,
@@ -190,6 +191,23 @@ def _db_init() -> None:
                   offset INTEGER DEFAULT 0,
                   mtime INTEGER DEFAULT 0
                 );
+                """)
+                # Claude Code writes one assistant line per content block of a
+                # single API response, all repeating the same message.id and
+                # an identical usage object (measured 2.5x overcount on real
+                # transcripts). The unique index makes inserts idempotent on
+                # message.id — duplicate blocks, tail cycles that re-see a
+                # message, and resumed-session history copies all collapse.
+                ucols = {r["name"] for r in c.execute("PRAGMA table_info(usage_events)").fetchall()}
+                if "message_id" not in ucols:
+                    # Pre-dedup rows are inflated by duplicate blocks — wipe
+                    # and let the tailer re-backfill the 48h window cleanly.
+                    c.execute("ALTER TABLE usage_events ADD COLUMN message_id TEXT DEFAULT ''")
+                    c.execute("DELETE FROM usage_events")
+                    c.execute("DELETE FROM jsonl_offsets")
+                c.executescript("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_msgid
+                  ON usage_events(message_id) WHERE message_id != '';
                 """)
 
                 # Workflow cost tracking table

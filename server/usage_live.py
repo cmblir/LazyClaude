@@ -6,6 +6,16 @@ each cycle instead of re-reading multi-MB files. Each assistant turn's
 usage lands in usage_events keyed by the message timestamp, which makes
 "today" aggregation correct even for sessions spanning midnight
 (sessions.started_at bucketing attributes everything to the start day).
+
+Dedup: Claude Code writes one assistant line per content block of a
+single API response, all carrying the same message.id and an identical
+usage object (~2.5x overcount if summed naively). usage_events has a
+unique index on message_id, and all inserts go through INSERT OR IGNORE —
+duplicate blocks, tail cycles that re-see a message, and resumed-session
+history copies all collapse to one row per API response.
+
+Nested transcripts (subagents/, workflows/) are tailed for usage events
+only — they are not sessions and must not pollute the session list.
 """
 from __future__ import annotations
 
@@ -18,7 +28,8 @@ from pathlib import Path
 from .config import PROJECTS_DIR
 from .db import _db, _db_init
 from .logger import log
-from .sessions import INDEX_LOCK, _index_jsonl, _index_jsonl_unlocked
+from .sessions import INDEX_LOCK, _index_jsonl_unlocked
+
 from .utils import _iso_ms
 
 _TAIL_INTERVAL_SEC = 5.0
@@ -27,6 +38,11 @@ _TAIL_INTERVAL_SEC = 5.0
 # tracking from their current end — bounded one-time cost instead of
 # re-parsing the user's whole ~/.claude/projects history.
 _BACKFILL_WINDOW_MS = 48 * 3600 * 1000
+
+_INSERT_EVENT_SQL = (
+    "INSERT OR IGNORE INTO usage_events (session_id,ts,model,message_id,input_tokens,"
+    "output_tokens,cache_read_tokens,cache_creation_tokens) VALUES (?,?,?,?,?,?,?,?)"
+)
 
 _STARTED = False
 
@@ -39,6 +55,7 @@ def _parse_appended(jsonl: Path, session_id: str, offset: int) -> tuple[list[tup
     half-written JSON record is never consumed.
     """
     rows: list[tuple] = []
+    seen_mids: set = set()
     consumed = offset
     with jsonl.open("rb") as f:
         f.seek(offset)
@@ -63,17 +80,36 @@ def _parse_appended(jsonl: Path, session_id: str, offset: int) -> tuple[list[tup
             u_cc = int(usage.get("cache_creation_input_tokens") or 0)
             if not (u_in or u_out or u_cr or u_cc):
                 continue
-            ts = _iso_ms(m.get("timestamp", "") or "") or int(time.time() * 1000)
-            rows.append((session_id, ts, str(msg_obj.get("model") or ""),
+            mid = str(msg_obj.get("id") or "")
+            if mid and mid in seen_mids:
+                continue
+            if mid:
+                seen_mids.add(mid)
+            # Fallback ts=0 matches _index_jsonl_unlocked — the same physical
+            # line must produce the same row whichever path parses it first.
+            ts = _iso_ms(m.get("timestamp", "") or "") or 0
+            rows.append((session_id, ts, str(msg_obj.get("model") or ""), mid,
                          u_in, u_out, u_cr, u_cc))
     return rows, consumed
 
 
-def _tail_file(jsonl: Path, mtime_ms: int) -> int:
+def _insert_events(c, rows: list[tuple]) -> list[tuple]:
+    """Insert usage rows, returning only those actually inserted (the unique
+    message_id index silently drops duplicates)."""
+    inserted: list[tuple] = []
+    for r in rows:
+        if c.execute(_INSERT_EVENT_SQL, r).rowcount:
+            inserted.append(r)
+    return inserted
+
+
+def _tail_file(jsonl: Path, mtime_ms: int, update_session: bool) -> int:
     """Consume appended bytes of one known file. Returns events inserted.
 
     Re-reads the stored offset under INDEX_LOCK because a concurrent full
     reindex (boot / manual) may have advanced it after the cycle snapshot.
+    The offset write is a compare-and-swap so a second dashboard process
+    sharing the DB can't double-apply the same byte range.
     """
     with INDEX_LOCK:
         with _db() as c:
@@ -92,17 +128,28 @@ def _tail_file(jsonl: Path, mtime_ms: int) -> int:
         if new_offset == cur:
             return 0
         with _db() as c:
-            if rows:
-                c.executemany(
-                    "INSERT INTO usage_events (session_id,ts,model,input_tokens,output_tokens,"
-                    "cache_read_tokens,cache_creation_tokens) VALUES (?,?,?,?,?,?,?)",
-                    rows,
+            if row is not None:
+                moved = c.execute(
+                    "UPDATE jsonl_offsets SET offset=?, mtime=? WHERE jsonl_path=? AND offset=?",
+                    (new_offset, mtime_ms, str(jsonl), cur),
+                ).rowcount
+                if not moved:
+                    # Another writer advanced the cursor first — drop batch;
+                    # the unique index would drop the rows anyway.
+                    return 0
+            else:
+                c.execute(
+                    "INSERT OR REPLACE INTO jsonl_offsets (jsonl_path,session_id,offset,mtime) VALUES (?,?,?,?)",
+                    (str(jsonl), jsonl.stem, new_offset, mtime_ms),
                 )
-                d_in = sum(r[3] for r in rows)
-                d_out = sum(r[4] for r in rows)
-                d_cr = sum(r[5] for r in rows)
-                d_cc = sum(r[6] for r in rows)
-                last_ts = max(r[1] for r in rows)
+            inserted = _insert_events(c, rows)
+            updated = 1
+            if inserted and update_session:
+                d_in = sum(r[4] for r in inserted)
+                d_out = sum(r[5] for r in inserted)
+                d_cr = sum(r[6] for r in inserted)
+                d_cc = sum(r[7] for r in inserted)
+                last_ts = max(r[1] for r in inserted)
                 # Keep the sessions row live for the existing Usage views.
                 # sessions.mtime is intentionally NOT bumped so the boot-time
                 # full reindex still refreshes message counts / scores later.
@@ -113,21 +160,31 @@ def _tail_file(jsonl: Path, mtime_ms: int) -> int:
                     (d_in, d_out, d_cr, d_cc, d_in + d_out + d_cr + d_cc,
                      last_ts, jsonl.stem),
                 ).rowcount
-            else:
-                updated = 1
-            c.execute(
-                "INSERT OR REPLACE INTO jsonl_offsets (jsonl_path,session_id,offset,mtime) VALUES (?,?,?,?)",
-                (str(jsonl), jsonl.stem, new_offset, mtime_ms),
-            )
-        if rows and not updated:
+        if inserted and update_session and not updated:
             # Offset row without a sessions row (e.g. partially wiped DB) —
             # rebuild the session from scratch for consistency.
             _index_jsonl_unlocked(jsonl, jsonl.parent.name)
-    return len(rows)
+    return len(inserted)
+
+
+def _ingest_nested(jsonl: Path, mtime_ms: int, truncated: bool) -> int:
+    """Full events-only (re-)parse of a nested transcript. Caller-safe:
+    acquires INDEX_LOCK itself. Returns events inserted."""
+    with INDEX_LOCK:
+        rows, consumed = _parse_appended(jsonl, jsonl.stem, 0)
+        with _db() as c:
+            if truncated:
+                c.execute("DELETE FROM usage_events WHERE session_id=?", (jsonl.stem,))
+            inserted = _insert_events(c, rows)
+            c.execute(
+                "INSERT OR REPLACE INTO jsonl_offsets (jsonl_path,session_id,offset,mtime) VALUES (?,?,?,?)",
+                (str(jsonl), jsonl.stem, consumed, mtime_ms),
+            )
+    return len(inserted)
 
 
 def _tail_once() -> dict:
-    """One tail cycle over all session files. Returns counters."""
+    """One tail cycle over all session + nested transcript files."""
     stats = {"tailed": 0, "events": 0, "full": 0, "skippedOld": 0}
     if not PROJECTS_DIR.exists():
         return stats
@@ -137,10 +194,14 @@ def _tail_once() -> dict:
             for r in c.execute("SELECT jsonl_path, offset, mtime FROM jsonl_offsets")
         }
     now_ms = int(time.time() * 1000)
+    stale_seeds: list[tuple] = []
     for project_dir_path in PROJECTS_DIR.iterdir():
         if not project_dir_path.is_dir():
             continue
-        for jsonl in project_dir_path.glob("*.jsonl"):
+        for jsonl in project_dir_path.rglob("*.jsonl"):
+            # Direct children are sessions; deeper files are subagent /
+            # workflow transcripts (usage events only, never sessions rows).
+            nested = jsonl.parent != project_dir_path
             try:
                 st = jsonl.stat()
             except OSError:
@@ -151,29 +212,64 @@ def _tail_once() -> dict:
             if prev is None:
                 if now_ms - mtime_ms > _BACKFILL_WINDOW_MS:
                     # Pre-feature history — start tracking from current end.
-                    with INDEX_LOCK, _db() as c:
-                        c.execute(
-                            "INSERT OR REPLACE INTO jsonl_offsets (jsonl_path,session_id,offset,mtime) VALUES (?,?,?,?)",
-                            (str(jsonl), jsonl.stem, size, mtime_ms),
-                        )
+                    stale_seeds.append((str(jsonl), jsonl.stem, size, mtime_ms))
                     stats["skippedOld"] += 1
-                else:
-                    if _index_jsonl(jsonl, project_dir_path.name):
+                    continue
+                with INDEX_LOCK:
+                    # Re-check under the lock — the boot-time full indexer
+                    # may have claimed this file after our cycle snapshot.
+                    with _db() as c:
+                        claimed = c.execute(
+                            "SELECT 1 FROM jsonl_offsets WHERE jsonl_path=?",
+                            (str(jsonl),),
+                        ).fetchone()
+                    if claimed:
+                        continue
+                    if nested:
+                        pass  # handled below, outside this lock scope
+                    elif _index_jsonl_unlocked(jsonl, project_dir_path.name):
                         stats["full"] += 1
+                        continue
+                    else:
+                        # Empty/unparseable file — seed the cursor at 0 so it
+                        # isn't re-parsed every cycle; appended bytes will be
+                        # picked up by the tail path later.
+                        with _db() as c:
+                            c.execute(
+                                "INSERT OR REPLACE INTO jsonl_offsets (jsonl_path,session_id,offset,mtime) VALUES (?,?,?,?)",
+                                (str(jsonl), jsonl.stem, 0, 0),
+                            )
+                        continue
+                if nested:
+                    n = _ingest_nested(jsonl, mtime_ms, truncated=False)
+                    stats["full"] += 1
+                    stats["events"] += n
                 continue
             offset, _prev_mtime = prev
             if size == offset:
                 continue
             if size < offset:
-                # Rewritten/truncated (e.g. compaction) — full re-parse;
-                # _index_jsonl deletes + reinserts this session's events.
-                if _index_jsonl(jsonl, project_dir_path.name):
+                # Rewritten/truncated (e.g. compaction) — full re-parse.
+                if nested:
+                    stats["events"] += _ingest_nested(jsonl, mtime_ms, truncated=True)
                     stats["full"] += 1
+                else:
+                    with INDEX_LOCK:
+                        if _index_jsonl_unlocked(jsonl, project_dir_path.name):
+                            stats["full"] += 1
                 continue
-            n = _tail_file(jsonl, mtime_ms)
+            n = _tail_file(jsonl, mtime_ms, update_session=not nested)
             if n:
                 stats["tailed"] += 1
                 stats["events"] += n
+    if stale_seeds:
+        # One transaction for the whole historical backlog (first run after
+        # upgrade can be hundreds of files).
+        with INDEX_LOCK, _db() as c:
+            c.executemany(
+                "INSERT OR IGNORE INTO jsonl_offsets (jsonl_path,session_id,offset,mtime) VALUES (?,?,?,?)",
+                stale_seeds,
+            )
     return stats
 
 
