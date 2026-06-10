@@ -115,6 +115,8 @@ def _index_jsonl_unlocked(jsonl: Path, project_dir: str) -> Optional[dict]:
     tool_rows: list[tuple] = []
     usage_rows: list[tuple] = []
     seen_msg_ids: set = set()
+    # message.id → [usage_total, first_ts, tools]; flushed after the loop.
+    msg_tool_acc: dict = {}
     edges: list[tuple] = []
     first_prompt = ""
     model = ""
@@ -216,11 +218,19 @@ def _index_jsonl_unlocked(jsonl: Path, project_dir: str) -> Optional[dict]:
                             session_id, ts or 0, str(msg_obj.get("model") or ""),
                             mid, u_in, u_out, u_cr, u_cc,
                         ))
-                    # Distribute (input+output) tokens evenly across this turn's tools.
+                    # Distribute the message's tokens evenly across its tools.
+                    # Multi-block messages repeat the same usage on every
+                    # line, so accumulate tools per message.id and distribute
+                    # once at flush — per-line distribution multiplied
+                    # turn_tokens by the block count.
                     turn_total = u_in + u_out + u_cr + u_cc
-                    per_tool = (turn_total // len(turn_tools)) if turn_tools else 0
-                    for (tn, sa, inp_sum) in turn_tools:
-                        tool_rows.append((session_id, ts or 0, tn, sa, inp_sum, 0, per_tool))
+                    if mid:
+                        acc = msg_tool_acc.setdefault(mid, [turn_total, ts or 0, []])
+                        acc[2].extend(turn_tools)
+                    elif turn_tools:
+                        per_tool = turn_total // len(turn_tools)
+                        for (tn, sa, inp_sum) in turn_tools:
+                            tool_rows.append((session_id, ts or 0, tn, sa, inp_sum, 0, per_tool))
                 elif t == "tool_result":
                     content = (m.get("message") or {}).get("content")
                     if isinstance(content, list):
@@ -232,6 +242,13 @@ def _index_jsonl_unlocked(jsonl: Path, project_dir: str) -> Optional[dict]:
 
     if not saw_any:
         return None
+
+    for turn_total, msg_ts, tools in msg_tool_acc.values():
+        if not tools:
+            continue
+        per_tool = turn_total // len(tools)
+        for (tn, sa, inp_sum) in tools:
+            tool_rows.append((session_id, msg_ts, tn, sa, inp_sum, 0, per_tool))
 
     started = min(timestamps) if timestamps else 0
     ended = max(timestamps) if timestamps else 0

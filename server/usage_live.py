@@ -44,6 +44,16 @@ _INSERT_EVENT_SQL = (
     "output_tokens,cache_read_tokens,cache_creation_tokens) VALUES (?,?,?,?,?,?,?,?)"
 )
 
+# usage_events rows older than this are pruned (the table only feeds
+# recent-window aggregations; unbounded growth was flagged in review).
+_RETENTION_DAYS = 90
+_CLEANUP_EVERY_CYCLES = 720  # ≈ 1h at the 5s cadence
+
+# Files whose last visit consumed nothing (e.g. a permanently unterminated
+# trailing line keeps size > offset) — skip while (size, mtime) unchanged
+# instead of re-reading the partial tail every cycle.
+_QUIET: dict = {}
+
 _STARTED = False
 
 
@@ -126,7 +136,9 @@ def _tail_file(jsonl: Path, mtime_ms: int, update_session: bool) -> int:
             return 0
         rows, new_offset = _parse_appended(jsonl, jsonl.stem, cur)
         if new_offset == cur:
+            _QUIET[str(jsonl)] = (size, mtime_ms)
             return 0
+        _QUIET.pop(str(jsonl), None)
         with _db() as c:
             if row is not None:
                 moved = c.execute(
@@ -248,6 +260,8 @@ def _tail_once() -> dict:
             offset, _prev_mtime = prev
             if size == offset:
                 continue
+            if _QUIET.get(str(jsonl)) == (size, mtime_ms):
+                continue
             if size < offset:
                 # Rewritten/truncated (e.g. compaction) — full re-parse.
                 if nested:
@@ -273,6 +287,21 @@ def _tail_once() -> dict:
     return stats
 
 
+def _cleanup_once() -> None:
+    """Prune old events and rows for files deleted from disk."""
+    cutoff = int(time.time() * 1000) - _RETENTION_DAYS * 86400 * 1000
+    with _db() as c:
+        c.execute("DELETE FROM usage_events WHERE ts < ?", (cutoff,))
+        paths = [r["jsonl_path"] for r in c.execute("SELECT jsonl_path FROM jsonl_offsets")]
+    gone = [(p, Path(p).stem) for p in paths if not Path(p).exists()]
+    if gone:
+        with _db() as c:
+            c.executemany("DELETE FROM jsonl_offsets WHERE jsonl_path=?", [(p,) for p, _ in gone])
+            c.executemany("DELETE FROM usage_events WHERE session_id=?", [(s,) for _, s in gone])
+        for p, _ in gone:
+            _QUIET.pop(p, None)
+
+
 def start_usage_tailer() -> None:
     """Spawn the tail-loop daemon thread (idempotent)."""
     global _STARTED
@@ -285,6 +314,7 @@ def start_usage_tailer() -> None:
         # Let the boot-time full index claim most changed files first; the
         # INDEX_LOCK + offset re-read keeps overlap correct either way.
         time.sleep(_TAIL_INTERVAL_SEC)
+        cycles = 0
         while True:
             try:
                 r = _tail_once()
@@ -292,6 +322,12 @@ def start_usage_tailer() -> None:
                     log.debug("usage tail: %s", r)
             except Exception as e:
                 log.warning("usage tail cycle failed: %s", e)
+            cycles += 1
+            if cycles % _CLEANUP_EVERY_CYCLES == 1:
+                try:
+                    _cleanup_once()
+                except Exception as e:
+                    log.warning("usage cleanup failed: %s", e)
             time.sleep(_TAIL_INTERVAL_SEC)
 
     threading.Thread(target=_loop, daemon=True, name="usage-tail").start()

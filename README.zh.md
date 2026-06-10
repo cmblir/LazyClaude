@@ -62,6 +62,21 @@ POST /api/auto_resume/inject_live
 
 ---
 
+## ⚡ 实时令牌用量 (v3.99.47+)
+
+用量页顶部的**今日实时**组件：今日总量/输入/输出/缓存令牌、按小时图表、按模型分布、每分钟 burn rate — 页面打开期间每 5 秒刷新。
+
+后台 tail 解析器监视 `~/.claude/projects/**/*.jsonl`，只解析新追加的行（按文件字节游标），因此无需重启服务器即可保持今日数据最新，且令牌归属到实际使用的日期 — 跨午夜会话不再全部计入开始日。子代理/工作流 transcript 也被统计；同一响应按 content block 重复写入的 usage 以 `message.id` 去重，只计一次。
+
+```
+GET /api/usage/today
+→ { totals, hourly[24], byModel, topSessions, burnPerMin, lastEventTs }
+```
+
+历史说明：升级后首次启动只回填最近 48 小时内修改过的会话文件；更早的历史从当前状态开始跟踪。事件保留 90 天后自动清理。
+
+---
+
 ## 📐 架构
 
 ```
