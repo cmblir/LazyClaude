@@ -75,6 +75,11 @@ const NAV = [
     docUrl: null
   },
   {
+    id: 'pluginHub', icon: '🔌', label: '플러그인 허브', group: 'build',
+    desc: 'GitHub에서 Claude Code 플러그인·마켓플레이스를 별점순으로 실시간 검색 → 검사 → 1클릭 설치',
+    docUrl: null
+  },
+  {
     id: 'caveman', icon: '🪨', label: 'Caveman', group: 'build',
     desc: '출력 토큰 ~75% 절감 스킬 스위트 — 설치/상태/압축 레벨(lite·full·ultra·wenyan)',
     docUrl: null
@@ -601,6 +606,43 @@ const _ESC_HTML_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, ch => _ESC_HTML_MAP[ch]);
+}
+
+// Render markdown from UNTRUSTED disk content (CLAUDE.md, saved plans,
+// project snapshots) safely. `marked` passes raw HTML through verbatim, so a
+// file containing `<img src=x onerror=…>` / `<script>` would execute when
+// injected via innerHTML. We sanitize marked's output with DOMParser: drop
+// active-content tags, strip on* handlers, and neutralize javascript:/data:html
+// URLs. Version-agnostic (no dependency on marked's renderer API). Markdown the
+// parser itself generates (bold/headings/links) stays intact.
+function renderMarkdown(src) {
+  const text = String(src == null ? '' : src);
+  let html;
+  try {
+    html = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(text) : escapeHtml(text);
+  } catch (e) {
+    return escapeHtml(text);
+  }
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script,iframe,object,embed,link,meta,base,form,svg,math,style').forEach(n => n.remove());
+    doc.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        const name = attr.name.toLowerCase();
+        const val = (attr.value || '').replace(/\s+/g, '').toLowerCase();
+        if (name.startsWith('on')) el.removeAttribute(attr.name);
+        else if ((name === 'href' || name === 'src' || name === 'xlink:href')
+                 && (val.startsWith('javascript:') || val.startsWith('vbscript:') || val.startsWith('data:text/html'))) {
+          el.removeAttribute(attr.name);
+        } else if (name === 'srcdoc') {
+          el.removeAttribute(attr.name);
+        }
+      }
+    });
+    return doc.body.innerHTML;
+  } catch (e) {
+    return escapeHtml(text);
+  }
 }
 
 // QQ223 — embed a JS expression value into an inline HTML attribute
@@ -4571,9 +4613,7 @@ function _wfRenderNode(n) {
     };
     const c = palette[d.color] || palette.yellow;
     const md = d.text || '';
-    let html = '';
-    try { html = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(md) : escapeHtml(md); }
-    catch (_) { html = escapeHtml(md); }
+    const html = renderMarkdown(md);
     return `
       <g class="wf-node${sel} wf-sticky" data-node="${n.id}" data-type="sticky" transform="translate(${n.x},${n.y})">
         <rect class="wf-node-ring" x="-4" y="-4" width="${w + 8}" height="${h + 8}" rx="10" ry="10"></rect>
@@ -17160,7 +17200,7 @@ VIEWS.claudemd = async () => {
       </div>
       <div class="card p-5 overflow-y-auto" style="max-height: 620px;">
         <div class="text-[11px] uppercase text-[var(--text-dim)] mb-2">${t('미리보기')}</div>
-        <div id="claudeMdPreview" class="prose-claude" data-no-i18n>${isEmpty ? '<div class="empty">' + t('소스가 비어있습니다') + '</div>' : marked.parse(raw)}</div>
+        <div id="claudeMdPreview" class="prose-claude" data-no-i18n>${isEmpty ? '<div class="empty">' + t('소스가 비어있습니다') + '</div>' : renderMarkdown(raw)}</div>
       </div>
     </div>
   `;
@@ -17192,7 +17232,7 @@ AFTER.claudemd = () => {
   const e = document.getElementById('claudeMdEditor');
   const p = document.getElementById('claudeMdPreview');
   if (e && p) {
-    e.addEventListener('input', () => { p.innerHTML = marked.parse(e.value); });
+    e.addEventListener('input', () => { p.innerHTML = renderMarkdown(e.value); });
   }
 };
 async function saveClaudeMd() {
@@ -17424,7 +17464,7 @@ function renderProjectDetail(d) {
       </div>` : '<div class="text-xs text-[var(--text-dim)]">—</div>';
 
   const claudeMdHtml = r.claudeMd
-    ? `<div class="card p-3 max-h-[260px] overflow-y-auto prose-claude text-xs">${marked.parse(r.claudeMd)}</div>`
+    ? `<div class="card p-3 max-h-[260px] overflow-y-auto prose-claude text-xs">${renderMarkdown(r.claudeMd)}</div>`
     : '<div class="text-xs text-[var(--text-dim)]">프로젝트 루트에 CLAUDE.md 없음</div>';
 
   const sessionsHtml = sessions.length ? `
@@ -20617,7 +20657,7 @@ async function viewPlan(id) {
       </div>
       <button class="btn-ghost btn" onclick="closeModal()">✕</button>
     </div>
-    <div class="p-5 overflow-y-auto prose-claude">${marked.parse(p.raw || '')}</div>
+    <div class="p-5 overflow-y-auto prose-claude">${renderMarkdown(p.raw || '')}</div>
   `);
 }
 
@@ -25535,6 +25575,163 @@ async function cavemanAction(action, btn) {
 // ── Claude 하네스 도구 카탈로그 ──────────────────────────────────────────
 // 인기 토큰절감/관측/라우팅 도구를 모아 바로 설치·실행. 설치/실행 명령은
 // 백엔드 카탈로그(harness_tools.py)에 하드코딩된 것만 Terminal 에서 돌린다.
+// ───────── Plugin Hub: live GitHub discovery + install of Claude Code plugins ─────────
+// Distinct from the curated `harness` tab: this searches GitHub in real time,
+// ranks marketplaces by stars, and installs via `claude plugin install`.
+// Handlers dispatch by index into window.__ph (never interpolate repo/plugin
+// names into onclick — injection-safe).
+window.__ph = window.__ph || { repos: [], plugins: [], repo: '', mkt: '' };
+
+VIEWS.pluginHub = async () => {
+  return `
+    <div class="mb-4 flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">🔌 ${t('플러그인 허브')}</h1>
+        <p class="text-sm text-[var(--text-mute)] mt-1">${t('GitHub에서 Claude Code 플러그인·마켓플레이스를 별점순으로 검색하고 바로 설치합니다.')}</p>
+      </div>
+    </div>
+    <div class="flex gap-2 mb-4 flex-wrap">
+      <input id="ph-q" class="input flex-1" style="min-width:200px;" placeholder="${t('검색 (비우면 인기 플러그인)')}" value="${escapeHtml(window.__ph.q || '')}" />
+      <button class="btn btn-primary text-sm" onclick="_phSearch()">${t('검색')}</button>
+      <button class="btn text-sm" onclick="_phShowInstalled()">${t('설치됨')}</button>
+    </div>
+    <div id="ph-results"><div class="card p-6 text-[12px] text-[var(--text-mute)]">${t('검색 중')}…</div></div>
+    <p class="text-[10px] text-[var(--text-dim)] mt-3">⚠️ ${t('플러그인 설치는 서드파티 코드(훅·MCP·실행파일)를 사용자 권한으로 실행합니다. 저장소를 확인한 뒤 설치하세요.')}</p>`;
+};
+
+AFTER.pluginHub = () => {
+  const inp = document.getElementById('ph-q');
+  if (inp) inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') _phSearch(); });
+  _phSearch();
+};
+
+function _phRepoCard(c, i) {
+  const official = c.official
+    ? `<span class="text-[10px] px-1.5 py-0.5 rounded ml-1" style="background:rgba(134,239,172,.15);color:#86efac">${t('공식')}</span>`
+    : '';
+  const meta = [c.license, (c.pushedAt || '').slice(0, 10)].filter(Boolean).join(' · ');
+  return `<div class="card p-4 flex flex-col">
+    <div class="flex items-center justify-between gap-2">
+      <div class="font-semibold text-sm break-all">${escapeHtml(c.fullName)}${official}</div>
+      <div class="text-xs text-[var(--text-mute)] whitespace-nowrap">★ ${Number(c.stars || 0).toLocaleString()}</div>
+    </div>
+    <div class="text-[10px] text-[var(--text-dim)] mt-0.5">${escapeHtml(meta)}</div>
+    <p class="text-xs text-[var(--text-mute)] mt-2 flex-1">${escapeHtml(c.description || '')}</p>
+    <div class="flex gap-2 mt-3 flex-wrap">
+      <button class="btn btn-primary text-xs" onclick="_phInspect(${i})">${t('검사 · 설치')}</button>
+      <a class="btn text-xs" href="${escapeHtml(c.htmlUrl || '#')}" target="_blank" rel="noopener noreferrer">${t('저장소')} ↗</a>
+    </div>
+  </div>`;
+}
+
+window._phSearch = async () => {
+  const inp = document.getElementById('ph-q');
+  const q = inp ? inp.value.trim() : '';
+  window.__ph.q = q;
+  const box = document.getElementById('ph-results');
+  const setBox = (h) => { if (box) box.innerHTML = h; };
+  setBox(`<div class="card p-6 text-[12px] text-[var(--text-mute)]">${t('검색 중')}…</div>`);
+  let r;
+  try {
+    r = await api('/api/plugin_hub/search?q=' + encodeURIComponent(q));
+  } catch (e) {
+    return setBox(`<div class="card p-6 text-[12px]" style="color:var(--danger)">${escapeHtml(e.message)}</div>`);
+  }
+  if (!r || !r.ok) {
+    return setBox(`<div class="card p-6 text-[12px]" style="color:var(--danger)">${escapeHtml((r && r.error) || t('검색 실패'))}</div>`);
+  }
+  window.__ph.repos = r.repos || [];
+  if (!window.__ph.repos.length) {
+    return setBox(`<div class="card p-6 text-[12px] text-[var(--text-mute)]">${t('결과 없음')}</div>`);
+  }
+  const head = `<div class="text-[11px] text-[var(--text-dim)] mb-2">${t('결과')}: ${window.__ph.repos.length} / ${Number(r.total || 0).toLocaleString()}${r.authenticated ? '' : ' · ' + t('비인증 (GitHub 속도 제한)')}</div>`;
+  setBox(head + `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">${window.__ph.repos.map(_phRepoCard).join('')}</div>`);
+};
+
+window._phInspect = async (i) => {
+  const c = window.__ph.repos[i];
+  if (!c) return;
+  showModalLoading(t('마켓플레이스 검사 중') + '…');
+  let r;
+  try {
+    r = await api('/api/plugin_hub/inspect?repo=' + encodeURIComponent(c.fullName));
+  } catch (e) { closeModal(); return toast(e.message, 'err'); }
+  if (!r || !r.ok) { closeModal(); return toast((r && r.error) || t('검사 실패'), 'err'); }
+  window.__ph.plugins = r.plugins || [];
+  window.__ph.repo = c.fullName;
+  window.__ph.mkt = r.marketplaceName || '';
+  const plist = window.__ph.plugins.map((p, j) => {
+    const rc = p.risk || {};
+    const badge = rc.runsCode === true
+      ? `<span class="text-[10px] px-1.5 py-0.5 rounded" style="background:rgba(248,113,113,.15);color:#f87171">${t('코드 실행')}</span>`
+      : (rc.components && rc.components.length
+        ? `<span class="text-[10px] px-1.5 py-0.5 rounded" style="background:rgba(148,163,184,.15)">${escapeHtml(rc.components.join(', '))}</span>`
+        : '');
+    return `<div class="card p-3">
+      <div class="flex items-center justify-between gap-2">
+        <div class="font-semibold text-xs break-all">${escapeHtml(p.name)} ${badge}</div>
+        <button class="btn btn-primary text-[11px]" onclick="_phInstall(${j})">${t('설치')}</button>
+      </div>
+      <p class="text-[11px] text-[var(--text-mute)] mt-1">${escapeHtml(p.description || '')}</p>
+      <div class="mono text-[10px] bg-black/30 rounded px-2 py-1 mt-2 overflow-x-auto whitespace-nowrap">${escapeHtml(p.installCmd || '')}</div>
+    </div>`;
+  }).join('');
+  const trunc = r.truncated ? `<p class="text-[10px] text-[var(--text-dim)] mt-2">+${r.truncated} ${t('개 더 있음 (표시 생략)')}</p>` : '';
+  showModal(`
+    <div class="p-5" style="max-width:680px;max-height:80vh;overflow:auto;">
+      <h3 class="font-semibold text-base mb-1">🔌 ${escapeHtml((r.repo && r.repo.fullName) || c.fullName)}</h3>
+      <div class="text-xs text-[var(--text-mute)] mb-1">${escapeHtml(r.marketplaceDescription || '')}</div>
+      <div class="mono text-[10px] bg-black/30 rounded px-2 py-1 mb-3 overflow-x-auto whitespace-nowrap">${escapeHtml(r.addCmd || '')}</div>
+      ${window.__ph.plugins.length ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-2">${plist}</div>` : `<div class="text-xs text-[var(--text-mute)]">${t('플러그인 없음')}</div>`}
+      ${trunc}
+      <div class="flex justify-end gap-2 mt-4">
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+      </div>
+    </div>`);
+};
+
+window._phInstall = async (j) => {
+  const p = window.__ph.plugins[j];
+  const repo = window.__ph.repo;
+  const mkt = window.__ph.mkt;
+  if (!p || !repo || !mkt) return;
+  const ok = await confirmModal({
+    title: t('플러그인 설치'),
+    message: `${p.name}@${mkt} · ${repo} — ` + t('플러그인은 서드파티 코드(훅·MCP·실행파일)를 사용자 권한으로 실행할 수 있습니다. 신뢰하는 경우에만 설치하세요.'),
+    confirmLabel: t('설치'),
+    danger: true,
+  });
+  if (!ok) return;
+  showModalLoading(t('설치 중') + '…');
+  let r;
+  try {
+    r = await api('/api/plugin_hub/install', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repo, plugin: p.name, marketplace: mkt, confirm: true, scope: 'user' }),
+    });
+  } catch (e) { closeModal(); return toast(e.message, 'err'); }
+  closeModal();
+  if (!r || !r.ok) return toast((r && r.error) || t('설치 실패'), 'err');
+  toast(t('설치됨') + ': ' + (r.installed || p.name), 'ok');
+};
+
+window._phShowInstalled = async () => {
+  showModalLoading(t('설치된 플러그인 조회 중') + '…');
+  let r;
+  try { r = await api('/api/plugin_hub/installed'); }
+  catch (e) { closeModal(); return toast(e.message, 'err'); }
+  closeModal();
+  const plugins = (r && r.plugins) || [];
+  const list = plugins.length
+    ? plugins.map(p => `<li class="mono text-xs py-0.5">${escapeHtml(typeof p === 'string' ? p : (p.name || JSON.stringify(p)))}</li>`).join('')
+    : `<li class="text-xs text-[var(--text-mute)]">${t('설치된 플러그인 없음')}${r && r.note ? ' — ' + escapeHtml(r.note) : ''}</li>`;
+  showModal(`<div class="p-5" style="max-width:520px;">
+    <h3 class="font-semibold text-base mb-3">📦 ${t('설치된 플러그인')}</h3>
+    <ul>${list}</ul>
+    <div class="flex justify-end mt-4"><button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button></div>
+  </div>`);
+};
+
 VIEWS.harness = async () => {
   const d = await api('/api/harness-tools/list');
   state.data.harness = d;
@@ -27936,12 +28133,55 @@ window._armOpenDetail = (sid) => {
           </div>
           ${errHtml}
           <div class="flex justify-end gap-2 mt-4">
+            <button class="btn text-xs" onclick="_armDiagnose('${sid}')">🩺 ${t('진단')}</button>
             <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
           </div>
         </div>
       `);
     })
     .catch(e => toast(e.message, 'err'));
+};
+
+// Diagnose — answers "why isn't this binding resuming?" by surfacing the live
+// decision signals the worker uses (liveness / idle / rate-limit signal /
+// parsed reset / next action). Pure read; no state change, no spawn.
+window._armDiagnose = async (sid) => {
+  if (!sid) return;
+  let r;
+  try {
+    r = await api('/api/auto_resume/diagnose?sessionId=' + encodeURIComponent(sid));
+  } catch (e) {
+    return toast(e.message, 'err');
+  }
+  if (!r || !r.ok || !r.diagnosis) {
+    return toast((r && r.error) || t('진단 실패'), 'err');
+  }
+  const d = r.diagnosis;
+  const yn = (b) => (b ? '✅' : '❌');
+  const fmtTime = (ms) => (ms ? new Date(ms).toLocaleString() : '—');
+  const rows = [
+    [t('워커 실행 중'), yn(d.workerAlive)],
+    [t('세션 라이브'), yn(d.live)],
+    [t('jsonl 발견'), yn(d.jsonlResolved)],
+    [t('유휴 시간'), `${d.idleSeconds}s / ${d.idleRequired}s ${yn(d.idleSatisfied)}`],
+    [t('한도 신호 감지'), yn(d.rateLimitDetected)],
+    [t('파싱된 리셋 시각'), fmtTime(d.parsedResetMs)],
+    [t('다음 시도'), fmtTime(d.nextAttemptAt)],
+  ];
+  const tail = (d.tailPreview || '').trim();
+  showModal(`
+    <div class="p-5" style="max-width:560px;">
+      <h3 class="font-semibold text-base mb-1">🩺 Auto-Resume ${t('진단')}</h3>
+      <div class="text-xs mb-3 p-2 rounded" style="background:rgba(245,180,84,.12);">${escapeHtml(d.nextAction || '')}</div>
+      <div class="grid gap-2 text-sm" style="grid-template-columns: auto 1fr;">
+        ${rows.map(([k, v]) => `<div class="text-xs text-[var(--text-mute)] py-1">${k}</div><div class="mono text-xs py-1 break-all">${escapeHtml(String(v))}</div>`).join('')}
+      </div>
+      ${tail ? `<div class="mt-3"><div class="text-xs text-[var(--text-mute)] mb-1">${t('jsonl 꼬리')}</div><pre class="mono text-[11px] p-2 rounded overflow-auto" style="max-height:140px;background:rgba(148,163,184,.08);">${escapeHtml(tail.slice(-700))}</pre></div>` : ''}
+      <div class="flex justify-end gap-2 mt-4">
+        <button class="btn text-xs" onclick="closeModal()">${t('닫기')}</button>
+      </div>
+    </div>
+  `);
 };
 
 // Hyper Advisor — opt-in meta-LLM call to suggest retry-policy adjustments.

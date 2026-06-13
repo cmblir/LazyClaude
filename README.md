@@ -105,6 +105,27 @@ Time-based deadlines (`durationSec` / `deadlineMs`) replace the legacy `maxAttem
 
 **Resume delay** (`resumeDelaySec`, v3.99.46+): by default the worker parses the reset moment from the cap message and resumes exactly then. Set a manual delay instead — resume N seconds after the limit hit (UI presets: 2h / 3h / custom hours).
 
+**Diagnose** (`GET /api/auto_resume/diagnose?sessionId=…`, v3.99.48+): the most common reason Auto-Resume appears to "do nothing" is silent non-detection — the session isn't live, the idle window isn't met yet, or the cap message didn't match the detector. The **🩺 Diagnose** button (in the Auto-Resume manager) runs the exact gates the worker uses and reports them back: worker alive, session live, idle vs required, rate-limit signal detected, parsed reset time, and the **next action** the worker would take — plus a jsonl tail so you can see what the detector matched against. The status endpoint also self-heals a dead worker thread whenever active bindings exist.
+
+```
+GET /api/auto_resume/diagnose?sessionId=…
+→ { workerAlive, live, idleSeconds, idleRequired, rateLimitDetected,
+    parsedResetMs, nextAttemptAt, nextAction, tailPreview }
+```
+
+---
+
+## 🔌 Plugin Hub (v3.99.48+)
+
+Discover and install Claude Code plugins straight from GitHub. The **Plugin Hub** tab searches GitHub for `claude-code-plugin` marketplace repos ranked by stars, inspects a repo's `.claude-plugin/marketplace.json`, and installs a chosen plugin via the `claude` CLI — no manual `marketplace add` / `install` typing.
+
+- **Search** — `GET /api/plugin_hub/search?q=` (topic search, star-ranked, 5-min cached). Set `GITHUB_TOKEN` / `GH_TOKEN` to lift the unauthenticated 10 req/min search limit.
+- **Inspect** — `GET /api/plugin_hub/inspect?repo=owner/name` parses the marketplace and flags each plugin's risk (a "runs code" badge for plugins shipping hooks / MCP servers / `bin/`).
+- **Install** — `POST /api/plugin_hub/install {repo, plugin, marketplace, confirm:true}` runs `claude plugin marketplace add` + `claude plugin install …@… --scope user`. **Gated**: refuses without `confirm:true`, and strict-validates `owner/repo` + plugin + marketplace identifiers before they reach the CLI (no shell, arg lists only).
+- **Installed** — `GET /api/plugin_hub/installed` lists what's already installed.
+
+> ⚠️ Installing a plugin executes third-party code (hooks / MCP servers / executables) with your user privileges. Review the repo and the risk flags before installing — the install step always requires explicit confirmation.
+
 ---
 
 ## ⚡ Real-time token usage (v3.99.47+)

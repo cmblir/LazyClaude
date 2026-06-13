@@ -296,6 +296,12 @@ try:
 except Exception:
     _NEW_EN_50, _NEW_ZH_50 = {}, {}
 
+# v3.99.x — Auto-Resume diagnose modal + Plugin Hub tab.
+try:
+    from translations_manual_51 import NEW_EN as _NEW_EN_51, NEW_ZH as _NEW_ZH_51
+except Exception:
+    _NEW_EN_51, _NEW_ZH_51 = {}, {}
+
 # ── 구조화 키 → 한국어 라벨 ──
 MANUAL_KO: dict[str, str] = {
     "settings.theme": "테마",
@@ -917,6 +923,10 @@ for _k, _v in _NEW_ZH_49.items():
 for _k, _v in _NEW_EN_50.items():
     MANUAL_EN.setdefault(_k, _v)
 for _k, _v in _NEW_ZH_50.items():
+    MANUAL_ZH.setdefault(_k, _v)
+for _k, _v in _NEW_EN_51.items():
+    MANUAL_EN.setdefault(_k, _v)
+for _k, _v in _NEW_ZH_51.items():
     MANUAL_ZH.setdefault(_k, _v)
 
 # extractor 오탐(코드/주석)이 초기 MANUAL_EN/ZH 에 한글 원문으로 등록돼 있는 경우 덮어쓰기

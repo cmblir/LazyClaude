@@ -190,12 +190,18 @@ from .ollama_hub import (
 )
 from .auto_resume import (
     api_auto_resume_advise,
-    api_auto_resume_cancel, api_auto_resume_get,
+    api_auto_resume_cancel, api_auto_resume_diagnose, api_auto_resume_get,
     api_auto_resume_hook_status, api_auto_resume_inject_live,
     api_auto_resume_install_hooks,
     api_auto_resume_prune_stale,
     api_auto_resume_set, api_auto_resume_status,
     api_auto_resume_uninstall_hooks,
+)
+from .plugin_hub import (
+    api_plugin_hub_install,
+    api_plugin_hub_inspect,
+    api_plugin_hub_installed,
+    api_plugin_hub_search,
 )
 from .backup import (
     api_backup_create, api_backup_delete,
@@ -466,7 +472,11 @@ ROUTES_GET: dict[str, Callable[[dict], Any]] = {
     "/api/costs/recommendations": api_cost_recommendations,
     "/api/auto_resume/status": api_auto_resume_status,
     "/api/auto_resume/get": api_auto_resume_get,
+    "/api/auto_resume/diagnose": api_auto_resume_diagnose,
     "/api/auto_resume/hook_status": api_auto_resume_hook_status,
+    "/api/plugin_hub/search": api_plugin_hub_search,
+    "/api/plugin_hub/inspect": api_plugin_hub_inspect,
+    "/api/plugin_hub/installed": api_plugin_hub_installed,
     "/api/backup/list": api_backup_list,
     "/api/housekeeping/report": api_housekeeping_report,
     "/api/rtk/status": api_rtk_status,
@@ -708,6 +718,7 @@ ROUTES_POST: dict[str, Callable[[dict], Any]] = {
     "/api/auto_resume/advise": api_auto_resume_advise,
     "/api/auto_resume/install_hooks": api_auto_resume_install_hooks,
     "/api/auto_resume/uninstall_hooks": api_auto_resume_uninstall_hooks,
+    "/api/plugin_hub/install": api_plugin_hub_install,
     "/api/backup/create": api_backup_create,
     "/api/backup/restore": api_backup_restore,
     "/api/backup/delete": api_backup_delete,
@@ -962,7 +973,54 @@ class Handler(BaseHTTPRequestHandler):
         if length:
             self.rfile.read(length)
 
+    def _guard_request(self, mutating: bool) -> bool:
+        """Reject DNS-rebinding (non-loopback Host) and cross-origin mutations
+        (CSRF). The server binds 127.0.0.1, but a malicious web page can still
+        target it cross-origin or via DNS-rebinding; this is the front gate.
+        External webhook endpoints authenticate themselves (HMAC/secret) and
+        are exempt. Set LAZYCLAUDE_DISABLE_ORIGIN_GUARD=1 to bypass (e.g. behind
+        a trusted reverse proxy). Returns True if the request may proceed."""
+        import os
+        from urllib.parse import urlsplit as _urlsplit
+        if os.environ.get("LAZYCLAUDE_DISABLE_ORIGIN_GUARD") == "1":
+            return True
+        path = unquote(urlparse(self.path).path)
+        if any(path.startswith(p) for p in (
+            "/api/slack/", "/api/discord/", "/api/telegram/", "/api/workflows/webhook/",
+        )):
+            return True  # externally-reachable webhooks authenticate separately
+
+        def _is_local(hostname: str) -> bool:
+            hn = (hostname or "").lower()
+            if hn in ("127.0.0.1", "localhost", "::1", "0.0.0.0"):
+                return True
+            extra = os.environ.get("LAZYCLAUDE_ALLOWED_HOSTS", "")
+            return hn in {h.strip().lower() for h in extra.split(",") if h.strip()}
+
+        host = (self.headers.get("Host") or "").strip()
+        if host:
+            try:
+                host_hn = _urlsplit("//" + host).hostname or ""
+            except Exception:
+                host_hn = ""
+            if not _is_local(host_hn):
+                self._send_json({"error": "forbidden: non-local Host header"}, 403)
+                return False
+        if mutating:
+            origin = (self.headers.get("Origin") or "").strip()
+            if origin:
+                try:
+                    o_hn = _urlsplit(origin).hostname or ""
+                except Exception:
+                    o_hn = ""
+                if not _is_local(o_hn):
+                    self._send_json({"error": "forbidden: cross-origin request"}, 403)
+                    return False
+        return True
+
     def do_GET(self) -> None:
+        if not self._guard_request(mutating=False):
+            return
         u = urlparse(self.path)
         path = unquote(u.path)
         query = parse_qs(u.query)
@@ -1000,6 +1058,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_static(path)
 
     def do_PUT(self) -> None:
+        if not self._guard_request(mutating=True):
+            return
         path = unquote(urlparse(self.path).path)
         body = self._read_body()
         if path in ROUTES_PUT:
@@ -1014,6 +1074,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json({"ok": False, "error": "unknown route"}, 404)
 
     def do_POST(self) -> None:
+        if not self._guard_request(mutating=True):
+            return
         path = unquote(urlparse(self.path).path)
         # chat/stream 은 SSE 응답 — dict 외 Handler 를 직접 받음
         if path == "/api/chat/stream":
