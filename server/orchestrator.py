@@ -1715,7 +1715,22 @@ def handle_slack_events_request(handler) -> None:
     raw = handler.rfile.read(length) if length else b""
 
     secret = os.environ.get("SLACK_SIGNING_SECRET", "").strip()
-    if secret:
+    if not secret:
+        # Fail closed: without a signing secret we cannot authenticate the
+        # sender, so an unsigned request could forge Slack events and trigger
+        # the orchestrator. Refuse unless the operator explicitly opts in
+        # (e.g. behind a trusted reverse proxy that authenticates upstream).
+        if os.environ.get("SLACK_ALLOW_UNSIGNED") != "1":
+            log.warning(
+                "slack events rejected: SLACK_SIGNING_SECRET not set "
+                "(set it, or SLACK_ALLOW_UNSIGNED=1 to bypass)"
+            )
+            handler.send_response(401)
+            handler.send_header("Content-Type", "application/json")
+            handler.end_headers()
+            handler.wfile.write(b'{"ok":false,"error":"signing secret not configured"}')
+            return
+    else:
         ok, reason = _verify_slack_signature(raw, dict(handler.headers), secret)
         if not ok:
             log.warning("slack signature verification failed: %s", reason)

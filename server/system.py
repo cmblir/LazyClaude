@@ -506,7 +506,7 @@ def api_memory_get(query: dict) -> dict:
         p = p.resolve()
     except Exception:
         return {"ok": False, "error": "invalid path"}
-    if not str(p).startswith(str(PROJECTS_DIR)):
+    if not str(p).startswith(str(PROJECTS_DIR) + os.sep):
         return {"ok": False, "error": "path outside projects dir"}
     if "/memory/" not in str(p):
         return {"ok": False, "error": "not a memory file"}
@@ -531,7 +531,7 @@ def api_memory_put(body: dict) -> dict:
         p = p.resolve()
     except Exception:
         return {"ok": False, "error": "invalid path"}
-    if not str(p).startswith(str(PROJECTS_DIR)):
+    if not str(p).startswith(str(PROJECTS_DIR) + os.sep):
         return {"ok": False, "error": "path outside projects dir"}
     if "/memory/" not in str(p):
         return {"ok": False, "error": "not a memory path"}
@@ -555,7 +555,7 @@ def api_memory_delete(body: dict) -> dict:
         p = p.resolve()
     except Exception:
         return {"ok": False, "error": "invalid path"}
-    if not str(p).startswith(str(PROJECTS_DIR)):
+    if not str(p).startswith(str(PROJECTS_DIR) + os.sep):
         return {"ok": False, "error": "path outside projects dir"}
     if "/memory/" not in str(p):
         return {"ok": False, "error": "not a memory file"}

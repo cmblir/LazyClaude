@@ -80,6 +80,12 @@ def _save_config(data: dict) -> bool:
         log.error("ai providers config save failed: %s", e)
         return False
     if ok:
+        # Secrets file (API keys in plaintext) — restrict to owner-only, like
+        # every other secret store in the repo (slack/telegram/discord/admin).
+        try:
+            os.chmod(PROVIDERS_CONFIG_PATH, 0o600)
+        except OSError:
+            pass
         with _AIK_CACHE["lock"]:
             _AIK_CACHE["key"] = None
             _AIK_CACHE["data"] = None
