@@ -1489,7 +1489,11 @@ async function renderView() {
     _translateDOM(v);
   } catch (e) {
     console.error(e);
-    v.innerHTML = `<div class="card p-8 empty">${t('뷰 렌더 실패:')} ${escapeHtml(e.message)}</div>`;
+    v.innerHTML = `<div class="card p-8 text-center" style="border-color:rgba(248,113,113,0.4);">
+      <div class="text-sm font-semibold mb-1" style="color:#f87171;">${t('뷰 렌더 실패:')}</div>
+      <div class="text-xs text-[var(--text-mute)] mb-3 break-all">${escapeHtml(e.message)}</div>
+      <button class="btn text-xs" onclick="renderView()">↻ ${t('다시 시도')}</button>
+    </div>`;
   } finally {
     __renderLock = false;
     // 큐에 쌓인 렌더 요청 처리
@@ -18116,10 +18120,6 @@ VIEWS.projectAgents = async () => {
     `}
   `;
 };
-AFTER.projectAgents = () => {
-  renderPaVisualization();
-};
-
 async function paRefreshViz() {
   const container = document.getElementById('paNetwork');
   if (!container) return;
@@ -18171,7 +18171,7 @@ async function paRefreshViz() {
   net.on('click', params => { if (params.nodes && params.nodes.length) handlePa(params.nodes[0]); });
   net.on('selectNode', params => { if (params.nodes && params.nodes.length) handlePa(params.nodes[0]); });
 }
-AFTER.projectAgents = () => { setTimeout(paRefreshViz, 50); };
+AFTER.projectAgents = () => { setTimeout(() => paRefreshViz().catch(() => {}), 50); };
 
 function paOpenRolePreview(roleId) {
   const role = (window.__paRoles || []).find(r => r.id === roleId);
@@ -26603,6 +26603,9 @@ async function _pollUsageToday() {
     if (_usageTodayTimer) { clearInterval(_usageTodayTimer); _usageTodayTimer = null; }
     return;
   }
+  // Skip the request while the browser tab is backgrounded — resume on the
+  // next tick when visible again. Avoids polling every 5s in a hidden tab.
+  if (document.hidden) return;
   let d;
   try {
     d = await api('/api/usage/today');
@@ -27219,7 +27222,7 @@ VIEWS.team = async () => {
             onclick="(async()=>{
               this.disabled=true;this.innerHTML='⏳ 터미널에서 로그인 중…';
               try{const r=await api('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
-              if(r.ok){toast(r.message,'ok');const p=setInterval(async()=>{try{const s=await api('/api/auth/status');if(s.connected){clearInterval(p);toast('로그인 성공!','ok');renderView();}}catch{}},5000);}
+              if(r.ok){toast(r.message,'ok');let _n=0;const p=setInterval(async()=>{if(state.view!=='team'||++_n>24){clearInterval(p);return;}try{const s=await api('/api/auth/status');if(s.connected){clearInterval(p);toast('로그인 성공!','ok');renderView();}}catch{}},5000);}
               else{toast(errMsg(r),'err');this.disabled=false;this.innerHTML='🚀 Claude 로그인';}}
               catch(e){toast(e.message,'err');this.disabled=false;this.innerHTML='🚀 Claude 로그인';}
             })()">
@@ -30853,6 +30856,8 @@ function _appendChatMsg(role, html) {
     ? `<div class="chat-bubble-user">${html}</div>`
     : `<div class="chat-bubble-bot">${html}</div>`;
   msgs.appendChild(div);
+  // Cap transcript DOM so a long session doesn't grow #chatMessages unbounded.
+  while (msgs.children.length > 200) msgs.removeChild(msgs.firstChild);
   msgs.scrollTop = msgs.scrollHeight;
   return div;
 }
@@ -31011,6 +31016,17 @@ async function sendChat() {
   const botDiv = _appendChatMsg('bot', '<span class="streaming-cursor"></span>');
   const bubble = botDiv.querySelector('.chat-bubble-bot');
   let fullText = '';
+  // Coalesce streaming re-renders to one per animation frame. The old code did
+  // bubble.innerHTML = escapeHtml(fullText) on EVERY delta → O(n²) over a long
+  // answer (re-escapes the whole accumulated text per token).
+  let _rafId = 0;
+  const _flushBubble = () => {
+    _rafId = 0;
+    bubble.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>') + '<span class="streaming-cursor"></span>';
+    const m = document.getElementById('chatMessages');
+    if (m) m.scrollTop = m.scrollHeight;
+  };
+  const _scheduleBubble = () => { if (!_rafId) _rafId = requestAnimationFrame(_flushBubble); };
   _chatStartWaitBubble();
 
   try {
@@ -31033,10 +31049,9 @@ async function sendChat() {
           bubble.innerHTML = `<span style="color:var(--err);">${escapeHtml(r.error)}</span>`;
         } else {
           let navBtn = '';
-          if (r.navigate) {
-            const navItem = NAV.find(n => n.id === r.navigate);
-            const label = navItem ? navItem.label : r.navigate;
-            navBtn = `<button class="btn text-[10px] mt-2" onclick="go('${r.navigate}');toggleChat();">${navItem ? navItem.icon + ' ' : ''} ${escapeHtml(label)} 탭으로 이동</button>`;
+          const navItem = r.navigate ? NAV.find(n => n.id === r.navigate) : null;
+          if (navItem) {
+            navBtn = `<button class="btn text-[10px] mt-2" onclick="go('${navItem.id}');toggleChat();">${navItem.icon ? navItem.icon + ' ' : ''}${escapeHtml(navItem.label)} 탭으로 이동</button>`;
           }
           bubble.innerHTML = escapeHtml(r.answer || '').replace(/\n/g, '<br>') + navBtn;
           _chatHistory.push({ role: 'assistant', text: r.answer || '' });
@@ -31076,28 +31091,30 @@ async function sendChat() {
             if (evtType === 'delta') {
               if (!fullText) _chatStopWaitBubble();  // 첫 토큰 도착 — 대기 말풍선 종료
               fullText += data.text || '';
-              bubble.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>') + '<span class="streaming-cursor"></span>';
-              const msgs = document.getElementById('chatMessages');
-              msgs.scrollTop = msgs.scrollHeight;
+              _scheduleBubble();
             } else if (evtType === 'replace') {
               _chatStopWaitBubble();
               fullText = data.text || fullText;
-              bubble.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>') + '<span class="streaming-cursor"></span>';
+              _scheduleBubble();
             } else if (evtType === 'done') {
               _chatStopWaitBubble();
+              if (_rafId) { cancelAnimationFrame(_rafId); _rafId = 0; }
               navigate = data.navigate;
               if (data.text && data.text !== fullText) fullText = data.text;
               let doneNavBtn = '';
-              if (navigate) {
-                const ni = NAV.find(n => n.id === navigate);
-                const nl = ni ? ni.label : navigate;
-                doneNavBtn = `<button class="btn text-[10px] mt-2" onclick="go('${navigate}');toggleChat();">${ni ? ni.icon + ' ' : ''} ${escapeHtml(nl)} 탭으로 이동</button>`;
+              // Only render the nav button for a REAL tab id — gating on the
+              // NAV match makes the id a known-safe literal (the raw model-
+              // supplied `navigate` previously went straight into onclick → XSS).
+              const ni = navigate ? NAV.find(n => n.id === navigate) : null;
+              if (ni) {
+                doneNavBtn = `<button class="btn text-[10px] mt-2" onclick="go('${ni.id}');toggleChat();">${ni.icon ? ni.icon + ' ' : ''}${escapeHtml(ni.label)} 탭으로 이동</button>`;
               }
               bubble.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>') + doneNavBtn;
               _chatHistory.push({ role: 'assistant', text: fullText });
               _chatStreaming = false;
             } else if (evtType === 'error') {
               _chatStopWaitBubble();
+              if (_rafId) { cancelAnimationFrame(_rafId); _rafId = 0; }
               bubble.innerHTML = `<span style="color:var(--err);">${escapeHtml(data.error || '오류')}</span>`;
               _chatStreaming = false;
               return;
@@ -31109,11 +31126,11 @@ async function sendChat() {
     }
 
     // 스트리밍 완료 — 커서 제거 + 네비 버튼
+    if (_rafId) { cancelAnimationFrame(_rafId); _rafId = 0; }
     let navBtn = '';
-    if (navigate) {
-      const navItem = NAV.find(n => n.id === navigate);
-      const label = navItem ? navItem.label : navigate;
-      navBtn = `<button class="btn text-[10px] mt-2" onclick="go('${navigate}');toggleChat();">${navItem ? navItem.icon + ' ' : ''} ${escapeHtml(label)} 탭으로 이동</button>`;
+    const _navItem = navigate ? NAV.find(n => n.id === navigate) : null;
+    if (_navItem) {
+      navBtn = `<button class="btn text-[10px] mt-2" onclick="go('${_navItem.id}');toggleChat();">${_navItem.icon ? _navItem.icon + ' ' : ''}${escapeHtml(_navItem.label)} 탭으로 이동</button>`;
     }
     bubble.innerHTML = escapeHtml(fullText).replace(/\n/g, '<br>') + navBtn;
     _chatHistory.push({ role: 'assistant', text: fullText });
