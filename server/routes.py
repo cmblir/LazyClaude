@@ -959,19 +959,25 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    # Bound the allocation any single request can force: an oversized
+    # Content-Length (e.g. 2 GB) would otherwise make the worker thread attempt
+    # a multi-GB read → OOM. 32 MB is ample for this JSON API (incl. workflow
+    # imports).
+    _MAX_BODY = 32 * 1024 * 1024
+
     def _read_body(self) -> dict:
         length = int(self.headers.get("Content-Length", 0) or 0)
         if not length:
             return {}
         try:
-            return json.loads(self.rfile.read(length))
+            return json.loads(self.rfile.read(min(length, self._MAX_BODY)))
         except Exception:
             return {}
 
     def _drain(self) -> None:
         length = int(self.headers.get("Content-Length", 0) or 0)
         if length:
-            self.rfile.read(length)
+            self.rfile.read(min(length, self._MAX_BODY))
 
     def _guard_request(self, mutating: bool) -> bool:
         """Reject DNS-rebinding (non-loopback Host) and cross-origin mutations
@@ -1041,7 +1047,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(ROUTES_GET[path](query))
             except Exception as e:
                 log.exception("route error: %s", path)
-                self._send_json({"error": str(e)}, 500)
+                self._send_json({"error": "internal error"}, 500)
             return
         # regex item-routes
         for pattern, fn in _ITEM_GET_ROUTES:
@@ -1050,7 +1056,7 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     self._send_json(fn(m.group(1)))
                 except Exception as e:
-                    self._send_json({"error": str(e)}, 500)
+                    self._send_json({"error": "internal error"}, 500)
                 return
         if path.startswith("/api/"):
             self._send_json({})

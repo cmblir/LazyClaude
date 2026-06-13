@@ -1970,11 +1970,33 @@ _HTTP_PRIVATE_PREFIXES_V4 = (
 _HTTP_PRIVATE_PREFIXES_V6 = ("fc", "fd", "fe80:", "fe9", "fea", "feb")  # RFC 4193 ULA + link-local
 
 
+def _ip_is_blocked(ipstr: str) -> bool:
+    """True if ``ipstr`` parses as a private/loopback/link-local/reserved/CGNAT
+    address. Uses ``ipaddress`` so encoded forms (decimal ``2130706433``, hex
+    ``0x7f000001``, IPv4-mapped IPv6) are caught once resolved — the old
+    string-prefix check missed all of those."""
+    import ipaddress
+    s = (ipstr or "").split("%", 1)[0]  # drop IPv6 zone id
+    try:
+        ip = ipaddress.ip_address(s)
+    except ValueError:
+        return False
+    if (ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+        return True
+    # 100.64.0.0/10 (CGNAT) — not flagged is_private on older Pythons.
+    if ip.version == 4 and (
+        int(ipaddress.ip_address("100.64.0.0")) <= int(ip) <= int(ipaddress.ip_address("100.127.255.255"))
+    ):
+        return True
+    return False
+
+
 def _http_is_internal(host: str) -> bool:
     """호스트가 내부/사설/메타데이터 대역인지 판정.
 
-    IPv4/IPv6 리터럴과 일반 이름 모두 처리. DNS 이름은 getaddrinfo 로
-    해석해 실제 IP 가 내부 대역이면 True (DNS rebinding 방어).
+    IP 리터럴(인코딩된 십진/16진 포함)은 ipaddress 로, DNS 이름은 getaddrinfo
+    로 해석한 실제 IP 를 ipaddress 로 검사 (DNS rebinding 방어, fail-closed).
     """
     if not host:
         return True
@@ -1983,24 +2005,17 @@ def _http_is_internal(host: str) -> bool:
         return True
     if h.endswith(".localhost"):
         return True
-    if h.startswith(_HTTP_PRIVATE_PREFIXES_V4):
+    if _ip_is_blocked(h):
         return True
-    if any(h.startswith(p) for p in _HTTP_PRIVATE_PREFIXES_V6):
-        return True
-    # DNS 이름 → IP 해석 후 다시 검사 (DNS rebinding 방어)
     try:
         import socket as _sock
-        for info in _sock.getaddrinfo(host, None):
-            ip = info[4][0]
-            if ip in _HTTP_BLOCKED_HOSTS:
-                return True
-            if ip.startswith(_HTTP_PRIVATE_PREFIXES_V4):
-                return True
-            if any(ip.startswith(p) for p in _HTTP_PRIVATE_PREFIXES_V6):
-                return True
+        infos = _sock.getaddrinfo(host, None)
     except Exception:
-        # 해석 실패 시엔 차단으로 처리 (fail-closed)
-        return True
+        return True  # 해석 실패 → 차단 (fail-closed)
+    for info in infos:
+        ip = info[4][0]
+        if ip in _HTTP_BLOCKED_HOSTS or _ip_is_blocked(ip):
+            return True
     return False
 
 
@@ -2014,6 +2029,12 @@ def _execute_http_node(data: dict, inputs: list[str], _elapsed) -> dict:
     import urllib.request
     import urllib.error
     from urllib.parse import urlparse
+
+    class _NoFollowRedirect(urllib.request.HTTPRedirectHandler):
+        # SSRF: a 3xx to an internal host (169.254.169.254 / 127.0.0.1 / ...)
+        # would otherwise be chased WITHOUT re-running the host check below.
+        def redirect_request(self, *a, **k):
+            return None
 
     url = (data.get("url") or "").strip()
     if not url:
@@ -2049,7 +2070,8 @@ def _execute_http_node(data: dict, inputs: list[str], _elapsed) -> dict:
 
     try:
         req = urllib.request.Request(url, data=req_body, headers=req_headers, method=method)
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        _opener = urllib.request.build_opener(_NoFollowRedirect)
+        with _opener.open(req, timeout=30) as resp:
             response_text = resp.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         err_body = ""
@@ -2780,6 +2802,14 @@ def _execute_docker_run_node(data: dict, inputs: list[str], _elapsed) -> dict:
     timeout = int(data.get("timeoutSec") or 60)
     mount = (data.get("mountPath") or "").strip()
     mount_ro = bool(data.get("mountReadonly", True))
+    if mount:
+        safe_mount = _under_home(mount)
+        if not safe_mount:
+            return {"status": "err", "output": "", "durationMs": _elapsed(),
+                    "error": f"mountPath '{mount}' must be under your home directory (~/) "
+                             f"— refused for host-mount safety (a workflow could otherwise "
+                             f"mount / or /etc into the container)."}
+        mount = safe_mount
 
     argv = ["docker", "run", "--rm", "-i",
             f"--network={network}",

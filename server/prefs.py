@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 from copy import deepcopy
 from pathlib import Path
@@ -30,6 +31,10 @@ PREFS_PATH = _env_path(
     "CLAUDE_DASHBOARD_PREFS",
     Path.home() / ".claude-dashboard-prefs.json",
 )
+
+# Serialize read-modify-write so concurrent POST /api/prefs/set calls (the
+# server is threaded) can't interleave into a lost update.
+_PREFS_LOCK = threading.Lock()
 
 
 # ───────── Schema ─────────
@@ -281,7 +286,6 @@ def api_prefs_set(body: dict) -> dict:
         { "patch": { "ui": {"theme": "midnight"}, "ai": {"effort": "high"} } }
     """
     body = body or {}
-    current = load_prefs()
 
     if "patch" in body and isinstance(body["patch"], dict):
         patch = body["patch"]
@@ -290,13 +294,16 @@ def api_prefs_set(body: dict) -> dict:
     else:
         return {"ok": False, "error": "missing 'patch' or 'section'+'key'"}
 
-    next_prefs: dict = {}
-    for section, defaults in DEFAULT_PREFS.items():
-        section_patch = patch.get(section) if isinstance(patch.get(section), dict) else {}
-        base = dict(current.get(section) or defaults)
-        next_prefs[section] = _validate_section(section, section_patch or {}, base)
-
-    ok = _write(next_prefs)
+    # Hold the lock across load→validate→write so a concurrent set doesn't
+    # clobber this one (read-A, read-B, write-A, write-B lost-update).
+    with _PREFS_LOCK:
+        current = load_prefs()
+        next_prefs: dict = {}
+        for section, defaults in DEFAULT_PREFS.items():
+            section_patch = patch.get(section) if isinstance(patch.get(section), dict) else {}
+            base = dict(current.get(section) or defaults)
+            next_prefs[section] = _validate_section(section, section_patch or {}, base)
+        ok = _write(next_prefs)
     return {"ok": bool(ok), "prefs": next_prefs, "savedAt": _stat_mtime() if ok else 0}
 
 

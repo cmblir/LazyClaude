@@ -107,7 +107,7 @@ def test_execute_uses_subprocess(wf, monkeypatch):
     r = wf._execute_docker_run_node({
         "image": "alpine:3", "command": "echo hi",
         "timeoutSec": 30, "memMb": 256,
-        "mountPath": "/data", "mountReadonly": True,
+        "mountPath": "~/wf-data", "mountReadonly": True,
         "network": "none", "env": {"FOO": "bar"},
     }, ["upstream input"], lambda: 0)
     assert r["status"] == "ok"
@@ -117,10 +117,24 @@ def test_execute_uses_subprocess(wf, monkeypatch):
     assert "--network=none" in argv
     assert "--memory=256m" in argv
     assert "--security-opt=no-new-privileges" in argv
-    assert "/data:/data:ro" in " ".join(argv)
+    import os as _os
+    _home = _os.path.expanduser("~")
+    assert f"{_home}/wf-data:{_home}/wf-data:ro" in " ".join(argv)
     assert "FOO=bar" in argv
     assert captured["input"] == "upstream input"
     assert captured["timeout"] == 30
+
+
+def test_rejects_mount_outside_home(wf, monkeypatch):
+    """M4 — a mountPath outside $HOME is refused so a workflow can't mount /
+    or /etc into the container."""
+    monkeypatch.setattr("shutil.which", lambda _x: "/usr/local/bin/docker")
+    r = wf._execute_docker_run_node(
+        {"image": "alpine:3", "command": "echo hi", "mountPath": "/etc"},
+        [], lambda: 0,
+    )
+    assert r["status"] == "err"
+    assert "home" in r["error"].lower()
 
 
 # ───── I2 (v2.61.0) — docker_run result cache ─────
