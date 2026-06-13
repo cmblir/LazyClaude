@@ -10439,7 +10439,7 @@ VIEWS.overview = async () => {
   }).join('') : `<div class="card p-5 empty text-sm">🎉 셋업이 이미 훌륭합니다. 추천 액션이 없습니다.</div>`;
 
   const topSessionsHtml = (stats.topSessions || []).slice(0, 5).map(s => `
-    <div class="p-2 rounded hover:bg-white/5 cursor-pointer" onclick="openSessionDetail('${s.session_id}')">
+    <div class="p-2 rounded hover:bg-white/5 cursor-pointer" onclick="openSessionDetail('${escapeHtml(s.session_id)}')">
       <div class="flex items-center gap-2">
         <span class="chip" style="background:${scoreColor(s.score)}22; border-color:${scoreColor(s.score)}55; color:${scoreColor(s.score)}">★ ${s.score}</span>
         <span class="text-xs flex-1 truncate text-[var(--text-mute)]">${escapeHtml(s.project || '—')}</span>
@@ -10984,7 +10984,7 @@ AFTER.analytics = () => {
 // IntersectionObserver-driven append. Keeps the markup in one place.
 function _sessRowHtml(s, arActiveIds) {
   return `
-    <tr class="link-row" onclick="openSessionDetail('${s.session_id}')">
+    <tr class="link-row" onclick="openSessionDetail('${escapeHtml(s.session_id)}')">
       <td>
         <div class="inline-flex items-center justify-center w-10 h-8 rounded-lg mono font-bold"
              style="background:${scoreColor(s.score)}20; color:${scoreColor(s.score)};">
@@ -16604,16 +16604,6 @@ VIEWS.mcp = async () => {
     ${renderConnectorGroup('💻 Claude Desktop 앱 MCP (claude_desktop_config.json)', conn.desktop || [], false)}
   `;
 };
-AFTER.mcp = () => {
-  const el = document.getElementById('mcpQ');
-  if (!el) return;
-  let d;
-  el.addEventListener('input', e => {
-    clearTimeout(d);
-    d = setTimeout(() => { state.data.mcpFilter = e.target.value; renderView(); }, 200);
-  });
-};
-
 async function installMcp(id) {
   // 1) prepare — 필요한 env/값 조회
   const prep = await api('/api/mcp/install/prepare', {
@@ -16719,6 +16709,17 @@ async function removeProjectMcp(cwd, name) {
 }
 
 AFTER.mcp = () => {
+  // MCP search filter (#mcpQ). This binding used to live in a separate
+  // AFTER.mcp that this definition silently overwrote, leaving the search box
+  // dead — merged here so typing filters again.
+  const q = document.getElementById('mcpQ');
+  if (q) {
+    let d;
+    q.addEventListener('input', e => {
+      clearTimeout(d);
+      d = setTimeout(() => { state.data.mcpFilter = e.target.value; renderView(); }, 200);
+    });
+  }
   // v2.33.7 — 커넥터 health probe (비동기)
   api('/api/mcp/health').then(r => {
     if (!r || !r.ok) return;
@@ -17472,7 +17473,7 @@ function renderProjectDetail(d) {
       <thead><tr><th>점수</th><th>첫 요청</th><th class="text-right">도구</th><th class="text-right">에이전트</th><th class="text-right">오류</th><th class="text-right">시작</th></tr></thead>
       <tbody>
         ${sessions.slice(0, 20).map(s => `
-          <tr class="link-row" onclick="closeModal();openSessionDetail('${s.session_id}')">
+          <tr class="link-row" onclick="closeModal();openSessionDetail('${escapeHtml(s.session_id)}')">
             <td><div class="inline-flex items-center justify-center w-9 h-7 rounded mono font-bold text-xs"
               style="background:${scoreColor(s.score)}22;color:${scoreColor(s.score)}">${s.score}</div></td>
             <td class="text-xs max-w-[320px] truncate" data-no-i18n>${escapeHtml((s.first_user_prompt || '').slice(0, 120) || '—')}</td>
@@ -18357,7 +18358,7 @@ function renderScoreDetail(d) {
     </div>`).join('');
 
   const bestSess = (d.best || []).map(s => `
-    <tr class="link-row" onclick="closeModal();openSessionDetail('${s.session_id}')">
+    <tr class="link-row" onclick="closeModal();openSessionDetail('${escapeHtml(s.session_id)}')">
       <td><span class="chip" style="background:${scoreColor(s.score)}22;color:${scoreColor(s.score)}">★ ${s.score}</span></td>
       <td class="text-xs max-w-[340px] truncate" data-no-i18n>${escapeHtml((s.first_user_prompt || '').slice(0, 100))}</td>
       <td class="text-right text-xs">${s.tool_use_count}</td>
@@ -18365,7 +18366,7 @@ function renderScoreDetail(d) {
     </tr>`).join('');
 
   const worstSess = (d.worst || []).map(s => `
-    <tr class="link-row" onclick="closeModal();openSessionDetail('${s.session_id}')">
+    <tr class="link-row" onclick="closeModal();openSessionDetail('${escapeHtml(s.session_id)}')">
       <td><span class="chip" style="background:${scoreColor(s.score)}22;color:${scoreColor(s.score)}">★ ${s.score}</span></td>
       <td class="text-xs max-w-[340px] truncate" data-no-i18n>${escapeHtml((s.first_user_prompt || '').slice(0, 100))}</td>
       <td class="text-right text-xs">${s.tool_use_count}</td>
@@ -22492,7 +22493,7 @@ AFTER.otel = () => {
   // 자동 새로고침 — 30초마다 현재 탭이 otel 일 때만.
   if (window._otelTimer) { clearInterval(window._otelTimer); }
   window._otelTimer = setInterval(() => {
-    if ((state.data && state.data._activeView) === 'otel') {
+    if (state.view === 'otel') {
       _otelRefresh();
     } else {
       clearInterval(window._otelTimer);
@@ -26512,7 +26513,7 @@ VIEWS.usage = async () => {
         <thead><tr><th>첫 요청</th><th>프로젝트</th><th class="text-right">토큰</th><th class="text-right">시작</th></tr></thead>
         <tbody>
           ${(tk.topSessions || []).map(s => `
-            <tr class="link-row" onclick="openSessionDetail('${s.session_id}')">
+            <tr class="link-row" onclick="openSessionDetail('${escapeHtml(s.session_id)}')">
               <td class="text-xs max-w-[340px] truncate">${s.first_user_prompt ? `<span data-no-i18n>${escapeHtml(s.first_user_prompt.slice(0, 120))}</span>` : t('(요청 없음)')}</td>
               <td class="text-xs">${escapeHtml(s.project || '—')}</td>
               <td class="text-right mono" style="color:#d97757">${fmtTokens(s.total_tokens || 0)}</td>
