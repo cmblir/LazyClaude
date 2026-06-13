@@ -886,3 +886,138 @@ class TestResumeInTmuxPane:
 
 # Needed for the integration tests above
 import time  # noqa: E402
+
+
+# ───────── diagnose endpoint (why-isn't-it-resuming observability) ─────────
+
+
+class TestDiagnose:
+    def _seed(
+        self,
+        tmp_path,
+        monkeypatch,
+        *,
+        jsonl_text,
+        idle_age=600,
+        idle_required=30,
+        enabled=True,
+        live=True,
+        extra=None,
+    ):
+        import os
+        import server.auto_resume as ar
+
+        monkeypatch.setattr(ar, "AUTO_RESUME_PATH", tmp_path / "ar.json")
+        monkeypatch.setattr(
+            ar, "_live_cli_sessions", lambda: {"sid-d": {"pid": 4242}} if live else {}
+        )
+        cwd = tmp_path / "cwd"
+        cwd.mkdir()
+        jsonl = tmp_path / "s.jsonl"
+        jsonl.write_text(jsonl_text)
+        t = time.time() - idle_age
+        os.utime(jsonl, (t, t))
+        entry = {
+            "sessionId": "sid-d",
+            "enabled": enabled,
+            "cwd": str(cwd),
+            "jsonlPath": str(jsonl),
+            "prompt": "go",
+            "idleSeconds": idle_required,
+            "maxAttempts": 5,
+            "attempts": 0,
+            "nextAttemptAt": 0,
+            "state": "watching",
+            "createdAt": int(time.time() * 1000),
+        }
+        if extra:
+            entry.update(extra)
+        ar._dump_all({"sid-d": entry})
+        return ar
+
+    def test_requires_session_id(self, tmp_path, monkeypatch):
+        import server.auto_resume as ar
+
+        monkeypatch.setattr(ar, "AUTO_RESUME_PATH", tmp_path / "ar.json")
+        r = ar.api_auto_resume_diagnose({"sessionId": [""]})
+        assert r["ok"] is False and "sessionId" in r["error"]
+
+    def test_unknown_session_errors(self, tmp_path, monkeypatch):
+        import server.auto_resume as ar
+
+        monkeypatch.setattr(ar, "AUTO_RESUME_PATH", tmp_path / "ar.json")
+        ar._dump_all({})
+        r = ar.api_auto_resume_diagnose({"sessionId": ["nope"]})
+        assert r["ok"] is False
+
+    def test_idle_and_rate_limited_would_resume(self, tmp_path, monkeypatch):
+        ar = self._seed(
+            tmp_path,
+            monkeypatch,
+            jsonl_text='{"role":"assistant","content":"5-hour limit reached, try again later"}\n',
+        )
+        r = ar.api_auto_resume_diagnose({"sessionId": ["sid-d"]})
+        assert r["ok"] is True
+        d = r["diagnosis"]
+        assert d["rateLimitDetected"] is True
+        assert d["idleSatisfied"] is True
+        assert d["live"] is True
+        assert "RESUME" in d["nextAction"] or "PARK" in d["nextAction"]
+
+    def test_not_idle_enough_reports_watching(self, tmp_path, monkeypatch):
+        ar = self._seed(
+            tmp_path,
+            monkeypatch,
+            jsonl_text='{"content":"5-hour limit reached"}\n',
+            idle_age=5,
+            idle_required=120,
+        )
+        d = ar.api_auto_resume_diagnose({"sessionId": ["sid-d"]})["diagnosis"]
+        assert d["idleSatisfied"] is False
+        assert "watching" in d["nextAction"]
+
+    def test_no_rate_limit_signal_reports_watching(self, tmp_path, monkeypatch):
+        ar = self._seed(
+            tmp_path,
+            monkeypatch,
+            jsonl_text='{"role":"assistant","content":"all good, finished the task"}\n',
+        )
+        d = ar.api_auto_resume_diagnose({"sessionId": ["sid-d"]})["diagnosis"]
+        assert d["rateLimitDetected"] is False
+        assert "no rate-limit signal" in d["nextAction"].lower()
+
+
+class TestWorkerSelfHeal:
+    def test_status_revives_dead_worker_when_enabled(self, tmp_path, monkeypatch):
+        import server.auto_resume as ar
+
+        monkeypatch.setattr(ar, "AUTO_RESUME_PATH", tmp_path / "ar.json")
+        monkeypatch.setattr(ar, "_live_cli_sessions", lambda: {})
+        monkeypatch.setattr(ar, "_WORKER_THREAD", None)  # worker dead
+        called = {"n": 0}
+        monkeypatch.setattr(
+            ar, "_ensure_worker_running", lambda: called.__setitem__("n", called["n"] + 1)
+        )
+        ar._dump_all(
+            {"s1": {"sessionId": "s1", "enabled": True, "state": "watching", "createdAt": 1}}
+        )
+        ar._AR_STATUS_CACHE["data"] = None
+        ar.api_auto_resume_status({"nocache": ["1"]})
+        assert called["n"] >= 1
+
+    def test_status_no_revive_when_none_enabled(self, tmp_path, monkeypatch):
+        import server.auto_resume as ar
+
+        monkeypatch.setattr(ar, "AUTO_RESUME_PATH", tmp_path / "ar.json")
+        monkeypatch.setattr(ar, "_live_cli_sessions", lambda: {})
+        monkeypatch.setattr(ar, "_WORKER_THREAD", None)
+        called = {"n": 0}
+        monkeypatch.setattr(
+            ar, "_ensure_worker_running", lambda: called.__setitem__("n", called["n"] + 1)
+        )
+        ar._dump_all(
+            {"s1": {"sessionId": "s1", "enabled": False, "state": "stopped", "createdAt": 1}}
+        )
+        ar._AR_STATUS_CACHE["data"] = None
+        ar.api_auto_resume_status({"nocache": ["1"]})
+        assert called["n"] == 0

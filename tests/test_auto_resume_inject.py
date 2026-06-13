@@ -380,11 +380,14 @@ class TestSystemEventsInject:
         # Script must `activate` the app and target System Events.
         assert "tell application appName to activate" in called["script"]
         assert "tell application \"System Events\"" in called["script"]
-        # Both keystrokes appear via clipboard-paste.
-        assert '"1"' in called["script"]
-        assert '"go"' in called["script"]
-        # Cmd+V keystroke present.
-        assert 'keystroke "v" using command down' in called["script"]
+        # Both keystrokes are typed DIRECTLY via System Events keystroke
+        # (v3.99.46+: the clipboard + Cmd+V path was dropped because Warp
+        # silently swallows a programmatic paste).
+        assert 'keystroke "1"' in called["script"]
+        assert 'keystroke "go"' in called["script"]
+        # The dropped Cmd+V clipboard-paste must NOT reappear.
+        assert "using command down" not in called["script"]
+        assert "set the clipboard" not in called["script"]
         # Return key code 36.
         assert "key code 36" in called["script"]
 
@@ -399,8 +402,9 @@ class TestSystemEventsInject:
         monkeypatch.setattr(m, "_run_osascript", lambda script, **kw: (called.update({"s": script}), (True, "system-events:ok"))[1])
         ok, _ = m._system_events_inject("Warp", ["1", "계속 시작."])
         assert ok is True
-        # Korean string is passed through to clipboard literal.
-        assert "계속 시작." in called["s"]
+        # Korean string is typed directly via the keystroke literal (System
+        # Events keystroke handles Unicode without the clipboard layer).
+        assert 'keystroke "계속 시작."' in called["s"]
 
 
 # ───────── _iterm2_inject AppleScript composition ─────────

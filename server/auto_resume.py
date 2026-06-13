@@ -967,6 +967,16 @@ def api_auto_resume_status(query: dict) -> dict:
             "entries": [],
             "active": [],
         }
+    # Self-heal: if any binding is enabled but the worker thread is dead
+    # (crashed import, killed, never started after a process restart that
+    # bypassed start_auto_resume), revive it. Cheap — runs on every poll but
+    # is just a liveness check + bool scan. This is the difference between a
+    # binding silently never firing and the worker picking it up next tick.
+    if any(e.get("enabled") for e in store.values()) and not (
+        _WORKER_THREAD and _WORKER_THREAD.is_alive()
+    ):
+        _ensure_worker_running()
+
     nc = (query or {}).get("nocache")
     if isinstance(nc, list):
         nc = nc[0] if nc else None
@@ -1037,6 +1047,123 @@ def api_auto_resume_get(query: dict) -> dict:
         else:
             out["snapshotPreview"] = ""
     return {"ok": True, "entry": out}
+
+
+def _diagnose_entry(entry: dict, live_map: Optional[dict] = None) -> dict:
+    """Compute the live decision signals for one binding.
+
+    Answers the single question users actually ask when auto-resume "doesn't
+    work": *why is (or isn't) it acting on this session right now?* It runs the
+    exact same gates the worker (`_process_one`) uses — liveness, idle window,
+    rate-limit signal, parsed reset time, deadline/cap — and reports what the
+    worker WOULD do on its next tick, plus a short jsonl tail so the user can
+    eyeball what the detector is matching against. Read-only; mutates nothing.
+    """
+    sid = entry.get("sessionId") or ""
+    cwd = entry.get("cwd") or ""
+    if live_map is None:
+        try:
+            live_map = _live_cli_sessions()
+        except Exception:
+            live_map = {}
+    is_live = sid in (live_map or {})
+
+    jsonl_path = entry.get("jsonlPath") or ""
+    jsonl: Optional[Path] = Path(jsonl_path) if jsonl_path else None
+    if jsonl is None or not jsonl.exists():
+        jsonl = _resolve_jsonl(sid, cwd)
+
+    now_ms = _now_ms()
+    enabled = bool(entry.get("enabled"))
+    state = entry.get("state") or STATE_WATCHING
+    next_at = int(entry.get("nextAttemptAt") or 0)
+    deadline_ms = int(entry.get("deadlineMs") or 0)
+    idle_required = int(entry.get("idleSeconds") or DEFAULT_IDLE_SECONDS)
+    max_attempts = (
+        int(entry.get("maxAttempts"))
+        if entry.get("maxAttempts") is not None
+        else DEFAULT_MAX_ATTEMPTS
+    )
+    attempts = int(entry.get("attempts") or 0)
+
+    idle = _jsonl_idle_seconds(jsonl) if jsonl else -1.0
+    tail = _read_jsonl_tail(jsonl, 4096) if jsonl else ""
+    rate_limited = _looks_rate_limited(jsonl) if jsonl else False
+    try:
+        msg_ts = jsonl.stat().st_mtime if jsonl else 0.0
+    except Exception:
+        msg_ts = 0.0
+    manual_delay = int(entry.get("resumeDelaySec") or 0)
+    if manual_delay > 0 and msg_ts:
+        reset_ms: Optional[int] = int(msg_ts * 1000) + manual_delay * 1000
+    else:
+        reset_ms = (
+            _parse_reset_time(tail, now_ts=now_ms / 1000.0, anchor_ts=msg_ts or None)
+            if tail
+            else None
+        )
+
+    # Mirror _process_one's gate order to predict the next action.
+    if not enabled:
+        next_action = "disabled — binding not enabled (re-bind to arm)"
+    elif state in (STATE_FAILED, STATE_DONE):
+        next_action = f"terminal state '{state}' — worker will not act"
+    elif deadline_ms and now_ms >= deadline_ms:
+        next_action = "would EXHAUST — deadline passed"
+    elif max_attempts > 0 and attempts >= max_attempts:
+        next_action = f"would EXHAUST — max attempts reached ({attempts}/{max_attempts})"
+    elif jsonl is None:
+        next_action = "ERROR — session jsonl not found under ~/.claude/projects"
+    elif next_at and now_ms < next_at:
+        secs = max(0, (next_at - now_ms) // 1000)
+        next_action = f"waiting — next attempt in ~{secs}s"
+    elif idle < idle_required:
+        next_action = f"watching — idle {idle:.0f}s < required {idle_required}s"
+    elif not rate_limited:
+        next_action = "watching — idle long enough, but NO rate-limit signal in jsonl tail"
+    elif reset_ms and reset_ms > now_ms and not bool(entry.get("_resetParked")):
+        secs = max(0, (reset_ms - now_ms) // 1000)
+        next_action = f"would PARK until reset — ~{secs}s away"
+    else:
+        next_action = "would RESUME on next tick"
+
+    return {
+        "sessionId": sid,
+        "workerAlive": bool(_WORKER_THREAD and _WORKER_THREAD.is_alive()),
+        "enabled": enabled,
+        "state": state,
+        "live": is_live,
+        "jsonlResolved": bool(jsonl),
+        "jsonlPath": str(jsonl) if jsonl else "",
+        "idleSeconds": round(idle, 1),
+        "idleRequired": idle_required,
+        "idleSatisfied": bool(jsonl) and idle >= idle_required,
+        "rateLimitDetected": rate_limited,
+        "parsedResetMs": int(reset_ms) if reset_ms else 0,
+        "nextAttemptAt": next_at,
+        "deadlineMs": deadline_ms,
+        "attempts": attempts,
+        "maxAttempts": max_attempts,
+        "nextAction": next_action,
+        "tailPreview": tail[-700:],
+    }
+
+
+def api_auto_resume_diagnose(query: dict) -> dict:
+    """GET /api/auto_resume/diagnose?sessionId=… — live detection signals.
+
+    Surfaces WHY a binding is or isn't resuming so a stuck "nothing happens"
+    state is debuggable instead of silent. Pure read; runs the same gates as
+    the worker without mutating state or spawning anything.
+    """
+    sid = (query.get("sessionId", [""])[0] or "").strip()
+    if not sid:
+        return {"ok": False, "error": "sessionId required"}
+    store = _load_all()
+    entry = store.get(sid)
+    if not entry:
+        return {"ok": False, "error": "no auto-resume binding for this session"}
+    return {"ok": True, "diagnosis": _diagnose_entry(entry)}
 
 
 def api_auto_resume_advise(body: dict) -> dict:
