@@ -5,7 +5,9 @@ stdlib 만 의존. 다른 server.* 모듈의 말단 유틸.
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -26,14 +28,28 @@ def _safe_read(p: Path, limit: Optional[int] = None) -> str:
 
 
 def _safe_write(p: Path, text: str) -> bool:
-    """원자적 쓰기 — tmp 파일에 쓰고 rename. 부모 디렉토리 자동 생성."""
+    """원자적 쓰기 — 고유 tmp 파일에 쓰고 rename. 부모 디렉토리 자동 생성.
+
+    고유 tmp 명(``mkstemp``)을 쓰는 이유: 고정 ``<p>.tmp`` 경로는 같은 파일을
+    동시에 쓰는 두 스레드가 서로의 tmp 를 truncate/interleave 해 torn write 를
+    낼 수 있다. 스레드별 고유 tmp + ``os.replace`` 로 각 writer 의 내용은 항상
+    완전한 파일로 남는다 (어느 writer 가 이기는지는 호출부 락이 결정)."""
+    tmp_name = None
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(p.suffix + ".tmp")
-        tmp.write_text(text, encoding="utf-8")
-        tmp.replace(p)
+        fd, tmp_name = tempfile.mkstemp(dir=str(p.parent), prefix=p.name + ".", suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_name, str(p))
         return True
     except Exception as e:
+        if tmp_name:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
         log.error("write failed for %s: %s", p, e)
         return False
 
