@@ -163,6 +163,12 @@ TAB_CATALOG: list[tuple[str, str, str, list[str]]] = [
         "카탈로그. 저장소·설치 명령을 보고 Terminal 에서 바로 설치·실행.",
         ["하네스", "harness", "caveman", "ccusage", "토큰 절감", "token saver",
          "claude tools", "도구 카탈로그", "codeburn", "awesome claude code"]),
+    ("pluginHub",     "work",
+        "플러그인 허브 — GitHub에서 Claude Code 플러그인·마켓플레이스를 "
+        "별점순으로 실시간 검색하고, marketplace.json 을 검사한 뒤 "
+        "`claude plugin install` 로 1클릭 설치. 훅·MCP 등 코드 실행 위험 표시.",
+        ["플러그인", "plugin", "marketplace", "마켓플레이스", "플러그인 허브",
+         "plugin hub", "github plugin", "claude plugin", "설치", "install"]),
     ("caveman",       "work",
         "Caveman 전용 탭 — 출력 토큰 ~75% 절감 스킬 스위트(caveman·cavecrew·"
         "caveman-commit/compress/help/review/stats) 설치 상태·재설치·압축 "
